@@ -489,8 +489,8 @@ def process_session(session_id):
             # Saving LFP for all channels used
             np.savez(os.path.join(session_subfolder, f"probe_{probe_id}_channel_{this_chan_id}_lfp_ca1_peakripplepower.npz"), lfp_ca1 = peakripchan_lfp_ca1)
             np.savez(os.path.join(session_subfolder, f"probe_{probe_id}_channel_{this_chan_id}_lfp_time_index_1500hz.npz"), lfp_time_index = lfp_time_index)
-            for i in range(2):
-                channel_outside_hp = "channelsrawInd_"+ str(take_two[i])
+            for i in [0,1]:
+                channel_outside_hp = str(take_two[i])
                 np.savez(os.path.join(session_subfolder, f"probe_{probe_id}_channel_{channel_outside_hp}_lfp_control_channel.npz"), lfp_control_channel = control_channels[i])
             
             # clean memory...
@@ -553,6 +553,7 @@ def process_session(session_id):
                 
             # movement control
             for i in [0,1]:
+                channel_outside_hp = take_two[i]
                 movement_control_channel = control_channels[i]
                 movement_control_channel = filter_ripple_band(movement_control_channel[:,None])
 
