@@ -24,14 +24,5 @@ Core funcitons used in many files here.
 ### ExtractingSWRs
 Code which loops through ABI and IBL sessions to generate the SWR dataset.  Because the IBL and ABI api's have conflicting requirements it is necessary to write scripts for each.  Multiprocessing is implemented.  Soon these will be put into a snakemake pipeline to provide an example of how to build reproducible workflows.
 
-## Usage
-For students to get a leg up on analysing the LFP data from neuropixels rpobed
-
-## Contributing
-Guidelines for how to contribute to the project.
-
-## License
-Information about the project's license.
-
 ![](Images/neurons.png)
 ![](Images/nplfptrace.png)
