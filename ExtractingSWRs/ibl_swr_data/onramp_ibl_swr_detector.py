@@ -32,7 +32,7 @@ import time # for debugging
 import traceback
 import logging
 
-from multiprocessing import Pool
+from multiprocessing import Pool, Process, Queue
 
 from one.api import ONE
 ONE.setup(base_url='https://openalyx.internationalbrainlab.org', silent=True)
@@ -306,7 +306,28 @@ def gamma_band_1500hzsig_filter(interpolated_1500hz_signal,
     
     return bandpassed_signal
 
-
+def listener_process(queue):
+    """ 
+    This function is run by the listener process. It listens for messages on the queue
+    and writes them to the log file.
+    
+    Parameters
+    ----------
+    queue : multiprocessing.Queue
+        The queue to listen on.
+        
+    Returns
+    -------
+    None
+    
+    """
+    # Configure the logger
+    logging.basicConfig(filename='abi_detector_app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
+    while True:
+        message = queue.get()
+        if message == 'kill':
+            break
+        logging.error(message)
 
 
 # load in the brain atlas and the brain region object for working with the ccf and ABI region id's in channels objects
@@ -563,13 +584,21 @@ def process_session(session_id):
                 csv_path = os.path.join(session_subfolder, csv_filename)
                 movement_controls.to_csv(csv_path, index=True)
                 print("Done Probe id " + str(probe_id))
-    except Exception as e:
+    except (IndexError, NameError) as e:
         # if there is an error we want to know about it, but we dont want it to stop the loop
         # so we will print the error to a file and continue
-        logging.error('Error in session: %s', session_id)
+        logging.error('Error in session: %s', 'probe id: %s', session_id, probe_id)
         logging.error(traceback.format_exc())
-  
+
+
+# create a queue to share data between processes for logging errors
+queue = Queue()
+listener = Process(target=listener_process, args=(queue,))
+listener.start()
+
 # run the processes with the specified number of cores
 with Pool(pool_size) as p:
     p.map(process_session, session_list)
 
+queue.put('kill')
+listener.join()

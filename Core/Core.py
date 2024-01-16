@@ -1,9 +1,38 @@
 # Core.py 
 # The core functions used across this repository
 # Functions
+# libraries
+import os
+import re
+import subprocess 
+import numpy as np
+import pandas as pd
+from scipy import io, signal
+#from fitter import Fitter, get_common_distributions, get_distributions
 import scipy.ndimage
-import timeit #for testing and tracking run times
-import scipy.stats 
+from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter1d
+import matplotlib.pyplot as plt
+# for ripple detection
+import ripple_detection
+from ripple_detection.core import filter_ripple_band
+from ripple_detection.simulate import simulate_time
+from scipy import signal
+import seaborn as sns
+#import KernelRegDraft as kreg # custom module, not needed
+#import 'Stienmetz2019Reanalyzed/KernelRegDraft.py' as kreg
+import piso #can be difficult to install, https://piso.readthedocs.io/en/latest/
+from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter1d
+from scipy import stats
+from tqdm import tqdm
+import piso
+from ripple_detection.simulate import simulate_time
+from allensdk.brain_observatory.ecephys.ecephys_project_cache import EcephysProjectCache
+import xarray as xr
+from scipy import interpolate
+from scipy.signal import firwin, lfilter
+
 
 
 def check_overlap(df1, df2):

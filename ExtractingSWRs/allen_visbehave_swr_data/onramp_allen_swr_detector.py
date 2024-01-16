@@ -32,7 +32,7 @@ from tqdm import tqdm
 from allensdk.brain_observatory.ecephys.ecephys_project_cache import EcephysProjectCache
 from scipy import interpolate
 from scipy.signal import firwin, lfilter
-from multiprocessing import Pool
+from multiprocessing import Pool, Queue, Process
 import time
 import traceback
 import logging
@@ -310,6 +310,30 @@ def gamma_band_1500hzsig_filter(interpolated_1500hz_signal,
     bandpassed_signal = lfilter(bandpass_taps, 1.0, low_passed_signal)
     
     return bandpassed_signal
+
+
+def listener_process(queue):
+    """ 
+    This function is run by the listener process. It listens for messages on the queue
+    and writes them to the log file.
+    
+    Parameters
+    ----------
+    queue : multiprocessing.Queue
+        The queue to listen on.
+        
+    Returns
+    -------
+    None
+    
+    """
+    # Configure the logger
+    logging.basicConfig(filename='ibl_detector_app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
+    while True:
+        message = queue.get()
+        if message == 'kill':
+            break
+        logging.error(message)
 
 # Setting up the ABI Cache
 manifest_path = os.path.join(sdk_cache_dir, "manifest.json")
@@ -624,19 +648,28 @@ def process_session(session_id):
         hours_sesh, rem_sesh = divmod(elapsed_time_sesh, 3600)
         minutes_sesh, seconds_sesh = divmod(rem_sesh, 60)
         print(f"Elapsed time for session: {int(hours_sesh)}:{int(minutes_sesh)}:{seconds_sesh:.2f}")
-    except Exception as e:
+    
+    except (IndexError, NameError) as e:
         # if there is an error we want to know about it, but we dont want it to stop the loop
         # so we will print the error to a file and continue
-        logging.error('Error in session: %s', session_id)
+        logging.error('Error in session: %s', 'probe id: %s', session_id, probe_id)
         logging.error(traceback.format_exc())
   
 # already filterd for only brain observatory sessions
 session_list = sessions.index.values
 
+# create a queue for the listener to write to
+queue = Queue()
+listener = Process(target=listener_process, args=(queue,))
+listener.start()
+
 # run the processes with the specified number of cores
 with Pool(pool_size) as p:
     p.map(process_session, session_list)
-    
+
+queue.put('kill')
+listener.join()
+
 print("Done! Results in " + swr_output_dir_path)
 
 end_time_outer = time.time()  # end timing
