@@ -33,5 +33,5 @@ Guidelines for how to contribute to the project.
 ## License
 Information about the project's license.
 
-![Image description]('/home/acampbell/NeuropixelsLFPOnRamp/Images/neurons.png')
-![Image description]('/home/acampbell/NeuropixelsLFPOnRamp/Images/nplfptrace.png')
+![](Images/neurons.png)
+![](Images/nplfptrace.png)
