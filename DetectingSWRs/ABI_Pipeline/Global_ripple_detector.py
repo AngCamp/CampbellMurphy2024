@@ -22,10 +22,8 @@ from scipy.ndimage import gaussian_filter1d
 from scipy import stats
 from tqdm import tqdm
 
-
-
-input_dir = '/space/scratch/allen_visbehave_swr_data/testing_dir/filtered_swrs'
-#output_dir = os.path.curdir
+input_dir = '/space/scratch/allen_visbehave_swr_data/testing_dir_filtered'
+# output_dir = os.path.curdir
 global_rip_label = 'no_movement_no_gamma'
 
 # Functions

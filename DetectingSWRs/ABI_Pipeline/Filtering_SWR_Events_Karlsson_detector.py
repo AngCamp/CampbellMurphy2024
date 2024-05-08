@@ -4,11 +4,13 @@
 
 # change this as needed:
 sdk_cache_dir='/space/scratch/allen_visbehave_data'# path to where the cache for the allensdk is (wehre the lfp is going)
-input_dir = '/space/scratch/allen_visbehave_swr_data/allen_visbehave_swr_5sdthresh'
-output_dir = '/space/scratch/allen_visbehave_swr_data/allen_visbehave_swr_5sdthresh'
-swr_output_dir = 'filtered_swrs_buszaki' # directory specifying the 
+input_dir = '/space/scratch/allen_visbehave_swr_data/testing_dir'
+output_dir = '/space/scratch/allen_visbehave_swr_data/'
+swr_output_dir = 'testing_dir_filtered' # directory specifying the 
 
-# thresholding parameters
+
+# thresholding aprameters
+
 
 select_these_sessions = []
 # test set list
@@ -34,7 +36,6 @@ from scipy import signal
 # %%
 #import KernelRegDraft as kreg # custom module, not needed
 #import 'Stienmetz2019Reanalyzed/KernelRegDraft.py' as kreg
-import piso #can be difficult to install, https://piso.readthedocs.io/en/latest/
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage import gaussian_filter1d
 from scipy import stats
@@ -128,10 +129,9 @@ def check_overlap(df1, df2):
 if len(select_these_sessions)==0:
     select_these_sessions = get_session_id_numbers_from_swr_event_directories(input_dir)
 
-
-
-# creating the path to our output directory for the filtered swrs
+# creating the path to our output directory for the filtered swrs, and a directory if it doesn't exist
 swr_output_dir_path = os.path.join(output_dir, swr_output_dir)
+os.makedirs(swr_output_dir_path, exist_ok=True)
 
 # we start by calling and filtering our dataframe of the sessions we will be working with
 
@@ -162,17 +162,29 @@ for seshnum in tqdm(range(0, len(select_these_sessions)), desc="Processing", uni
         # check if the events overlap with each other
         # check if they overlap with gamma events
     
+        
+        # check if they overlap with gamma events
+        gamma_event_file = get_files_with_substrings(session_path, substring1='probe_' + str(probe_id), substring2='gamma_band_events')
+        gamma_events = pd.read_csv(os.path.join(session_path, gamma_event_file[0]), index_col=0)
+        putative_ripples_df['Overlaps_with_gamma'] = check_overlap(putative_ripples_df, gamma_events)
+        print('Gamma events')
+
         # now check if the overlapping non hippocampal HFEs also overlap with the hippocampal HFEs
         # if they do we mark them in the dataframe
         # check if the HFE events in the non hippocampal channels overlap
         movement_channels_files = get_files_with_substrings(session_path, substring1='probe_' + str(probe_id), substring2='movement_artifacts')
         movement_channel_1 = pd.read_csv(os.path.join(session_path, movement_channels_files[0]))
+        movement_channel_2 = pd.read_csv(os.path.join(session_path, movement_channels_files[1]))
+        overlapping_artifacts = []
+        if movement_channel_1.shape[0] > movement_channel_2.shape[0]:
+            overlapping_artifacts = movement_channel_1[check_overlap(movement_channel_1, movement_channel_2)]
+        elif movement_channel_1.shape[0] < movement_channel_2.shape[0]:
+            overlapping_artifacts = movement_channel_2[check_overlap(movement_channel_2, movement_channel_1)]
         print('Check for overlapping movement artifacts')
-        putative_ripples_df['Overlaps_with_movement'] = check_overlap(putative_ripples_df, movement_channel_1)
+        putative_ripples_df['Overlaps_with_movement'] = check_overlap(putative_ripples_df, overlapping_artifacts)
         
         print('Filtering the putative ripples...')
-        #filtered_df = putative_ripples_df[(putative_ripples_df['Overlaps_with_gamma'] == False) & (putative_ripples_df['Overlaps_with_movement'] == False)]
-        filtered_df = putative_ripples_df[putative_ripples_df['Overlaps_with_movement'] == False]
+        filtered_df = putative_ripples_df[(putative_ripples_df['Overlaps_with_gamma'] == False) & (putative_ripples_df['Overlaps_with_movement'] == False)]
         # this line filtered by max lfp ampiplitude which is pointless, should be removed
         #filtered_df = filtered_df[filtered_df.Peak_Amplitude_lfpzscore > lfp_amplidude_threshold]
         print('Writing filtered events to file')
@@ -180,7 +192,7 @@ for seshnum in tqdm(range(0, len(select_these_sessions)), desc="Processing", uni
         csv_path = os.path.join(session_subfolder, csv_filename)
         filtered_df.to_csv(csv_path, index=True)
         new_row = {'session_id': session_id, 'probe_id': probe_id, 'ripple_number': filtered_df.shape[0]}
-        eventspersession_df = eventspersession_df.append(new_row, ignore_index=True)
+        eventspersession_df = pd.concat([eventspersession_df, pd.DataFrame([new_row])], ignore_index=True) 
         print('Done probe ' + str(probe_id))
         
     # make list of global ripples
@@ -188,6 +200,7 @@ for seshnum in tqdm(range(0, len(select_these_sessions)), desc="Processing", uni
     
     
     print('Done session ' + str(session_id))
+
 """
 # compute QC thresholds
 eventspersession_df['ripple_number_logep1'] = np.log10(eventspersession_df['ripple_number']+1)
