@@ -4,7 +4,7 @@
 A Repo showcasing how to process and analyze Neuropixels LFP from the two largest publicly available datasets the ABI Visual Behaviour and the IBL dataset
 
 ### CCF_reannotation
-Guide on how to reannotate CCF cooridnates to a more detailed brain atlas or brain atals other than the Allen Institutes Atlas.
+Guide on how to reannotate CCF cooridnates to a more detailed brain atlas or brain atlas other than the Allen Institutes Atlas.
 
 ### Example Notebooks (Tutorials)
 This directory contains jupyter example notebooks that demonstrate how each steps of the SWR extraction works and how to compare LFP to behavioural variables for running analyses.  Explains hwo to create and test your own filters, how to compute power, dimensionality reduction on LFP, and basic inferential statistical analyses that can be done using these methods.  Versions for the IBL and ABI are provided, or at least code for how to extract the same information.
