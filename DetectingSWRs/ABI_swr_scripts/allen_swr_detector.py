@@ -36,31 +36,19 @@ import time
 import traceback
 import logging
 import logging.handlers
-import argparse
+
 
 # start timing
 start_time_outer = time.time()  # start timing
+
 """
-# Create the parser
-parser = argparse.ArgumentParser(description='Process parameters.')
-
-# Add the arguments
-parser.add_argument('--pool_size', type=int, help='The pool size')
-parser.add_argument('--sdk_cache_dir', type=str, help='The SDK cache directory')
-parser.add_argument('--output_dir', type=str, help='The output directory')
-parser.add_argument('--swr_output_dir', type=str, help='The SWR output directory')
-parser.add_argument('--run_name', type=str, help='The run name')
-parser.add_argument('--select_these_sessions', nargs='*', help='The selected sessions')
-parser.add_argument('--only_brain_observatory_sessions', type=bool, help='Only use brain observatory sessions')
-parser.add_argument('--dont_wipe_these_sessions', nargs='*', help='Don\'t wipe these sessions')
-parser.add_argument('--gamma_event_thresh', type=int, help='The gamma event threshold')
-parser.add_argument('--gamma_filters_path', type=str, help='The gamma filters path')
-parser.add_argument('--theta_filter_path', type=str, help='The theta filter path')
-parser.add_argument('--ripple_band_threshold', type=int, help='The ripple band threshold')
-parser.add_argument('--movement_artifact_ripple_band_threshold', type=int, help='The movement artifact ripple band threshold')
-
-# Parse the arguments
-args = parser.parse_args()
+    This code calls the Neuropixels LFP data from the visual behaviour
+    datasets and loops through it storing channels used as well as
+    the.
+    
+    The methods are based on a combination of methods taken from De Filliopo et al., (2022), Nitzan et al., (2020) which were both used on the ABA and IBL datasets for 
+    detecting ripples while the mouse was still.  Methods for improving detectors so that putative ripples occuring during movement could be detected are based on 
+    criteria from Frank and Chen (2008) as well as
 """
 
 # change these as needed:
@@ -89,8 +77,6 @@ theta_filter_path = '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_d
 
 ripple_band_threshold = 2 # note this defines the threshold for envelopes, from these events identify ones with peaks that pass a peak-power threshold as well
 movement_artifact_ripple_band_threshold = 2
-
-
 
 # functions
 

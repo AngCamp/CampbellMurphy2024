@@ -22,14 +22,12 @@ from scipy.ndimage import gaussian_filter1d
 from scipy import stats
 from tqdm import tqdm
 
-"""
 input_dir = '/space/scratch/allen_visbehave_swr_data/testing_dir_filtered'
 # output_dir = os.path.curdir
 global_rip_label = 'no_movement_no_gamma'
-minimum_ripple_num = 100 # minimum number of ripples a probe needs to be included in the analysis
-"""
 
 # Functions
+
 def check_overlap(df1, df2, offset=0):
     # returns true or false if there is overlap between the two dataframes with start_time and end_time columns
     result = []
@@ -197,24 +195,16 @@ for session_id in session_list:
     
     probe_event_dict = {}
     probe_list = eventspersession_df.probe_id[eventspersession_df.session_id==session_id].unique()
-    new_probe_list =[]
     for probe_id in probe_list:
 
         eventfilename = find_probe_filename(sesh_path, criteria1= 'probe_{}'.format(probe_id), criteria2= 'filtered_swrs')
         probe_file_path = os.path.join(sesh_path,eventfilename)
-        rips_on_probe = pd.read_csv(probe_file_path, index_col=0)
-        if rips_on_probe.shape[0] > minimum_ripple_num:
-            probe_event_dict[probe_id] = rips_on_probe
-            new_probe_list.append(probe_id)  # add probe_id to new list
-        else:
-            continue
+        probe_event_dict[probe_id] = pd.read_csv(probe_file_path, index_col=0)
         # filter out events with movement artifacts, or gamma band events
         filtered_events = probe_event_dict[probe_id]
 
         filtered_events = filtered_events[(filtered_events.Overlaps_with_gamma==False)&(filtered_events.Overlaps_with_movement==False)]
         probe_event_dict[probe_id] = filtered_events
-    
-    probe_list = new_probe_list # remove the probes that are not worth analyzing
 
 
 

@@ -1,3 +1,22 @@
+# this code filters the events provided based on certain criteria
+# draft code is in /home/acampbell/AllenLFP/AllenLFP_test.ipynb
+
+
+# change this as needed:
+sdk_cache_dir='/space/scratch/allen_visbehave_data'# path to where the cache for the allensdk is (wehre the lfp is going)
+input_dir = '/space/scratch/allen_visbehave_swr_data/testing_dir'
+output_dir = '/space/scratch/allen_visbehave_swr_data/'
+swr_output_dir = 'testing_dir_filtered' # directory specifying the 
+
+
+# thresholding aprameters
+
+
+select_these_sessions = []
+# test set list
+#select_these_sessions = [715093703, 719161530, 721123822, 743475441, 744228101, 746083955, 750332458, 750749662, 751348571, 754312389, 754829445, 755434585, 756029989, 757216464, 757970808, 758798717, 759883607, 760345702, 761418226, 762602078, 763673393]
+#select_these_sessions = [715093703]
+
 # libraries
 import os
 import re
@@ -22,32 +41,6 @@ from scipy.ndimage import gaussian_filter1d
 from scipy import stats
 from tqdm import tqdm
 from allensdk.brain_observatory.ecephys.ecephys_project_cache import EcephysProjectCache
-import argparse
-
-# change this as needed:
-sdk_cache_dir='/space/scratch/allen_visbehave_data'# path to where the cache for the allensdk is (wehre the lfp is going)
-input_dir = '/space/scratch/allen_visbehave_swr_data/testing_dir'
-output_dir = '/space/scratch/allen_visbehave_swr_data/'
-swr_output_dir = 'testing_dir_filtered' # directory specifying the 
-
-
-
-
-"""
-# change this as needed:
-# Create the parser
-parser = argparse.ArgumentParser(description='Process parameters.')
-
-# Add the arguments
-parser.add_argument('--sdk_cache_dir_filter', type=str, help='The SDK cache directory for filtering')
-parser.add_argument('--input_dir', type=str, help='The input directory')
-parser.add_argument('--output_dir_filter', type=str, help='The output directory for filtering')
-parser.add_argument('--swr_output_dir', type=str, help='The SWR output directory')
-
-# Parse the arguments
-args = parser.parse_args()
-"""
-
 
 # Functions
 
