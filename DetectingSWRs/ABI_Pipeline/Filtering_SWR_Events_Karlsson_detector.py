@@ -22,36 +22,17 @@ from scipy.ndimage import gaussian_filter1d
 from scipy import stats
 from tqdm import tqdm
 from allensdk.brain_observatory.ecephys.ecephys_project_cache import EcephysProjectCache
-import argparse
+import yaml
 
-"""
-# change this as needed:
-sdk_cache_dir='/space/scratch/allen_visbehave_data'# path to where the cache for the allensdk is (wehre the lfp is going)
-input_dir_filter = '/space/scratch/allen_visbehave_swr_data/testing_dir'
-output_dir_filter= '/space/scratch/allen_visbehave_swr_data/'
-swr_output_dir_filter= 'testing_dir' # directory specifying the 
-select_these_sessions = [] # if you want to select specific sessions, put the session numbers in this list, otherwise it will select all sessions
-"""
+# Load the configuration from a YAML file
+with open('abi_swr_config.yaml', 'r') as f:
+    config = yaml.safe_load(f)
 
-# change this as needed:
-# Create the parser
-parser = argparse.ArgumentParser(description='Process parameters.')
-
-# Add the arguments
-parser.add_argument('--sdk_cache_dir_filter', type=str, help='The SDK cache directory for filtering')
-parser.add_argument('--input_dir_filter', type=str, help='The input directory')
-parser.add_argument('--output_dir_filter', type=str, help='The output directory for filtering')
-parser.add_argument('--swr_output_dir', type=str, help='The SWR output directory')
-
-# Parse the arguments
-args = parser.parse_args()
-
-# arguments for script
-sdk_cache_dir_filter = args.sdk_cache_dir_filter
-input_dir_filter = args.input_dir_filter
-output_dir_filter = args.output_dir_filter
-swr_output_dir_filter= args.swr_output_dir_filter
-
+# Get the values from the configuration
+sdk_cache_dir_filter = config['sdk_cache_dir_filter']
+input_dir_filter = config['input_dir_filter']
+output_dir_filter = config['output_dir_filter']
+swr_output_dir_filter = config['swr_output_dir_filter']
 
 
 # Functions

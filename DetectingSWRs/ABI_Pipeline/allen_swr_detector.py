@@ -18,75 +18,33 @@ import time
 import traceback
 import logging
 import logging.handlers
-import argparse
+import yaml
 
 # start timing
 start_time_outer = time.time()  # start timing
 
-# Create the parser
-parser = argparse.ArgumentParser(description='Process parameters.')
 
-# Add the arguments
-parser.add_argument('--pool_size', type=int, help='The pool size')
-parser.add_argument('--sdk_cache_dir', type=str, help='The SDK cache directory')
-parser.add_argument('--output_dir', type=str, help='The output directory')
-parser.add_argument('--swr_output_dir', type=str, help='The SWR output directory')
-parser.add_argument('--run_name', type=str, help='The run name')
-parser.add_argument('--select_these_sessions', nargs='*', help='The selected sessions')
-parser.add_argument('--only_brain_observatory_sessions', type=bool, help='Only use brain observatory sessions')
-parser.add_argument('--dont_wipe_these_sessions', nargs='*', help='Don\'t wipe these sessions')
-parser.add_argument('--gamma_event_thresh', type=int, help='The gamma event threshold')
-parser.add_argument('--gamma_filter_path', type=str, help='The gamma filters path')
-parser.add_argument('--theta_filter_path', type=str, help='The theta filter path')
-parser.add_argument('--ripple_band_threshold', type=int, help='The ripple band threshold')
-parser.add_argument('--movement_artifact_ripple_band_threshold', type=int, help='The movement artifact ripple band threshold')
-parser.add_argument('--save_lfp', type=bool, help='TO save the lpf or not')
+# Load the configuration from a YAML file
+with open('abi_swr_config.yaml', 'r') as f:
+    config = yaml.safe_load(f)
 
-# Parse the arguments
-args = parser.parse_args()
+# Get the values from the configuration
+pool_size = config['pool_size']
+sdk_cache_dir = config['sdk_cache_dir']
+output_dir = config['output_dir']
+swr_output_dir = config['swr_output_dir']
+run_name = config['run_name']
+select_these_sessions = config['select_these_sessions']
+only_brain_observatory_sessions = config['only_brain_observatory_sessions']
+dont_wipe_these_sessions = config['dont_wipe_these_sessions']
+gamma_event_thresh = config['gamma_event_thresh']
+gamma_filter_path = config['gamma_filter_path']
+theta_filter_path = config['theta_filter_path']
+ripple_band_threshold = config['ripple_band_threshold']
+movement_artifact_ripple_band_threshold = config['movement_artifact_ripple_band_threshold']
+save_lfp = config['save_lfp']
 
-print(args.gamma_filter_path)
-# arguments for script
-pool_size = args.pool_size
-sdk_cache_dir = args.sdk_cache_dir
-output_dir = args.output_dir
-swr_output_dir = args.swr_output_dir
-run_name = args.run_name
-select_these_sessions = args.select_these_sessions
-only_brain_observatory_sessions = args.only_brain_observatory_sessions
-dont_wipe_these_sessions = args.dont_wipe_these_sessions
-gamma_event_thresh = args.gamma_event_thresh
-gamma_filter_path = args.gamma_filter_path
-print(gamma_filter_path)
-theta_filter_path = args.theta_filter_path
-ripple_band_threshold = args.ripple_band_threshold
-movement_artifact_ripple_band_threshold = args.movement_artifact_ripple_band_threshold
-save_lfp = args.save_lfp
 
-"""
-# change these as needed:
-pool_size = 6 # 10 was too high, program crashed 
-sdk_cache_dir='/space/scratch/allen_visbehave_data'# path to where the cache for the allensdk is (wehre the lfp is going)
-output_dir = '/space/scratch/allen_visbehave_swr_data'
-swr_output_dir = 'testing_dir' # directory specifying the output
-run_name = 'test_run' # part of the nameing for the output files
-save_lfp = True # save the lfp for each channel used in the detection
-
-# example input
-select_these_sessions = []
-only_brain_observatory_sessions = True # if true only sessions from the brain observatory will be used
-dont_wipe_these_sessions = []
-
-# THRESHOLDS
-gamma_event_thresh = 3 # zscore threshold for gamma events
-
-# gamma filters are same as default for now
-gamma_filters_path = '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/frank2008_gamma_1500hz_bandpass_filter.npz'
-theta_filter_path = '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/theta_1500hz_bandpass_filter.npz'
-
-ripple_band_threshold = 2 # note this defines the threshold for envelopes, from these events identify ones with peaks that pass a peak-power threshold as well
-movement_artifact_ripple_band_threshold = 2
-"""
 # Functions
 
 def call_bash_function(bash_command = ""):
@@ -457,7 +415,7 @@ def process_session(session_id):
         ca1_chans_arr = np.array([], dtype=int)
 
         # get lfp for each probe
-        for probe_id in probes_of_interest[0:2]:    
+        for probe_id in probes_of_interest:    
             
             #timing the probe...
             start_time_probe = time.time() 
@@ -663,7 +621,7 @@ pool_size = 6
     
 # already filterd for only brain observatory sessions
 session_list = sessions.index.values
-session_list = session_list[0:4] # for testing
+session_list = session_list[0:8] # for testing
 
 # run the processes with the specified number of cores:
 with Pool(pool_size, initializer=init_pool, initargs=(queue,)) as p:

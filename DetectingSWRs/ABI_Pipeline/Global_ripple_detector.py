@@ -21,41 +21,16 @@ from scipy.ndimage import gaussian_filter
 from scipy.ndimage import gaussian_filter1d
 from scipy import stats
 from tqdm import tqdm
+import yaml
 
+# Load the configuration from a YAML file
+with open('abi_swr_config.yaml', 'r') as f:
+    config = yaml.safe_load(f)
 
-
-
-import argparse
-
-# Create the parser
-parser = argparse.ArgumentParser(description='Process some integers.')
-
-# Add the arguments
-parser.add_argument('--input_dir_global',
-                    type=str,
-                    help='The input directory')
-
-parser.add_argument('--global_rip_label',
-                    type=str,
-                    help='The global ripple label')
-
-parser.add_argument('--minimum_ripple_num',
-                    type=int,
-                    help='The minimum number of ripples')
-
-# Parse the arguments
-args = parser.parse_args()
-
-# arguments for script
-input_dir_global= args.input_dir_global
-global_rip_label = args.global_rip_label
-minimum_ripple_num = args.minimum_ripple_num
-
-"""
-input_dir_global = '/space/scratch/allen_visbehave_swr_data/testing_dir'
-global_rip_label = 'no_movement_no_gamma'
-minimum_ripple_num = 100 # minimum number of ripples a probe needs to be included in the analysis
-"""
+# Get the values from the configuration
+input_dir_global = config['input_dir_global']
+global_rip_label = config['global_rip_label']
+minimum_ripple_num = config['minimum_ripple_num']
 
 # Functions
 def check_overlap(df1, df2, offset=0):
