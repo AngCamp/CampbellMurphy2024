@@ -40,6 +40,7 @@ parser.add_argument('--gamma_filter_path', type=str, help='The gamma filters pat
 parser.add_argument('--theta_filter_path', type=str, help='The theta filter path')
 parser.add_argument('--ripple_band_threshold', type=int, help='The ripple band threshold')
 parser.add_argument('--movement_artifact_ripple_band_threshold', type=int, help='The movement artifact ripple band threshold')
+parser.add_argument('--save_lfp', type=bool, help='TO save the lpf or not')
 
 # Parse the arguments
 args = parser.parse_args()
@@ -60,6 +61,7 @@ print(gamma_filter_path)
 theta_filter_path = args.theta_filter_path
 ripple_band_threshold = args.ripple_band_threshold
 movement_artifact_ripple_band_threshold = args.movement_artifact_ripple_band_threshold
+save_lfp = args.save_lfp
 
 """
 # change these as needed:
@@ -483,7 +485,7 @@ def process_session(session_id):
                     raise ValueError(f"During session {session_id} processing : Nan in lfp of Probe {probe_id}, probe skipped.")  # Raise error
             except ValueError as e:
                 logging.error(e)  # Log the error message, skip to next probe
-                del lfp  # Delete and lfp from memory to save RAM
+                del lfp  # Delete lfp from memory to save RAM
                 continue
             
             # get the timestamps for this lfp recording

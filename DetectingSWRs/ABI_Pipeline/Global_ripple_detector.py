@@ -31,13 +31,9 @@ import argparse
 parser = argparse.ArgumentParser(description='Process some integers.')
 
 # Add the arguments
-parser.add_argument('--input_dir',
+parser.add_argument('--input_dir_global',
                     type=str,
                     help='The input directory')
-
-parser.add_argument('--output_dir',
-                    type=str,
-                    help='The output directory')
 
 parser.add_argument('--global_rip_label',
                     type=str,
@@ -51,14 +47,12 @@ parser.add_argument('--minimum_ripple_num',
 args = parser.parse_args()
 
 # arguments for script
-input_dir = args.input_dir
-output_dir = args.output_dir
+input_dir_global= args.input_dir_global
 global_rip_label = args.global_rip_label
 minimum_ripple_num = args.minimum_ripple_num
 
 """
-input_dir = '/space/scratch/allen_visbehave_swr_data/testing_dir'
-output_dir = '/space/scratch/allen_visbehave_swr_data/testing_dir'
+input_dir_global = '/space/scratch/allen_visbehave_swr_data/testing_dir'
 global_rip_label = 'no_movement_no_gamma'
 minimum_ripple_num = 100 # minimum number of ripples a probe needs to be included in the analysis
 """
@@ -216,7 +210,7 @@ def find_probe_filename(unfiltered_swr_path, criteria1, criteria2):
 
 
 
-eventspersession_df = pd.read_csv(os.path.join(input_dir,'eventspersession_df.csv'), index_col=0)
+eventspersession_df = pd.read_csv(os.path.join(input_dir_global,'eventspersession_df.csv'), index_col=0)
 # Convert 'probe_id' and 'session_id' to a category type
 
 # computing global ripples

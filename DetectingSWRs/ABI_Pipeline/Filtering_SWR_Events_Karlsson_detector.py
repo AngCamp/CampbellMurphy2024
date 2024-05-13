@@ -23,14 +23,15 @@ from scipy import stats
 from tqdm import tqdm
 from allensdk.brain_observatory.ecephys.ecephys_project_cache import EcephysProjectCache
 import argparse
+
 """
 # change this as needed:
 sdk_cache_dir='/space/scratch/allen_visbehave_data'# path to where the cache for the allensdk is (wehre the lfp is going)
-input_dir = '/space/scratch/allen_visbehave_swr_data/testing_dir'
-output_dir = '/space/scratch/allen_visbehave_swr_data/'
-swr_output_dir = 'testing_dir' # directory specifying the 
+input_dir_filter = '/space/scratch/allen_visbehave_swr_data/testing_dir'
+output_dir_filter= '/space/scratch/allen_visbehave_swr_data/'
+swr_output_dir_filter= 'testing_dir' # directory specifying the 
 select_these_sessions = [] # if you want to select specific sessions, put the session numbers in this list, otherwise it will select all sessions
-
+"""
 
 # change this as needed:
 # Create the parser
@@ -38,18 +39,18 @@ parser = argparse.ArgumentParser(description='Process parameters.')
 
 # Add the arguments
 parser.add_argument('--sdk_cache_dir_filter', type=str, help='The SDK cache directory for filtering')
-parser.add_argument('--input_dir', type=str, help='The input directory')
+parser.add_argument('--input_dir_filter', type=str, help='The input directory')
 parser.add_argument('--output_dir_filter', type=str, help='The output directory for filtering')
 parser.add_argument('--swr_output_dir', type=str, help='The SWR output directory')
 
 # Parse the arguments
 args = parser.parse_args()
-"""
+
 # arguments for script
 sdk_cache_dir_filter = args.sdk_cache_dir_filter
-input_dir = args.input_dir
+input_dir_filter = args.input_dir_filter
 output_dir_filter = args.output_dir_filter
-swr_output_dir = args.swr_output_dir
+swr_output_dir_filter= args.swr_output_dir_filter
 
 
 
@@ -137,10 +138,10 @@ def check_overlap(df1, df2):
 
 # Replace 'your_directory_path' with the actual path of the directory you want to search
 if len(select_these_sessions)==0:
-    select_these_sessions = get_session_id_numbers_from_swr_event_directories(input_dir)
+    select_these_sessions = get_session_id_numbers_from_swr_event_directories(input_dir_filter)
 
 # creating the path to our output directory for the filtered swrs, and a directory if it doesn't exist
-swr_output_dir_path = os.path.join(output_dir, swr_output_dir)
+swr_output_dir_path = os.path.join(output_dir, swr_output_dir_filter)
 os.makedirs(swr_output_dir_path, exist_ok=True)
 
 # we start by calling and filtering our dataframe of the sessions we will be working with
@@ -152,7 +153,7 @@ for seshnum in tqdm(range(0, len(select_these_sessions)), desc="Processing", uni
     session_id = select_these_sessions[seshnum]
     
     # making the input path for this session
-    session_path = os.path.join(input_dir, 'swrs_session_' + str(session_id))
+    session_path = os.path.join(input_dir_filter, 'swrs_session_' + str(session_id))
     
     # making the output path for this session and the subfolder for the session
     session_subfolder = "swrs_session_" + str(session_id)
