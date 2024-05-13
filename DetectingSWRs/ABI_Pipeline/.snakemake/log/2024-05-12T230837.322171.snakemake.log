@@ -1,0 +1,23 @@
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 1 (use --cores to define parallelism)
+Rules claiming more threads will be scaled down.
+Conda environments: ignored
+Job stats:
+job                   count
+------------------  -------
+allen_swr_detector        1
+total                     1
+
+Select jobs to execute...
+
+[Sun May 12 23:08:37 2024]
+rule allen_swr_detector:
+    output: output/allen_swr_detector_output.txt
+    jobid: 0
+    reason: Missing output files: output/allen_swr_detector_output.txt
+    priority: 3
+    resources: tmpdir=/tmp
+
+Terminating processes on user request, this might take some time.
+Complete log: .snakemake/log/2024-05-12T230837.322171.snakemake.log

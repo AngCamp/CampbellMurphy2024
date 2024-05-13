@@ -22,9 +22,43 @@ from scipy.ndimage import gaussian_filter1d
 from scipy import stats
 from tqdm import tqdm
 
+
+
+
+import argparse
+
+# Create the parser
+parser = argparse.ArgumentParser(description='Process some integers.')
+
+# Add the arguments
+parser.add_argument('--input_dir',
+                    type=str,
+                    help='The input directory')
+
+parser.add_argument('--output_dir',
+                    type=str,
+                    help='The output directory')
+
+parser.add_argument('--global_rip_label',
+                    type=str,
+                    help='The global ripple label')
+
+parser.add_argument('--minimum_ripple_num',
+                    type=int,
+                    help='The minimum number of ripples')
+
+# Parse the arguments
+args = parser.parse_args()
+
+# arguments for script
+input_dir = args.input_dir
+output_dir = args.output_dir
+global_rip_label = args.global_rip_label
+minimum_ripple_num = args.minimum_ripple_num
+
 """
-input_dir = '/space/scratch/allen_visbehave_swr_data/testing_dir_filtered'
-# output_dir = os.path.curdir
+input_dir = '/space/scratch/allen_visbehave_swr_data/testing_dir'
+output_dir = '/space/scratch/allen_visbehave_swr_data/testing_dir'
 global_rip_label = 'no_movement_no_gamma'
 minimum_ripple_num = 100 # minimum number of ripples a probe needs to be included in the analysis
 """
@@ -200,9 +234,9 @@ for session_id in session_list:
     new_probe_list =[]
     for probe_id in probe_list:
 
-        eventfilename = find_probe_filename(sesh_path, criteria1= 'probe_{}'.format(probe_id), criteria2= 'filtered_swrs')
+        eventfilename = find_probe_filename(sesh_path, criteria1= 'probe_{}'.format(probe_id), criteria2= 'karlsson_detector')
         probe_file_path = os.path.join(sesh_path,eventfilename)
-        rips_on_probe = pd.read_csv(probe_file_path, index_col=0)
+        rips_on_probe = pd.read_csv(probe_file_path, index_col=0, compression='gzip')
         if rips_on_probe.shape[0] > minimum_ripple_num:
             probe_event_dict[probe_id] = rips_on_probe
             new_probe_list.append(probe_id)  # add probe_id to new list
@@ -234,4 +268,4 @@ for session_id in session_list:
     putative_global_ripples = add_overlap_probes(putative_global_ripples, probe_event_dict, "probes_event_is_on")
     global_ripples_dict[session_id] = putative_global_ripples
     print(global_ripples_dict.keys())
-    putative_global_ripples.to_csv(os.path.join(sesh_path, 'session_{}_putative_global_swrs{}.csv'.format(session_id, global_rip_label)), index=True)
+    putative_global_ripples.to_csv(os.path.join(sesh_path, 'session_{}_putative_global_swrs_{}.csv'.format(session_id, global_rip_label)), index=True)

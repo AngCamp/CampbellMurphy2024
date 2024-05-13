@@ -10,7 +10,7 @@ select_these_sessions: []
 only_brain_observatory_sessions: True
 dont_wipe_these_sessions: []
 gamma_event_thresh: 3
-gamma_filters_path: '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/frank2008_gamma_1500hz_bandpass_filter.npz'
+gamma_filter_path: '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/frank2008_gamma_1500hz_bandpass_filter.npz'
 theta_filter_path: '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/theta_1500hz_bandpass_filter.npz'
 ripple_band_threshold: 2
 movement_artifact_ripple_band_threshold: 2
