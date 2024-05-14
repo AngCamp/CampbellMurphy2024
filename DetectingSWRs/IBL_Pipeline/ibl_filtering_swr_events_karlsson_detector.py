@@ -7,12 +7,7 @@ import pandas as pd
 from scipy import io, signal
 #from fitter import Fitter, get_common_distributions, get_distributions
 import scipy.ndimage
-from scipy.ndimage import gaussian_filter
-from scipy.ndimage import gaussian_filter1d
-import matplotlib.pyplot as plt
 # for ripple detection
-import ripple_detection
-import ripple_detection.simulate as ripsim # for making our time vectors
 from scipy import signal
 # %%
 #import KernelRegDraft as kreg # custom module, not needed
@@ -21,19 +16,22 @@ from scipy.ndimage import gaussian_filter
 from scipy.ndimage import gaussian_filter1d
 from scipy import stats
 from tqdm import tqdm
-from allensdk.brain_observatory.ecephys.ecephys_project_cache import EcephysProjectCache
 import yaml
+from one.api import ONE
 
+
+ONE.setup(base_url='https://openalyx.internationalbrainlab.org', silent=True)
+one = ONE(password='international')
+        
 # Load the configuration from a YAML file
-with open('abi_swr_config.yaml', 'r') as f:
+with open('ibl_swr_config.yaml', 'r') as f:
     config = yaml.safe_load(f)
 
 # Get the values from the configuration
-sdk_cache_dir_filter = config['sdk_cache_dir_filter']
 input_dir_filter = config['input_dir_filter']
 output_dir_filter = config['output_dir_filter']
 swr_output_dir_filter = config['swr_output_dir_filter']
-
+select_these_sessions =  config['select_these_sessions']
 
 # Functions
 
@@ -42,7 +40,7 @@ def get_session_id_numbers_from_swr_event_directories(directory_path):
     all_directories = [d for d in os.listdir(directory_path) if os.path.isdir(os.path.join(directory_path, d)) and "swrs_session_" in d]
 
     # Remove the substring "swrs_session_" and convert to int
-    directory_numbers = [int(d.replace("swrs_session_", "")) for d in all_directories]
+    directory_numbers = [str(d.replace("swrs_session_", "")) for d in all_directories]
 
     return directory_numbers
 
@@ -105,6 +103,21 @@ def probe_ids_fromfilenames(filenames):
             probe_ids.append(int(match.group(1)))
     return probe_ids
 
+def probe_ids_fromfilenames(filenames):
+    probe_ids = []
+    for filename in filenames:
+        match = re.search(r'probe_([\w-]+)_', filename)
+        if match:
+            probe_ids.append(match.group(1))
+    return probe_ids
+
+def probe_ids_fromfilenames(filenames):
+    probe_ids = []
+    for filename in filenames:
+        match = re.search(r'probe_([\w-]+?)_', filename)
+        if match:
+            probe_ids.append(match.group(1))
+    return probe_ids
 
 def check_overlap(df1, df2):
     # returns true or false if there is overlap between the two dataframes with start_time and end_time columns
@@ -122,7 +135,7 @@ if len(select_these_sessions)==0:
     select_these_sessions = get_session_id_numbers_from_swr_event_directories(input_dir_filter)
 
 # creating the path to our output directory for the filtered swrs, and a directory if it doesn't exist
-swr_output_dir_path = os.path.join(output_dir, swr_output_dir_filter)
+swr_output_dir_path = os.path.join(output_dir_filter, swr_output_dir_filter)
 os.makedirs(swr_output_dir_path, exist_ok=True)
 
 # we start by calling and filtering our dataframe of the sessions we will be working with
@@ -144,20 +157,26 @@ for seshnum in tqdm(range(0, len(select_these_sessions)), desc="Processing", uni
     # make probe list
     probe_file_list = get_files_with_substrings(session_path, substring1='probe', substring2='karlsson_detector_events')
     probe_id_list = probe_ids_fromfilenames(probe_file_list)
+    print('probe_file_list: ' + str(probe_file_list))
+    print('probe_id_list: ' + str(probe_id_list))
+    probelist, probenames = one.eid2pid(session_id) # probe_id is pid in the IBL tutorials
     
     for probe_num in range(0, len(probe_file_list)):
         # load the dataframe containing the putative ripples, filter for ones matching cirteria
+        print('probe_num: ' + str(probe_num))
+        print('probe_file_list[probe_num]: ' + str(probe_file_list[probe_num]))
         events_csv_path = os.path.join(session_path, probe_file_list[probe_num])
         putative_ripples_df = pd.read_csv(events_csv_path, compression='gzip')
         print('putative ripples df')
-
+        putative_ripples_df.head()
         probe_id = probe_id_list[probe_num]
         # check if the events overlap with each other
         # check if they overlap with gamma events
     
-        
         # check if they overlap with gamma events
+        print("probe_id: " + str(probe_id))
         gamma_event_file = get_files_with_substrings(session_path, substring1='probe_' + str(probe_id), substring2='gamma_band_events')
+        print('gamma_event_file: ' + str(gamma_event_file))
         gamma_events = pd.read_csv(os.path.join(session_path, gamma_event_file[0]), index_col=0, compression='gzip')
         putative_ripples_df['Overlaps_with_gamma'] = check_overlap(putative_ripples_df, gamma_events)
         print('Gamma events')
@@ -181,8 +200,8 @@ for seshnum in tqdm(range(0, len(select_these_sessions)), desc="Processing", uni
         # this line filtered by max lfp ampiplitude which is pointless, should be removed
         #filtered_df = filtered_df[filtered_df.Peak_Amplitude_lfpzscore > lfp_amplidude_threshold]
         print('Writing filtered events to file')
-
-        filtered_df.to_csv(events_csv_path, index=True, compression='gzip')
+        print('events_csv_path: ' + events_csv_path)
+        filtered_df.to_csv(events_csv_path, index=False, compression='gzip')
         new_row = {'session_id': session_id, 'probe_id': probe_id, 'ripple_number': filtered_df.shape[0]}
         eventspersession_df = pd.concat([eventspersession_df, pd.DataFrame([new_row])], ignore_index=True) 
         print('Done probe ' + str(probe_id))

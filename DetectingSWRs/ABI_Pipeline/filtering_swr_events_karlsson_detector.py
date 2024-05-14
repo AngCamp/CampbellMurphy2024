@@ -1,22 +1,3 @@
-# this code filters the events provided based on certain criteria
-# draft code is in /home/acampbell/AllenLFP/AllenLFP_test.ipynb
-
-
-# change this as needed:
-sdk_cache_dir='/space/scratch/allen_visbehave_data'# path to where the cache for the allensdk is (wehre the lfp is going)
-input_dir = '/space/scratch/allen_visbehave_swr_data/testing_dir'
-output_dir = '/space/scratch/allen_visbehave_swr_data/'
-swr_output_dir = 'testing_dir_filtered' # directory specifying the 
-
-
-# thresholding aprameters
-
-
-select_these_sessions = []
-# test set list
-#select_these_sessions = [715093703, 719161530, 721123822, 743475441, 744228101, 746083955, 750332458, 750749662, 751348571, 754312389, 754829445, 755434585, 756029989, 757216464, 757970808, 758798717, 759883607, 760345702, 761418226, 762602078, 763673393]
-#select_these_sessions = [715093703]
-
 # libraries
 import os
 import re
@@ -41,6 +22,19 @@ from scipy.ndimage import gaussian_filter1d
 from scipy import stats
 from tqdm import tqdm
 from allensdk.brain_observatory.ecephys.ecephys_project_cache import EcephysProjectCache
+import yaml
+
+# Load the configuration from a YAML file
+with open('abi_swr_config.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+
+# Get the values from the configuration
+sdk_cache_dir_filter = config['sdk_cache_dir_filter']
+input_dir_filter = config['input_dir_filter']
+output_dir_filter = config['output_dir_filter']
+swr_output_dir_filter = config['swr_output_dir_filter']
+select_these_sessions = config['select_these_sessions']
+
 
 # Functions
 
@@ -113,7 +107,6 @@ def probe_ids_fromfilenames(filenames):
     return probe_ids
 
 
-
 def check_overlap(df1, df2):
     # returns true or false if there is overlap between the two dataframes with start_time and end_time columns
     result = []
@@ -127,10 +120,10 @@ def check_overlap(df1, df2):
 
 # Replace 'your_directory_path' with the actual path of the directory you want to search
 if len(select_these_sessions)==0:
-    select_these_sessions = get_session_id_numbers_from_swr_event_directories(input_dir)
+    select_these_sessions = get_session_id_numbers_from_swr_event_directories(input_dir_filter)
 
 # creating the path to our output directory for the filtered swrs, and a directory if it doesn't exist
-swr_output_dir_path = os.path.join(output_dir, swr_output_dir)
+swr_output_dir_path = os.path.join(output_dir_filter, swr_output_dir_filter)
 os.makedirs(swr_output_dir_path, exist_ok=True)
 
 # we start by calling and filtering our dataframe of the sessions we will be working with
@@ -142,7 +135,7 @@ for seshnum in tqdm(range(0, len(select_these_sessions)), desc="Processing", uni
     session_id = select_these_sessions[seshnum]
     
     # making the input path for this session
-    session_path = os.path.join(input_dir, 'swrs_session_' + str(session_id))
+    session_path = os.path.join(input_dir_filter, 'swrs_session_' + str(session_id))
     
     # making the output path for this session and the subfolder for the session
     session_subfolder = "swrs_session_" + str(session_id)
@@ -155,7 +148,8 @@ for seshnum in tqdm(range(0, len(select_these_sessions)), desc="Processing", uni
     
     for probe_num in range(0, len(probe_file_list)):
         # load the dataframe containing the putative ripples, filter for ones matching cirteria
-        putative_ripples_df = pd.read_csv(os.path.join(session_path, probe_file_list[probe_num]))
+        events_csv_path = os.path.join(session_path, probe_file_list[probe_num])
+        putative_ripples_df = pd.read_csv(events_csv_path, compression='gzip')
         print('putative ripples df')
 
         probe_id = probe_id_list[probe_num]
@@ -165,7 +159,7 @@ for seshnum in tqdm(range(0, len(select_these_sessions)), desc="Processing", uni
         
         # check if they overlap with gamma events
         gamma_event_file = get_files_with_substrings(session_path, substring1='probe_' + str(probe_id), substring2='gamma_band_events')
-        gamma_events = pd.read_csv(os.path.join(session_path, gamma_event_file[0]), index_col=0)
+        gamma_events = pd.read_csv(os.path.join(session_path, gamma_event_file[0]), index_col=0, compression='gzip')
         putative_ripples_df['Overlaps_with_gamma'] = check_overlap(putative_ripples_df, gamma_events)
         print('Gamma events')
 
@@ -173,8 +167,8 @@ for seshnum in tqdm(range(0, len(select_these_sessions)), desc="Processing", uni
         # if they do we mark them in the dataframe
         # check if the HFE events in the non hippocampal channels overlap
         movement_channels_files = get_files_with_substrings(session_path, substring1='probe_' + str(probe_id), substring2='movement_artifacts')
-        movement_channel_1 = pd.read_csv(os.path.join(session_path, movement_channels_files[0]))
-        movement_channel_2 = pd.read_csv(os.path.join(session_path, movement_channels_files[1]))
+        movement_channel_1 = pd.read_csv(os.path.join(session_path, movement_channels_files[0]), compression='gzip')
+        movement_channel_2 = pd.read_csv(os.path.join(session_path, movement_channels_files[1]), compression='gzip')
         overlapping_artifacts = []
         if movement_channel_1.shape[0] > movement_channel_2.shape[0]:
             overlapping_artifacts = movement_channel_1[check_overlap(movement_channel_1, movement_channel_2)]
@@ -188,9 +182,8 @@ for seshnum in tqdm(range(0, len(select_these_sessions)), desc="Processing", uni
         # this line filtered by max lfp ampiplitude which is pointless, should be removed
         #filtered_df = filtered_df[filtered_df.Peak_Amplitude_lfpzscore > lfp_amplidude_threshold]
         print('Writing filtered events to file')
-        csv_filename = f"session_{session_id}_probe_{probe_id}_filtered_swrs.csv"
-        csv_path = os.path.join(session_subfolder, csv_filename)
-        filtered_df.to_csv(csv_path, index=True)
+
+        filtered_df.to_csv(events_csv_path, index=True, compression='gzip')
         new_row = {'session_id': session_id, 'probe_id': probe_id, 'ripple_number': filtered_df.shape[0]}
         eventspersession_df = pd.concat([eventspersession_df, pd.DataFrame([new_row])], ignore_index=True) 
         print('Done probe ' + str(probe_id))
@@ -200,33 +193,6 @@ for seshnum in tqdm(range(0, len(select_these_sessions)), desc="Processing", uni
     
     
     print('Done session ' + str(session_id))
-
-"""
-# compute QC thresholds
-eventspersession_df['ripple_number_logep1'] = np.log10(eventspersession_df['ripple_number']+1)
-
-def compute_kurtosis_threshold(data):
-    threshold = np.min(data)
-    while True:
-        mask = data > threshold
-        filtered_data = data[mask]
-        kurt = kurtosis(filtered_data)
-        if kurt<3:
-            return threshold
-        threshold += 0.1
-
-thresh = compute_kurtosis_threshold(eventspersession_df.ripple_number_logep1)
-
-threshold_log10_df = eventspersession_df[eventspersession_df.ripple_number_logep1>thresh]
-lower_bound_5th = threshold_log10_df.ripple_number_logep1.quantile(0.05)
-upper_bound_95th = threshold_log10_df.ripple_number_logep1.quantile(0.95)
-mask = (eventspersession_df.ripple_number_logep1>lower_bound_5th)&(eventspersession_df.ripple_number_logep1<upper_bound_95th)
-eventspersession_df['within_lognormal_bounds'] = mask
-
-eventspersession_df.to_csv('/space/scratch/allen_visbehave_swr_data_test/filtered_swrs/eventspersession_df.csv')
-
-eventspersession_df.to_csv(os.path.join(swr_output_dir_path, 'eventspersession_df.csv'), index=True)
-"""
 
 eventspersession_df.to_csv(os.path.join(swr_output_dir_path, 'eventspersession_df.csv'), index=True)
 print('Done all sessions.')

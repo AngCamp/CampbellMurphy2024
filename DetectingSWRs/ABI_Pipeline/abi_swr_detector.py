@@ -1,12 +1,3 @@
-# Allen Visual Behaviour SWR Collection Script
-# Called by a bash script
-# Produces SWR events at a 2.5 zscore threshold
-# also produces time series lsiting gamma band events (minimum 0.015 s long) and motion artifacts on a channel outside brain
-# TO DO:  Interpolate between all the channels some how and merge the lfp signals from ca1 into a big 6 by samples array to run the detector on.
-
-# Technical details of this dataset are located here: https://brainmapportal-live-4cc80a57cd6e400d854-f7fdcae.divio-media.net/filer_public/f7/06/f706855a-a3a1-4a3a-a6b0-3502ad64680f/visualbehaviorneuropixels_technicalwhitepaper.pdf
-# IF that link does not work this url can also work: https://portal.brain-map.org/explore/circuits/visual-behavior-neuropixels 
-
 # Allen Visual Behaviour SWR detection script
 
 # libraries
@@ -14,18 +5,9 @@ import os
 import subprocess 
 import numpy as np
 import pandas as pd
-from scipy import io, signal
-#from fitter import Fitter, get_common_distributions, get_distributions
-import scipy.ndimage
-from scipy.ndimage import gaussian_filter
-from scipy.ndimage import gaussian_filter1d
-import matplotlib.pyplot as plt
-# for ripple detection
+from scipy import signal
 import ripple_detection
 from ripple_detection import filter_ripple_band
-import ripple_detection.simulate as ripsim # for making our time vectors
-from scipy.ndimage import gaussian_filter
-from scipy.ndimage import gaussian_filter1d
 from scipy import stats
 from tqdm import tqdm
 from allensdk.brain_observatory.ecephys.ecephys_project_cache import EcephysProjectCache
@@ -36,54 +18,35 @@ import time
 import traceback
 import logging
 import logging.handlers
-
+import yaml
 
 # start timing
 start_time_outer = time.time()  # start timing
 
-"""
-    This code calls the Neuropixels LFP data from the visual behaviour
-    datasets and loops through it storing channels used as well as
-    the.
-    
-    The methods are based on a combination of methods taken from De Filliopo et al., (2022), Nitzan et al., (2020) which were both used on the ABA and IBL datasets for 
-    detecting ripples while the mouse was still.  Methods for improving detectors so that putative ripples occuring during movement could be detected are based on 
-    criteria from Frank and Chen (2008) as well as
-"""
 
-# change these as needed:
-pool_size = 6 # 10 was too high, program crashed 
-sdk_cache_dir='/space/scratch/allen_visbehave_data'# path to where the cache for the allensdk is (wehre the lfp is going)
-output_dir = '/space/scratch/allen_visbehave_swr_data'
-#swr_output_dir = 'allen_visbehave_swr_2sd_envelope' # directory specifying the output
-swr_output_dir = 'testing_dir' # directory specifying the output
-run_name = 'final_run' # part of the nameing for the output files
+# Load the configuration from a YAML file
+with open('abi_swr_config.yaml', 'r') as f:
+    config = yaml.safe_load(f)
 
-# example input
-select_these_sessions = []
-only_brain_observatory_sessions = True # if true only sessions from the brain observatory will be used
-#select_these_sessions = [715093703, 719161530, 721123822]
-#select_these_sessions = [715093703]
-#select_these_sessions = [746083955] # the first screwed up when selecting a probe. Session id
-#select_these_sessions = [816200189] # this one messed up when doing the movement artifact detection at probe 836943715
-dont_wipe_these_sessions = []
+# Get the values from the configuration
+pool_size = config['pool_size']
+sdk_cache_dir = config['sdk_cache_dir']
+output_dir = config['output_dir']
+swr_output_dir = config['swr_output_dir']
+run_name = config['run_name']
+select_these_sessions = config['select_these_sessions']
+only_brain_observatory_sessions = config['only_brain_observatory_sessions']
+dont_wipe_these_sessions = config['dont_wipe_these_sessions']
+gamma_event_thresh = config['gamma_event_thresh']
+gamma_filter_path = config['gamma_filter_path']
+theta_filter_path = config['theta_filter_path']
+ripple_band_threshold = config['ripple_band_threshold']
+movement_artifact_ripple_band_threshold = config['movement_artifact_ripple_band_threshold']
+save_lfp = config['save_lfp']
 
-# THRESHOLDS
-gamma_event_thresh = 3 # zscore threshold for gamma events
 
-# gamma filters are same as default for now
-gamma_filters_path = '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/frank2008_gamma_1500hz_bandpass_filter.npz'
-theta_filter_path = '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/theta_1500hz_bandpass_filter.npz'
-
-ripple_band_threshold = 2 # note this defines the threshold for envelopes, from these events identify ones with peaks that pass a peak-power threshold as well
-movement_artifact_ripple_band_threshold = 2
-
-# functions
-
-# subprocess is a default module
+# Functions
 def call_bash_function(bash_command = ""):
-    #example bash comand:
-    #bash_command = "source /path/to/your/bash_script.sh && your_bash_function"
     process = subprocess.Popen(bash_command, stdout=subprocess.PIPE, shell=True)
     output, error = process.communicate()
 
@@ -93,10 +56,29 @@ def call_bash_function(bash_command = ""):
     else:
         print("Error:", error.decode('utf-8'))
 
-# Assuming you have your signal_array, b, and a defined as before
 def finitimpresp_filter_for_LFP(LFP_array, samplingfreq, lowcut = 1, highcut = 250,
                     filter_order = 101):
+    """
+    Filter the LFP array using a finite impulse response filter.
     
+    Parameters
+    ----------
+    LFP_array : np.array
+        The LFP array.
+    samplingfreq : float
+        The sampling frequency of the LFP array.
+    lowcut : float
+        The lowcut frequency.
+    highcut : float
+        The highcut frequency.
+    filter_order : int
+        The filter order.
+    
+    Returns
+    -------
+    np.array
+        The filtered LFP array.    
+    """
     nyquist = 0.5 * samplingfreq
 
     # Design the FIR bandpass filter using scipy.signal.firwin
@@ -112,19 +94,28 @@ def finitimpresp_filter_for_LFP(LFP_array, samplingfreq, lowcut = 1, highcut = 2
 def event_boundary_detector(time, five_to_fourty_band_power_df, envelope=True, minimum_duration = 0.02, maximum_duration = 0.4,
                        threshold_sd=2.5, envelope_threshold_sd=1):
     """
-    Power threshold event detector, includes an envelope as well if wanted
-    
-    Originally for detecting sharp waves in the striatum radiatum, takes in power signal from 
-    
-    From Fernández-Ruiz, A., Oliva, A., Fermino de Oliveira, E., Rocha-Almeida, F., Tingley, D., 
-    & Buzsáki, G. (2019). Long-duration hippocampal sharp wave ripples improve memory. Science, 364(6445), 1082-1086.
-    
-    
-    Sharp waves were detected separately using LFP from a CA1 str. radiatum channel, filtered with band-pass filter boundaries
-   (5-40 Hz). LFP events of a minimum duration of 20 ms and maximum 400 ms exceeding 2.5 SD of the
-   background signal were included as candidate SPWs. Only if a SPW was simultaneously detected with
-   a ripple, a CA1 SPW-R event was retained for further analysis. SPW-R bursts were classified when more
-   than one event was detected in a 400 ms time window.
+    For detecting gamma events.
+    Parameters
+    ----------
+    time : np.array
+        The time values for the signal.
+    five_to_fourty_band_power_df : np.array
+        The power of the signal in the 5-40 Hz band.
+    envelope : bool
+        Whether to use the envelope threshold.
+    minimum_duration : float
+        The minimum duration of an event.
+    maximum_duration : float
+        The maximum duration of an event.
+    threshold_sd : float
+        The threshold in standard deviations.
+    envelope_threshold_sd : float
+        The envelope threshold in standard deviations.
+        
+    Returns
+    -------
+    pd.DataFrame
+        A dataframe with the start and end times of the events.
     
     """
     
@@ -202,8 +193,20 @@ def event_boundary_detector(time, five_to_fourty_band_power_df, envelope=True, m
 
 def event_boundary_times(time, past_thresh):
     """
-    finds the times of a vector of true statements and returns values from another
+    Finds the times of a vector of true statements and returns values from another
     array representing the times
+    
+    Parameters
+    ----------
+    time : np.array
+        The time values for the signal.
+    past_thresh : np.array
+        The boolean array of the signal.
+        
+    Returns
+    -------
+    pd.DataFrame
+        A dataframe with the start and end times of the events.    
     """
     # Find the indices where consecutive True values start
     starts = np.where(past_thresh & ~np.roll(past_thresh, 1))[0]
@@ -219,22 +222,35 @@ def event_boundary_times(time, past_thresh):
       
     return events_df
 
-def peaks_in_events(events, time_values, signal_values):
+def peaks_time_of_events(events, time_values, signal_values):
+    """
+    Computes the times when ripple power peaks in the events
+    
+    Parameters
+    ----------
+    events : pd.DataFrame
+        The events dataframe.
+    time_values : np.array
+        The time values for the signal.
+    signal_values : np.array
+        The signal values for the signal.
+        
+    Returns
+    -------
+    np.array
+        The times of the peaks in the ripple power signal.    
+    """
+    
     # looks for the peaks in the ripple power signal, value of zscored raw lfp peak and returns time of peak
     signal_values_zscore = stats.zscore(signal_values)
-    max_values = []
-    max_lfp_zscore_values = []
     peak_times = []
     for start, end in zip(events['start_time'], events['end_time']):
         window_idx = (time_values >= start) & (time_values <= end)
-        ripplesignal = signal_values[window_idx]
         ripple_lfp_zscore_signal = signal_values_zscore[window_idx]
-        maxpoint = np.argmax(ripplesignal)
-        max_values.append(ripplesignal[maxpoint])
-        max_lfp_zscore_values.append(ripple_lfp_zscore_signal[maxpoint])
+        maxpoint = np.argmax(ripple_lfp_zscore_signal)
         rippletimepoints = time_values[window_idx]
         peak_times.append(rippletimepoints[maxpoint])
-    return np.array(max_values), np.array(max_lfp_zscore_values),  np.array(peak_times)
+    return np.array(peak_times)
 
 
 def resample_signal(signal, times, new_rate):
@@ -260,8 +276,6 @@ def resample_signal(signal, times, new_rate):
 
     return new_signal, new_times
 
-
-
 # Set up error logging 
 MESSAGE = 25  # Define a custom logging level, between INFO (20) and WARNING (30)
 
@@ -283,7 +297,7 @@ def listener_process(queue):
     
     """
     root = logging.getLogger()
-    h = logging.FileHandler(f'ibl_detector_{swr_output_dir}_{run_name}_app.log', mode='w')
+    h = logging.FileHandler(f'abi_detector_{swr_output_dir}_{run_name}_app.log', mode='w')
     f = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
     h.setFormatter(f)
     root.addHandler(h)
@@ -301,14 +315,15 @@ def init_pool(*args):
     root = logging.getLogger()
     root.addHandler(h)
     root.setLevel(MESSAGE)  # Set logging level to MESSAGE
-    
-# loading filters (crates artifacts in first and last ~ 3.5 seconds of recordings, remember to clip these off)
-gamma_filter = np.load(gamma_filters_path)
+
+# loading filters (craetes artifacts in first and last ~ 3.5 seconds of recordings, remember to clip these off)
+gamma_filter = np.load(gamma_filter_path)
 gamma_filter = gamma_filter['arr_0']
 
 theta_filter = np.load(theta_filter_path)
 theta_filter = theta_filter['arr_0']
-# Setting up the ABI Cache
+
+# Setting up the ABI Cache (where data is held, what is present or absent)
 manifest_path = os.path.join(sdk_cache_dir, "manifest.json")
 
 cache = EcephysProjectCache.from_warehouse(manifest=manifest_path)
@@ -323,29 +338,15 @@ if len(select_these_sessions)>0:
     sessions = sessions.loc[ sessions.index.intersection(select_these_sessions) ]
 
 
-# Looping through the sessions specified
-"""
-    from tqdm import tqdm
-    import time
-
-    # Replace this with your actual loop or task
-    for i in tqdm(range(10), desc="Processing", unit="iteration"):
-        # Simulate some work
-        time.sleep(0.1)
-
-    print("Task completed!")
-"""
-
-# include a data frame that lists the sessions used, channels taken from each session and for what (movement vs ripples),
-# and if there is behavioural data or lfp data
-
-
 # Create main folder
 swr_output_dir_path = os.path.join(output_dir, swr_output_dir)
 os.makedirs(swr_output_dir_path, exist_ok=True)
 
+if save_lfp == True:
+    lfp_output_dir_path = os.path.join(output_dir, swr_output_dir+'_lfp_data')
+    os.makedirs(lfp_output_dir_path, exist_ok=True)
 
-#for seshnum in tqdm(range(0, sessions.shape[0]), desc="Processing", unit="iteration"):
+# this is the process we will run for each session over multiple cores
 def process_session(session_id):
     """
     This function takes in a session id and loops through the probes in that session,
@@ -390,7 +391,13 @@ def process_session(session_id):
         # Create subfolder for session, will contain all csvs for events detected and .npy of ca1 channels and control channels 
         session_subfolder = "swrs_session_" + str(session_id)
         session_subfolder = os.path.join(swr_output_dir_path, session_subfolder)
-        os.makedirs(session_subfolder, exist_ok=True) 
+        os.makedirs(session_subfolder, exist_ok=True)
+        
+        if save_lfp == True:
+            # Create subfolder for lfp data, will contain all npz files for lfp data
+            session_lfp_subfolder = "lfp_session_" + str(session_id)
+            session_lfp_subfolder = os.path.join(lfp_output_dir_path, session_lfp_subfolder)
+            os.makedirs(session_lfp_subfolder, exist_ok=True)
         
         # get probes with CA1 recordings out of recording
         probe_id_list = list(session.channels.probe_id.unique())
@@ -405,10 +412,6 @@ def process_session(session_id):
                 probes_of_interest.append(probe_id)
         # create an arraey to be filled with channel ids fro ca1
         ca1_chans_arr = np.array([], dtype=int)
-        used_channels_xarray_dict = {} # a list to put the lfp xarray objects into 
-        
-        # create an array to be filled with outside of brain controls
-        outof_hp_chans_arr = np.array([], dtype=int)
 
         # get lfp for each probe
         for probe_id in probes_of_interest:    
@@ -419,7 +422,6 @@ def process_session(session_id):
             # pull or laod the lfp for this probe
             print("Probe id " + str(probe_id))
             lfp = session.get_lfp(probe_id)
-            sampling_rate_this_probe = session.probes.lfp_sampling_rate[probe_id]
 
             print("Selecting CA1 channel...")
             # fetching channels in ca1 on this probe for this recording
@@ -440,9 +442,8 @@ def process_session(session_id):
                     raise ValueError(f"During session {session_id} processing : Nan in lfp of Probe {probe_id}, probe skipped.")  # Raise error
             except ValueError as e:
                 logging.error(e)  # Log the error message, skip to next probe
-                del lfp  # Delete and lfp from memory to save RAM
+                del lfp  # Delete lfp from memory to save RAM
                 continue
-            
             
             # get the timestamps for this lfp recording
             #lfp_time_index = lfp_ca1.index.values 
@@ -461,14 +462,10 @@ def process_session(session_id):
             #used_channels_xarray_dict[this_chan_id] = lfp.channel.values[this_chan_id]
             
             #GET LFP FOR ALL CHANNELS NEEDED, DELETE ARRAYS TO CLEAN UP MEMORY
-            lfp_time_index_og = lfp.time.values
             peakripchan_lfp_ca1 = lfp_ca1[:,lfp_ca1_chans == this_chan_id]
             
             # as detailed in supplementry methods in Nitzan et al., (2022) on page 2 under Event Detection
-            """"
-            An additional ‘noise’ signal from a channel outside of the hippocampus was provided to exclude
-            simultaneously occurring high frequency events. 
-            """
+            # we will take two control channels from the same probe rather than just one
             # Bute we will take two control channels from the same probe rather than just one
             idx = session.channels.probe_id == probe_id
             organisedprobechans = session.channels[idx].sort_values(by='probe_vertical_position')
@@ -494,12 +491,13 @@ def process_session(session_id):
                 control_channels.append(movement_control_channel)
             
             # Saving LFP for all channels used
-            np.savez(os.path.join(session_subfolder, f"probe_{probe_id}_channel_{this_chan_id}_lfp_ca1_peakripplepower.npz"), lfp_ca1 = peakripchan_lfp_ca1)
-            np.savez(os.path.join(session_subfolder, f"probe_{probe_id}_channel_{this_chan_id}_lfp_time_index_1500hz.npz"), lfp_time_index = lfp_time_index)
-            for i in [0,1]:
-                channel_outside_hp = str(take_two[i])
-                np.savez(os.path.join(session_subfolder, f"probe_{probe_id}_channel_{channel_outside_hp}_lfp_control_channel.npz"), lfp_control_channel = control_channels[i])
-            
+            if save_lfp == True:
+                np.savez(os.path.join(session_lfp_subfolder, f"probe_{probe_id}_channel_{this_chan_id}_lfp_ca1_peakripplepower.npz"), lfp_ca1 = lfp_ca1)
+                np.savez(os.path.join(session_lfp_subfolder, f"probe_{probe_id}_channel_{this_chan_id}_lfp_time_index_1500hz.npz"), lfp_time_index = lfp_time_index)
+                for i in [0,1]:
+                    channel_outside_hp = str(take_two[i])
+                    np.savez(os.path.join(session_lfp_subfolder, f"probe_{probe_id}_channel_{channel_outside_hp}_lfp_control_channel.npz"), lfp_control_channel = control_channels[i])
+                
             # clean memory...
             del lfp
             del lfp_ca1
@@ -525,14 +523,14 @@ def process_session(session_id):
             print("Done")
             # adds some stuff we want to the file
             peakrippleband_power = np.abs(signal.hilbert(peakrippleband))**2
-            Karlsson_ripple_times['Peak_Amp_RipBandPower'], Karlsson_ripple_times['Peak_Amp_RipBandPower_zscore'],  Karlsson_ripple_times['Peak_time'] = peaks_in_events(events=Karlsson_ripple_times, 
-                                                                                                                            time_values=lfp_time_index, 
-                                                                                                                            signal_values=peakrippleband_power)
+            Karlsson_ripple_times['Peak_time'] = peaks_time_of_events(events=Karlsson_ripple_times, 
+                                                                 time_values=lfp_time_index, 
+                                                                signal_values=peakrippleband_power)
             speed_cols = [col for col in Karlsson_ripple_times.columns if 'speed' in col]
             Karlsson_ripple_times = Karlsson_ripple_times.drop(columns=speed_cols)
             csv_filename = f"probe_{probe_id}_channel_{this_chan_id}_karlsson_detector_events.csv"
             csv_path = os.path.join(session_subfolder, csv_filename)
-            Karlsson_ripple_times.to_csv(csv_path, index=True)
+            Karlsson_ripple_times.to_csv(csv_path, index=True, compression='gzip')
             print("Writing to file.")
             print("Detecting gamma events.")
             # gamma power
@@ -547,22 +545,11 @@ def process_session(session_id):
             print("Done")
             csv_filename = f"probe_{probe_id}_channel_{this_chan_id}_gamma_band_events.csv"
             csv_path = os.path.join(session_subfolder, csv_filename)
-            gamma_times.to_csv(csv_path, index=True)
+            gamma_times.to_csv(csv_path, index=True, compression='gzip')
             print("Writing to file.")
             print("Selecting reference channel for movement artifact filtering.")
-            # movement artifact detector channel (SWR bandpass and power, then z-score)
-            # control_region_idx = session.channels.ecephys_structure_acronym.isna()
             
-            # make theta band, not used now
-            #theta_band = np.convolve(peakripchan_lfp_ca1.reshape(-1), theta_filter, mode='same') # reshape is needed to prevent "to deep" error
-            
-            # writing bands to file
-            # Create the file path
-            lfpsignals_filename = f"probe_{probe_id}_channel_{this_chan_id}_lfp_signals.npz"
-            lfpfile_path = os.path.join(session_subfolder, lfpsignals_filename)
 
-            # Save the arrays to a compressed .npz file
-            np.savez_compressed(lfpfile_path, rawlfp=peakripchan_lfp_ca1)
             # as detailed in supplementry methods in Nitzan et al., (2022) on page 2 under Event Detection
             """"
             An additional ‘noise’ signal from a channel outside of the hippocampus was provided to exclude
@@ -589,12 +576,11 @@ def process_session(session_id):
                 movement_controls = movement_controls.drop(columns=speed_cols)
                 csv_filename = f"probe_{probe_id}_channel_{channel_outside_hp}_movement_artifacts.csv"
                 csv_path = os.path.join(session_subfolder, csv_filename)
-                movement_controls.to_csv(csv_path, index=True)
+                movement_controls.to_csv(csv_path, index=True, compression='gzip')
                 print("Done Probe id " + str(probe_id))
             
-            #write these two to a numpy array finish loop
-            # write channel number and sessionid to a pandas array tracking where each channel came from
-            # so at the end of the loop you can identify which channel it called
+            #write these two to a numpy array, finish loop
+            # write channel number and session id to a pandas array tracking where each channel came from
             
             # At the end of the probe
             end_time_probe = time.time()
@@ -605,23 +591,6 @@ def process_session(session_id):
         
         print("Done Session id " + str(session_id))
         #loop over global channels
-        # needs changing to all channels
-        # this is difficult because the samples need to be interpolated between and matched
-        """
-        used_channels_xarray_dict[this_chan_id].append(lfp.channel.values[this_chan_id]).keys()
-        this_chan_id + used_channels_xarray_dict
-        
-        Karlsson_ripple_times = ripple_detection.Karlsson_ripple_detector(
-                time = lfp_time_index, 
-                filtered_lfps = lfp.sel(channel=ca1_chans_arr), 
-                speed = dummy_speed, 
-                sampling_frequency = 1250.0)
-        
-        # save to 
-        csv_filename = f"global_session_{session_id}_karlsson_detector_events.csv"
-        csv_path = os.path.join(session_subfolder, csv_filename)
-        Karlsson_ripple_times.to_csv(csv_path, index=True)
-        """
         
         # removing files
         # replace path/to/directory with cache and session info for this loop
@@ -643,7 +612,6 @@ def process_session(session_id):
         logging.error('Error in session: %s, probe id: %s', session_id, probe_id)
         logging.error(traceback.format_exc())
 
-
 queue = Queue()
 listener = Process(target=listener_process, args=(queue,))
 listener.start()
@@ -663,16 +631,17 @@ with Pool(pool_size, initializer=init_pool, initargs=(queue,)) as p:
 queue.put('kill')
 listener.join()
 
-
 print("Done! Results in " + swr_output_dir_path)
 
 #remove any empty directories
 # Bash command to find and remove all empty directories
-command = f"find {swr_output_dir_path} -type d -empty -delete"
+command_empty_swrdir_clear = f"find {swr_output_dir_path} -type d -empty -delete"
+command_empty_lfpdir_clear = f"find {lfp_output_dir_path} -type d -empty -delete"
 
 # Run the command
-subprocess.run(command, shell=True, check=True)
-
+subprocess.run(command_empty_swrdir_clear, shell=True, check=True)
+# Run the command
+subprocess.run(command_empty_lfpdir_clear , shell=True, check=True)
 
 end_time_outer = time.time()  # end timing
 elapsed_time_outer = end_time_outer - start_time_outer  # calculate elapsed time

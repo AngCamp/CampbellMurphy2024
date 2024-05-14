@@ -1,0 +1,48 @@
+# ibl_swr_detector.py
+# Number of processes to use
+pool_size: 2
+# Path to gamma filters
+gamma_filters_path: '/home/acampbell/Stienmetz2019Reanalyzed/PowerBandFilters/swr_detection_script_filters_1500Hz/frank2008_gamma_1500hz_bandpass_filter.npz'
+# Name of the run
+run_name: 'on_the_cluster'
+# Directory for the cache
+oneapi_cache_dir: '/space/scratch/IBL_data_cache'
+# Directory for the output
+output_dir: '/space/scratch/IBL_swr_data'
+# Directory for the SWR output
+swr_output_dir: 'ibl_swr_murphylab2024'
+# Threshold for gamma events
+gamma_event_thresh: 3
+# Threshold for ripple band
+ripple_band_threshold: 2
+# Threshold for movement artifact ripple band
+movement_artifact_ripple_band_threshold: 2
+# Sessions not to wipe
+dont_wipe_these_sessions: []
+# The input directory
+session_npz_filepath: 'all_ibl_sessions_with_ca1.npz'
+# to save the lfp from the channesl used
+save_lfp: True
+# select which session to run it on
+select_these_sessions: []
+
+# IBL_Filtering_SWR_Events_Karlsson_detector.py
+# Input directory for filtering
+input_dir_filter: '/space/scratch/IBL_swr_data/ibl_swr_murphylab2024'
+# Output directory for filtering
+output_dir_filter: '/space/scratch/IBL_swr_data'
+# SWR output directory for filtering
+swr_output_dir_filter: 'testing_dir'
+
+# Global_ripple_detector.py
+#
+# The input directory
+input_dir_global: '/space/scratch/IBL_swr_data/ibl_swr_murphylab2024'
+# The output directory
+output_dir_global: .
+# The global ripple label
+global_rip_label: 'no_movement_no_gamma'
+# The minimum number of ripples
+minimum_ripple_num: 100
+
+
