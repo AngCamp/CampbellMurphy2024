@@ -290,20 +290,6 @@ root - Level 25 - Processing complete for id cde63527-7f5a-4cc3-8ac2-215d82e7da2
 root - Level 25 - Processing complete for id a2b9fbbe-79fc-4166-a16e-b307813a2f06.
 root - Level 25 - Processing complete for id e8b4fda3-7fe4-4706-8ec2-91036cfee6bd.
 root - Level 25 - Processing complete for id 9b528ad0-4599-4a55-9148-96cc1d93fb24.
-FileExistsError: The directory /space/scratch/IBL_swr_data/ibl_swr_murphylab2024/swrs_session_83e77b4b-dfa0-4af9-968b-7ea0c7a0c7e4 already exists.
-
-root - Level 25 - PROCESSING FAILED REMOVING EMPTY SESSION SWR DIR :  session id c7248e09-8c0d-40f2-9eb4-700a8973d8c8 
-root - ERROR - Traceback (most recent call last):
-  File "/home/acampbell/NeuropixelsLFPOnRamp/DetectingSWRs/IBL_Pipeline/ibl_swr_detector.py", line 410, in process_session
-    raise FileExistsError(f"The directory {session_subfolder} already exists.")
-FileExistsError: The directory /space/scratch/IBL_swr_data/ibl_swr_murphylab2024/swrs_session_c7248e09-8c0d-40f2-9eb4-700a8973d8c8 already exists.
-
-root - Level 25 - PROCESSING FAILED REMOVING EMPTY SESSION SWR DIR :  session id 89f0d6ff-69f4-45bc-b89e-72868abb042a 
-root - ERROR - Traceback (most recent call last):
-  File "/home/acampbell/NeuropixelsLFPOnRamp/DetectingSWRs/IBL_Pipeline/ibl_swr_detector.py", line 443, in process_session
-    bin_file = next(df for df in data_files if df.suffix == '.cbin')
-TypeError: 'NoneType' object is not iterable
-
 root - ERROR - Traceback (most recent call last):
   File "/home/acampbell/NeuropixelsLFPOnRamp/DetectingSWRs/IBL_Pipeline/ibl_swr_detector.py", line 562, in process_session
     Karlsson_ripple_times.to_csv(csv_path, index=True, compression='gzip')
@@ -317,6 +303,19 @@ root - ERROR - Traceback (most recent call last):
     csv_formatter.save()
   File "/home/acampbell/miniconda3/envs/ONE_ibl_env/lib/python3.10/site-packages/pandas/io/formats/csvs.py", line 241, in save
     with get_handle(
+  File "/home/acampbell/miniconda3/envs/ONE_ibl_env/lib/python3.10/site-packages/pandas/io/common.py", line 734, in get_handle
+    check_parent_directory(str(handle))
+  File "/home/acampbell/miniconda3/envs/ONE_ibl_env/lib/python3.10/site-packages/pandas/io/common.py", line 597, in check_parent_directory
+    raise OSError(rf"Cannot save file into a non-existent directory: '{parent}'")
+OSError: Cannot save file into a non-existent directory: '/space/scratch/IBL_swr_data/ibl_swr_murphylab2024/swrs_session_2bdf206a-820f-402f-920a-9e86cd5388a4'
+
+root - Level 25 - PROCESSING FAILED REMOVING EMPTY SESSION SWR DIR :  session id edd22318-216c-44ff-bc24-49ce8be78374 
+root - ERROR - Traceback (most recent call last):
+  File "/home/acampbell/NeuropixelsLFPOnRamp/DetectingSWRs/IBL_Pipeline/ibl_swr_detector.py", line 410, in process_session
+    raise FileExistsError(f"The directory {session_subfolder} already exists.")
+FileExistsError: The directory /space/scratch/IBL_swr_data/ibl_swr_murphylab2024/swrs_session_edd22318-216c-44ff-bc24-49ce8be78374 already exists.
+
+andle(
   File "/home/acampbell/miniconda3/envs/ONE_ibl_env/lib/python3.10/site-packages/pandas/io/common.py", line 734, in get_handle
     check_parent_directory(str(handle))
   File "/home/acampbell/miniconda3/envs/ONE_ibl_env/lib/python3.10/site-packages/pandas/io/common.py", line 597, in check_parent_directory
