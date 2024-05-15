@@ -673,6 +673,7 @@ listener.start()
 data = np.load(session_npz_filepath)
 all_sesh_with_ca1_eid = data['all_sesh_with_ca1_eid_unique']
 del data
+all_sesh_with_ca1_eid[4:7]
 
 # run the processes with the specified number of cores:
 with Pool(pool_size, initializer=init_pool, initargs=(queue,)) as p:

@@ -177,14 +177,10 @@ for seshnum in tqdm(range(0, len(select_these_sessions)), desc="Processing", uni
         print('Check for overlapping movement artifacts')
         putative_ripples_df['Overlaps_with_movement'] = check_overlap(putative_ripples_df, overlapping_artifacts)
         
-        print('Filtering the putative ripples...')
-        filtered_df = putative_ripples_df[(putative_ripples_df['Overlaps_with_gamma'] == False) & (putative_ripples_df['Overlaps_with_movement'] == False)]
-        # this line filtered by max lfp ampiplitude which is pointless, should be removed
-        #filtered_df = filtered_df[filtered_df.Peak_Amplitude_lfpzscore > lfp_amplidude_threshold]
-        print('Writing filtered events to file')
-
-        filtered_df.to_csv(events_csv_path, index=True, compression='gzip')
-        new_row = {'session_id': session_id, 'probe_id': probe_id, 'ripple_number': filtered_df.shape[0]}
+        print('Writing events with fitlers to file')
+        putative_ripples_df.to_csv(events_csv_path, index=True, compression='gzip')
+        num_rips = (putative_ripples_df['Overlaps_with_gamma'] == False) & (putative_ripples_df['Overlaps_with_movement'] == False)
+        new_row = {'session_id': session_id, 'probe_id': probe_id, 'ripple_number': num_rips}
         eventspersession_df = pd.concat([eventspersession_df, pd.DataFrame([new_row])], ignore_index=True) 
         print('Done probe ' + str(probe_id))
         

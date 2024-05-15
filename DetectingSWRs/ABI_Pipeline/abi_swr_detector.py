@@ -620,7 +620,7 @@ pool_size = 6
     
 # already filterd for only brain observatory sessions
 session_list = sessions.index.values
-session_list = session_list # for testing
+session_list = session_list[0:5] # for testing
 
 # run the processes with the specified number of cores:
 with Pool(pool_size, initializer=init_pool, initargs=(queue,)) as p:

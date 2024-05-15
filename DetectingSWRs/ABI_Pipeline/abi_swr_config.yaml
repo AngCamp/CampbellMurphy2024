@@ -2,13 +2,14 @@
 # The pool size
 pool_size: 6
 # The SDK cache directory
-sdk_cache_dir: /space/scratch/allen_visbehave_data
+sdk_cache_dir: '/space/scratch/allen_visbehave_data'
 # The output directory
-output_dir: /space/scratch/allen_visbehave_swr_data
+output_dir: '/space/scratch/allen_visbehave_swr_data'
 # The SWR output directory
-swr_output_dir: allen_visbehave_swr_murphylab2024
+#swr_output_dir: allen_visbehave_swr_murphylab2024
+swr_output_dir: 'testing_dir'
 # The run name
-run_name: final_run
+run_name: 'final_run'
 # The sessions to select
 select_these_sessions: []
 # Whether to only use brain observatory sessions
@@ -18,9 +19,9 @@ dont_wipe_these_sessions: []
 # The gamma event threshold
 gamma_event_thresh: 3
 # The path to the gamma filter
-gamma_filter_path: /home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/frank2008_gamma_1500hz_bandpass_filter.npz
+gamma_filter_path: '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/frank2008_gamma_1500hz_bandpass_filter.npz'
 # The path to the theta filter
-theta_filter_path: /home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/theta_1500hz_bandpass_filter.npz
+theta_filter_path: '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/theta_1500hz_bandpass_filter.npz'
 # The ripple band threshold
 ripple_band_threshold: 2
 # The movement artifact ripple band threshold
@@ -32,15 +33,15 @@ save_lfp: true
 # The SDK cache directory for filtering
 sdk_cache_dir_filter: /space/scratch/allen_visbehave_data
 # The input directory
-input_dir_filter: /space/scratch/allen_visbehave_swr_data/allen_visbehave_swr_murphylab2024
+input_dir_filter: /space/scratch/allen_visbehave_swr_data/testing_dir
 # The output directory for filtering
 output_dir_filter: /space/scratch/allen_visbehave_swr_data/
 # The SWR output directory for filtering
-swr_output_dir_filter: allen_visbehave_swr_murphylab2024
+swr_output_dir_filter: testing_dir
 
 # Global_ripple_detector.py
 # The input directory
-input_dir_global: '/space/scratch/allen_visbehave_swr_data/allen_visbehave_swr_murphylab2024'
+input_dir_global: '/space/scratch/allen_visbehave_swr_data/testing_dir'
 # The output directory
 output_dir_global: .
 # The global ripple label
