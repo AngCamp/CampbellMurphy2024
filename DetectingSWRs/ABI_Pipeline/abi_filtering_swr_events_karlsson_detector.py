@@ -178,7 +178,7 @@ for seshnum in tqdm(range(0, len(select_these_sessions)), desc="Processing", uni
         putative_ripples_df['Overlaps_with_movement'] = check_overlap(putative_ripples_df, overlapping_artifacts)
         
         print('Writing events with fitlers to file')
-        putative_ripples_df.to_csv(events_csv_path, index=True, compression='gzip')
+        putative_ripples_df.reset_index(drop=True).to_csv(events_csv_path, index=False, compression='gzip')
         num_rips = (putative_ripples_df['Overlaps_with_gamma'] == False) & (putative_ripples_df['Overlaps_with_movement'] == False)
         new_row = {'session_id': session_id, 'probe_id': probe_id, 'ripple_number': num_rips}
         eventspersession_df = pd.concat([eventspersession_df, pd.DataFrame([new_row])], ignore_index=True) 
@@ -186,7 +186,6 @@ for seshnum in tqdm(range(0, len(select_these_sessions)), desc="Processing", uni
         
     # make list of global ripples
     # with peak ripple power detected in the hippocampal channels
-    
     
     print('Done session ' + str(session_id))
 

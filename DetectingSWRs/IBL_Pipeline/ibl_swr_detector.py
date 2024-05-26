@@ -488,7 +488,7 @@ def process_session(session_id):
             lfp_ca1, lfp_time_index = resample_signal(lfp_ca1, lfp_time_index_og, 1500.0) # note the original samplig rate is infered from the times object
             lfp_ca1 = lfp_ca1.T # transpose to get the right shape for the rest of the code
             
-            lfp_ca1_ripppleband = filter_ripple_band(lfp_ca1)
+            lfp_ca1_ripppleband = 
             highest_rip_power = np.abs(signal.hilbert(lfp_ca1_ripppleband))**2
             highest_rip_power = highest_rip_power.max(axis=0)
             

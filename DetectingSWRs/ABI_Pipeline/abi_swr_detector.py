@@ -492,7 +492,7 @@ def process_session(session_id):
             
             # Saving LFP for all channels used
             if save_lfp == True:
-                np.savez(os.path.join(session_lfp_subfolder, f"probe_{probe_id}_channel_{this_chan_id}_lfp_ca1_peakripplepower.npz"), lfp_ca1 = lfp_ca1)
+                np.savez(os.path.join(session_lfp_subfolder, f"probe_{probe_id}_channel_{this_chan_id}_lfp_ca1_peakripplepower.npz"), lfp_ca1 = peakripchan_lfp_ca1)
                 np.savez(os.path.join(session_lfp_subfolder, f"probe_{probe_id}_channel_{this_chan_id}_lfp_time_index_1500hz.npz"), lfp_time_index = lfp_time_index)
                 for i in [0,1]:
                     channel_outside_hp = str(take_two[i])
@@ -620,7 +620,7 @@ pool_size = 6
     
 # already filterd for only brain observatory sessions
 session_list = sessions.index.values
-session_list = session_list[0:5] # for testing
+session_list = session_list # for testing
 
 # run the processes with the specified number of cores:
 with Pool(pool_size, initializer=init_pool, initargs=(queue,)) as p:

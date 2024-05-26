@@ -31,6 +31,7 @@ with open('ibl_swr_config.yaml', 'r') as f:
 input_dir_global = config['input_dir_global']
 global_rip_label = config['global_rip_label']
 minimum_ripple_num = config['minimum_ripple_num']
+merge_events_offset = config['merge_events_offset']
 
 # Functions
 def check_overlap(df1, df2, offset=0):
@@ -121,7 +122,7 @@ def dataframe_union_of_event_times(list_of_event_intervals_df, offset=0, event_n
         Each DataFrame should have columns 'start_time' and 'end_time'
     offset : int, optional, time offset to merge intervals
     Returns
-    -------     
+    -------
     DataFrame : DataFrame of event times
         Columns are 'start_time' and 'end_time'
     """
@@ -130,30 +131,51 @@ def dataframe_union_of_event_times(list_of_event_intervals_df, offset=0, event_n
     union_df[event_name] = union_df.index
     return union_df
 
-def add_overlap_probes(df, df_dict, overlap_col_name='overlap_probes'):
-    """
-    Adds a column to a DataFrame that lists the probes that overlap with putative global event created from
-    the union of the DataFrames in df_dict
-    Parameters
-    ----------
-    df : DataFrame
-        DataFrame with columns 'start_time' and 'end_time'
-    df_dict : dict
-        Dictionary of DataFrames with columns 'start_time' and 'end_time'
-    overlap_col_name : str, optional, name of column to add to df
-    Returns
-    -------
-    DataFrame : DataFrame with new column 'overlap_probes'
-    """
+def add_overlap_probes(df, df_dict, overlap_col_name='overlap_probes', offset=0):
     overlap_probes = []
+    overlap_probes_row = []
+    peak_times = []
+    max_zscores = []
+    peak_probes = []
     for i, row in df.iterrows():
-        overlap_probes_row = []
+        overlap_probes_this_event = []
+        overlap_probes_row_this_event = []
+        peak_times_row = []
+        max_zscores_row = []
+        peak_probes_row = []
         for key, df_probe in df_dict.items():
-            overlap = any((df_probe['start_time'] < row['end_time']) & (df_probe['end_time'] > row['start_time']))
-            if overlap:
-                overlap_probes_row.append(key)
-        overlap_probes.append(overlap_probes_row)
+            overlap = (df_probe['start_time'] < row['end_time'] + offset) & (df_probe['end_time'] > row['start_time'] - offset)
+            if any(overlap):
+                overlap_probes_this_event.append(key)
+                peak_times_row.append(df_probe.loc[overlap, 'Peak_time'].values[0])
+                max_zscores_row.append(df_probe.loc[overlap, 'max_zscore'].values[0])
+                peak_probes_row.append(key)
+                overlap_probes_row_this_event.extend(np.where(overlap)[0].tolist())
+        overlap_probes.append(overlap_probes_this_event)
+        overlap_probes_row.append(overlap_probes_row_this_event)
+        max_zscore_idx = max_zscores_row.index(max(max_zscores_row))
+        peak_times.append(peak_times_row[max_zscore_idx])
+        max_zscores.append(max_zscores_row[max_zscore_idx])
+        peak_probes.append(peak_probes_row[max_zscore_idx])
     df[overlap_col_name] = overlap_probes
+    df['events_row_index'] = overlap_probes_row
+    df['global_peak_time'] = peak_times
+    df['global_max_zscore'] = max_zscores
+    df['peak_probe'] = peak_probes
+    
+    # New code to merge overlapping events
+    df = df.sort_values('start_time')
+    df['group'] = (df['start_time'] > df['end_time'].shift() + offset).cumsum()
+    df = df.groupby('group').agg({
+        'start_time': 'first',
+        'end_time': 'last',
+        overlap_col_name: 'first',
+        'events_row_index': 'first',
+        'global_peak_time': 'first',
+        'global_max_zscore': 'first',
+        'peak_probe': 'first'
+    }).reset_index(drop=True)
+    
     return df
 
 def find_probe_filename(unfiltered_swr_path, criteria1, criteria2):
@@ -234,7 +256,7 @@ for session_id in session_list:
         probe_event_dict[probe_id] = probe_event_df
         # at some point in the future we will tag each filtered event with a golbal_ripple id but for now we will not do this
         #probe_event_df.to_csv(os.path.join(sesh_path, 'session_{}_probe_{}_filtered_swrs.csv'.format(session_id, probe_id)), index=True)
-    putative_global_ripples = add_overlap_probes(putative_global_ripples, probe_event_dict, "probes_event_is_on")
+    putative_global_ripples = add_overlap_probes(putative_global_ripples, probe_event_dict, "probes_event_is_on",  offset=merge_events_offset)
     global_ripples_dict[session_id] = putative_global_ripples
     print(global_ripples_dict.keys())
-    putative_global_ripples.to_csv(os.path.join(sesh_path, 'session_{}_putative_global_swrs_{}.csv'.format(session_id, global_rip_label)), index=True)
+    putative_global_ripples.to_csv(os.path.join(sesh_path, 'session_{}_putative_global_swrs_{}.csv'.format(session_id, global_rip_label)), index=False, compression='gzip')

@@ -7,7 +7,7 @@ sdk_cache_dir: '/space/scratch/allen_visbehave_data'
 output_dir: '/space/scratch/allen_visbehave_swr_data'
 # The SWR output directory
 #swr_output_dir: allen_visbehave_swr_murphylab2024
-swr_output_dir: 'testing_dir'
+swr_output_dir: 'allen_visbehave_swr_murphylab2024'
 # The run name
 run_name: 'final_run'
 # The sessions to select
@@ -33,18 +33,20 @@ save_lfp: true
 # The SDK cache directory for filtering
 sdk_cache_dir_filter: /space/scratch/allen_visbehave_data
 # The input directory
-input_dir_filter: /space/scratch/allen_visbehave_swr_data/testing_dir
+input_dir_filter: /space/scratch/allen_visbehave_swr_data/allen_visbehave_swr_murphylab2024
 # The output directory for filtering
 output_dir_filter: /space/scratch/allen_visbehave_swr_data/
 # The SWR output directory for filtering
-swr_output_dir_filter: testing_dir
+swr_output_dir_filter: allen_visbehave_swr_murphylab2024
 
 # Global_ripple_detector.py
 # The input directory
-input_dir_global: '/space/scratch/allen_visbehave_swr_data/testing_dir'
+input_dir_global: '/space/scratch/allen_visbehave_swr_data/allen_visbehave_swr_murphylab2024'
 # The output directory
 output_dir_global: .
 # The global ripple label
 global_rip_label: 'no_movement_no_gamma'
 # The minimum number of ripples
 minimum_ripple_num: 100
+# If events start or end within this time frame of eachother they can be merged
+merge_events_offset: 0.025

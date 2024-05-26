@@ -32,7 +32,7 @@ input_dir_filter: '/space/scratch/IBL_swr_data/ibl_swr_murphylab2024'
 # Output directory for filtering
 output_dir_filter: '/space/scratch/IBL_swr_data'
 # SWR output directory for filtering
-swr_output_dir_filter: 'testing_dir'
+swr_output_dir_filter: 'ibl_swr_murphylab2024'
 
 # Global_ripple_detector.py
 #
@@ -44,5 +44,7 @@ output_dir_global: .
 global_rip_label: 'no_movement_no_gamma'
 # The minimum number of ripples
 minimum_ripple_num: 100
+# If events start or end within this time frame of eachother they can be merged
+merge_events_offset: 0.025
 
 
