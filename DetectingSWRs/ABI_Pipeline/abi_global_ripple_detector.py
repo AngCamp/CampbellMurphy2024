@@ -32,6 +32,7 @@ input_dir_global = config['input_dir_global']
 global_rip_label = config['global_rip_label']
 minimum_ripple_num = config['minimum_ripple_num']
 merge_events_offset = config['merge_events_offset']
+no_gamma = config['global_no_gamma']
 
 # Functions
 def check_overlap(df1, df2, offset=0):
@@ -236,7 +237,10 @@ for session_id in session_list:
         # filter out events with movement artifacts, or gamma band events
         filtered_events = probe_event_dict[probe_id]
 
-        filtered_events = filtered_events[(filtered_events.Overlaps_with_gamma==False)&(filtered_events.Overlaps_with_movement==False)]
+        if no_gamma:
+            filtered_events = filtered_events[(filtered_events.Overlaps_with_gamma==False)&(filtered_events.Overlaps_with_movement==False)]
+        else:
+            filtered_events = filtered_events[(filtered_events.Overlaps_with_movement==False)]
         probe_event_dict[probe_id] = filtered_events
     
     probe_list = new_probe_list # remove the probes that are not worth analyzing
