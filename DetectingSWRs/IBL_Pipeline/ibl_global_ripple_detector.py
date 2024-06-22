@@ -22,6 +22,7 @@ from scipy.ndimage import gaussian_filter1d
 from scipy import stats
 from tqdm import tqdm
 import yaml
+import traceback
 
 # Load the configuration from a YAML file
 with open('ibl_swr_config.yaml', 'r') as f:
@@ -216,51 +217,79 @@ session_list = list(eventspersession_df['session_id'].unique())
 
 global_ripples_dict = {}
 
-for session_id in session_list:
-    #session_id = session_list[sesh_num]
-    sesh_path = os.path.join(input_dir_global,'swrs_session_{}'.format(session_id))
-    probe_list = eventspersession_df.probe_id[eventspersession_df.session_id==session_id].unique()
-    
-    probe_event_dict = {}
-    probe_list = eventspersession_df.probe_id[eventspersession_df.session_id==session_id].unique()
-    new_probe_list =[]
-    for probe_id in probe_list:
+insufficient_ripples = []
 
-        eventfilename = find_probe_filename(sesh_path, criteria1= 'probe_{}'.format(probe_id), criteria2= 'karlsson_detector')
-        probe_file_path = os.path.join(sesh_path,eventfilename)
-        rips_on_probe = pd.read_csv(probe_file_path, index_col=0, compression='gzip')
-        if rips_on_probe.shape[0] > minimum_ripple_num:
-            probe_event_dict[probe_id] = rips_on_probe
-            new_probe_list.append(probe_id)  # add probe_id to new list
-        else:
-            continue
-        # filter out events with movement artifacts, or gamma band events
-        filtered_events = probe_event_dict[probe_id]
-
-        if no_gamma:
-            filtered_events = filtered_events[(filtered_events.Overlaps_with_gamma==False)&(filtered_events.Overlaps_with_movement==False)]
-        else:
-            filtered_events = filtered_events[(filtered_events.Overlaps_with_movement==False)]
-        probe_event_dict[probe_id] = filtered_events
-    
-    probe_list = new_probe_list # remove the probes that are not worth analyzing
-
-
-
-    # generate times of possible global ripples
-    putative_global_ripples = dataframe_union_of_event_times(list(probe_event_dict.values()), offset=0.02, event_name='putative_global_event_id')
-    
-    # check each probe for global ripples, give each ripple a global_event_id
-    for probe_id in probe_list:
-
-        mask = check_overlap(putative_global_ripples,  probe_event_dict[probe_id], offset=0.02)
-        probe_event_df = probe_event_dict[probe_id]
+for session_id in session_list:            
+    try:
+        #session_id = session_list[sesh_num]
+        sesh_path = os.path.join(input_dir_global,'swrs_session_{}'.format(session_id))
+        probe_list = eventspersession_df.probe_id[eventspersession_df.session_id==session_id].unique()
         
-        probe_event_df['putative_global_event_id'] = putative_global_ripples.putative_global_event_id[mask]
-        probe_event_dict[probe_id] = probe_event_df
-        # at some point in the future we will tag each filtered event with a golbal_ripple id but for now we will not do this
-        #probe_event_df.to_csv(os.path.join(sesh_path, 'session_{}_probe_{}_filtered_swrs.csv'.format(session_id, probe_id)), index=True)
-    putative_global_ripples = add_overlap_probes(putative_global_ripples, probe_event_dict, "probes_event_is_on",  offset=merge_events_offset)
-    global_ripples_dict[session_id] = putative_global_ripples
-    print(global_ripples_dict.keys())
-    putative_global_ripples.to_csv(os.path.join(sesh_path, 'session_{}_putative_global_swrs_{}.csv'.format(session_id, global_rip_label)), index=False, compression='gzip')
+        probe_event_dict = {}
+        probe_list = eventspersession_df.probe_id[eventspersession_df.session_id==session_id].unique()
+        
+        # check that there are sufficient ripples on at least one probe to pass the criteria
+        is_there_enough_ripples = False
+        for probe_id in probe_list:
+
+            eventfilename = find_probe_filename(sesh_path, criteria1= 'probe_{}'.format(probe_id), criteria2= 'karlsson_detector')
+            probe_file_path = os.path.join(sesh_path,eventfilename)
+            rip_df = pd.read_csv(probe_file_path, index_col=0, compression='gzip')
+            if (rip_df.shape[0]>minimum_ripple_num):
+                is_there_enough_ripples = True
+            if no_gamma & (rip_df[(rip_df['Overlaps_with_gamma']==False) &(rip_df['Overlaps_with_movement']==False)].shape[0]>minimum_ripple_num):
+                is_there_enough_ripples = True
+            elif rip_df[rip_df['Overlaps_with_movement']==False].shape[0]>minimum_ripple_num:
+                is_there_enough_ripples = True
+        # now we check and skip this iteration if none of the probes have enough
+        if is_there_enough_ripples == False:
+            insufficient_ripples.append(session_id)
+            print(f"{session_id} Does not have enough ripples to proceded")
+            continue
+        
+        
+        new_probe_list =[]
+        for probe_id in probe_list:
+
+            eventfilename = find_probe_filename(sesh_path, criteria1= 'probe_{}'.format(probe_id), criteria2= 'karlsson_detector')
+            probe_file_path = os.path.join(sesh_path,eventfilename)
+            rips_on_probe = pd.read_csv(probe_file_path, index_col=0, compression='gzip')
+            if rips_on_probe.shape[0] > minimum_ripple_num:
+                probe_event_dict[probe_id] = rips_on_probe
+                new_probe_list.append(probe_id)  # add probe_id to new list
+            else:
+                continue
+            # filter out events with movement artifacts, or gamma band events
+            filtered_events = probe_event_dict[probe_id]
+
+            if no_gamma:
+                filtered_events = filtered_events[(filtered_events.Overlaps_with_gamma==False)&(filtered_events.Overlaps_with_movement==False)]
+            else:
+                filtered_events = filtered_events[filtered_events.Overlaps_with_movement==False]
+            probe_event_dict[probe_id] = filtered_events
+        
+        probe_list = new_probe_list # remove the probes that are not worth analyzing
+
+
+
+        # generate times of possible global ripples
+        putative_global_ripples = dataframe_union_of_event_times(list(probe_event_dict.values()), offset=0.02, event_name='putative_global_event_id')
+        
+        # check each probe for global ripples, give each ripple a global_event_id
+        for probe_id in probe_list:
+
+            mask = check_overlap(putative_global_ripples,  probe_event_dict[probe_id], offset=0.02)
+            probe_event_df = probe_event_dict[probe_id]
+            
+            probe_event_df['putative_global_event_id'] = putative_global_ripples.putative_global_event_id[mask]
+            probe_event_dict[probe_id] = probe_event_df
+            # at some point in the future we will tag each filtered event with a golbal_ripple id but for now we will not do this
+            #probe_event_df.to_csv(os.path.join(sesh_path, 'session_{}_probe_{}_filtered_swrs.csv'.format(session_id, probe_id)), index=True)
+        putative_global_ripples = add_overlap_probes(putative_global_ripples, probe_event_dict, "probes_event_is_on",  offset=merge_events_offset)
+        global_ripples_dict[session_id] = putative_global_ripples
+        print(global_ripples_dict.keys())
+        putative_global_ripples.to_csv(os.path.join(sesh_path, 'session_{}_putative_global_swrs_{}.csv'.format(session_id, global_rip_label)), index=False, compression='gzip')
+    except:
+        traceback.print_exc() 
+print("Sessions with insufficient ripples...")
+print(insufficient_ripples)

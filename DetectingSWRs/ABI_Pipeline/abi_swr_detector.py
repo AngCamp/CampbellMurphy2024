@@ -378,7 +378,7 @@ def process_session(session_id):
     """
     session = cache.get_session_data(session_id)
     print("Starting Session id " + str(session_id))
-
+    probe_id = 'Not selected yet'
     # check if this session even has CA1 channels in it, if not skip this iteration and add the name to the list
     sesh_has_ca1 = np.isin('CA1', list(session.channels.ecephys_structure_acronym.unique()))
     if not sesh_has_ca1:
@@ -391,7 +391,10 @@ def process_session(session_id):
         # Create subfolder for session, will contain all csvs for events detected and .npy of ca1 channels and control channels 
         session_subfolder = "swrs_session_" + str(session_id)
         session_subfolder = os.path.join(swr_output_dir_path, session_subfolder)
-        os.makedirs(session_subfolder, exist_ok=True)
+        if os.path.exists(session_subfolder):
+            raise FileExistsError(f"The directory {session_subfolder} already exists.")
+        else:
+            os.makedirs(session_subfolder)
         
         if save_lfp == True:
             # Create subfolder for lfp data, will contain all npz files for lfp data

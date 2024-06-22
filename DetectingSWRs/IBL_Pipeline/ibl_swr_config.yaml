@@ -41,12 +41,12 @@ input_dir_global: '/space/scratch/IBL_swr_data/ibl_swr_murphylab2024'
 # The output directory
 output_dir_global: .
 # The global ripple label
-global_rip_label: 'no_movement'
+global_rip_label: 'no_movement_no_gamma'
 # The minimum number of ripples
 minimum_ripple_num: 100
 # If events start or end within this time frame of eachother they can be merged
 merge_events_offset: 0.025
 # whether or not to exclude events with gamma event overlap
-global_no_gamma: False
+global_no_gamma: True
 
 

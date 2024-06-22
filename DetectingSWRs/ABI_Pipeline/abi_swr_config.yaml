@@ -13,7 +13,7 @@ run_name: 'final_run'
 # The sessions to select
 select_these_sessions: []
 # Whether to only use brain observatory sessions
-only_brain_observatory_sessions: true
+only_brain_observatory_sessions: False
 # The sessions not to wipe
 dont_wipe_these_sessions: []
 # The gamma event threshold
