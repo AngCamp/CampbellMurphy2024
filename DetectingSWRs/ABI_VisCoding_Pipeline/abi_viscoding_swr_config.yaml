@@ -1,0 +1,53 @@
+# allen_swer_detector.py
+# The pool size
+pool_size: 6
+# The SDK cache directory
+sdk_cache_dir: '/space/scratch/allen_visbehave_data'
+# The output directory
+output_dir: '/space/scratch/allen_visbehave_swr_data'
+# The SWR output directory
+swr_output_dir: 'allen_viscoding_swr_murphylab2024'
+# The run name
+run_name: 'final_run'
+# The sessions to select
+select_these_sessions: []
+# Whether to only use brain observatory sessions
+only_brain_observatory_sessions: False
+# The sessions not to wipe
+dont_wipe_these_sessions: []
+# The gamma event threshold
+gamma_event_thresh: 3
+# The path to the gamma filter
+gamma_filter_path: '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/frank2008_gamma_1500hz_bandpass_filter.npz'
+# The path to the theta filter
+theta_filter_path: '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/theta_1500hz_bandpass_filter.npz'
+# The ripple band threshold
+ripple_band_threshold: 2
+# The movement artifact ripple band threshold
+movement_artifact_ripple_band_threshold: 2
+# Whether to save LFP
+save_lfp: true
+
+# Filtering_SWR_Events_Karlsson_detector.py
+# The SDK cache directory for filtering
+sdk_cache_dir_filter: /space/scratch/allen_visbehave_data
+# The input directory
+input_dir_filter: /space/scratch/allen_visbehave_swr_data/allen_viscoding_swr_murphylab2024
+# The output directory for filtering
+output_dir_filter: /space/scratch/allen_visbehave_swr_data/
+# The SWR output directory for filtering
+swr_output_dir_filter: allen_viscoding_swr_murphylab2024
+
+# Global_ripple_detector.py
+# The input directory
+input_dir_global: '/space/scratch/allen_visbehave_swr_data/allen_viscoding_swr_murphylab2024'
+# The output directory
+output_dir_global: .
+# The global ripple label
+global_rip_label: 'no_movement_no_gamma'
+# The minimum number of ripples
+minimum_ripple_num: 100
+# If events start or end within this time frame of eachother they can be merged
+merge_events_offset: 0.025
+# whether or not to exclude events with gamma event overlap
+global_no_gamma: True

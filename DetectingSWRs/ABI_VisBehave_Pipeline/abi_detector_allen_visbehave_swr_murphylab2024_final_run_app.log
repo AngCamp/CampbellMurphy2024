@@ -1,0 +1,28 @@
+root - ERROR - Error in session: 1063010385, probe id: 1063145255
+root - ERROR - Traceback (most recent call last):
+  File "/home/acampbell/NeuropixelsLFPOnRamp/DetectingSWRs/ABI_VisBehave_Pipeline/abi_visbehave_swr_detector.py", line 429, in process_session
+    lfp = session.get_lfp(probe_id)
+  File "/home/acampbell/miniconda3/envs/allensdk_env/lib/python3.10/site-packages/allensdk/brain_observatory/ecephys/behavior_ecephys_session.py", line 432, in get_lfp
+    return probe.lfp
+  File "/home/acampbell/miniconda3/envs/allensdk_env/lib/python3.10/site-packages/allensdk/brain_observatory/ecephys/_probe.py", line 108, in lfp
+    lfp = self._read_lfp_from_nwb()
+  File "/home/acampbell/miniconda3/envs/allensdk_env/lib/python3.10/site-packages/allensdk/brain_observatory/ecephys/_probe.py", line 359, in _read_lfp_from_nwb
+    path = self._probe_nwb_path()
+  File "/home/acampbell/miniconda3/envs/allensdk_env/lib/python3.10/site-packages/allensdk/brain_observatory/behavior/behavior_project_cache/project_apis/data_io/behavior_neuropixels_project_cloud_api.py", line 123, in f
+    return self._get_data_path(file_id=file_id)
+  File "/home/acampbell/miniconda3/envs/allensdk_env/lib/python3.10/site-packages/allensdk/brain_observatory/behavior/behavior_project_cache/project_apis/data_io/project_cloud_api_base.py", line 167, in _get_data_path
+    data_path = self.cache.download_data(file_id=file_id)
+  File "/home/acampbell/miniconda3/envs/allensdk_env/lib/python3.10/site-packages/allensdk/api/cloud_cache/cloud_cache.py", line 769, in download_data
+    self._update_list_of_downloads(file_attributes)
+  File "/home/acampbell/miniconda3/envs/allensdk_env/lib/python3.10/site-packages/allensdk/api/cloud_cache/cloud_cache.py", line 639, in _update_list_of_downloads
+    downloaded_data = json.load(in_file)
+  File "/home/acampbell/miniconda3/envs/allensdk_env/lib/python3.10/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+  File "/home/acampbell/miniconda3/envs/allensdk_env/lib/python3.10/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+  File "/home/acampbell/miniconda3/envs/allensdk_env/lib/python3.10/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+  File "/home/acampbell/miniconda3/envs/allensdk_env/lib/python3.10/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
