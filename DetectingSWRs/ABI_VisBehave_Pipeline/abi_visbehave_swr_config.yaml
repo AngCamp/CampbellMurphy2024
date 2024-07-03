@@ -51,4 +51,4 @@ minimum_ripple_num: 100
 # If events start or end within this time frame of eachother they can be merged
 merge_events_offset: 0.025
 # whether or not to exclude events with gamma event overlap
-global_no_gamma: False
+global_no_gamma: True

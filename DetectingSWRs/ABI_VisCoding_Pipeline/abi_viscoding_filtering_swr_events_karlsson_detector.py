@@ -34,6 +34,10 @@ input_dir_filter = config['input_dir_filter']
 output_dir_filter = config['output_dir_filter']
 swr_output_dir_filter = config['swr_output_dir_filter']
 select_these_sessions = config['select_these_sessions']
+if config['global_no_gamma']:
+    include_gamma_intersection = False
+else:
+    include_gamma_intersection = True
 
 
 # Functions
@@ -179,7 +183,7 @@ for seshnum in tqdm(range(0, len(select_these_sessions)), desc="Processing", uni
         
         print('Writing events with fitlers to file')
         putative_ripples_df.reset_index(drop=True).to_csv(events_csv_path, index=False, compression='gzip')
-        num_rips = (putative_ripples_df['Overlaps_with_gamma'] == False) & (putative_ripples_df['Overlaps_with_movement'] == False)
+        num_rips = ((putative_ripples_df['Overlaps_with_gamma'] == False) & (putative_ripples_df['Overlaps_with_movement'] == include_gamma_intersection)).sum()
         new_row = {'session_id': session_id, 'probe_id': probe_id, 'ripple_number': num_rips}
         eventspersession_df = pd.concat([eventspersession_df, pd.DataFrame([new_row])], ignore_index=True) 
         print('Done probe ' + str(probe_id))
@@ -189,5 +193,5 @@ for seshnum in tqdm(range(0, len(select_these_sessions)), desc="Processing", uni
     
     print('Done session ' + str(session_id))
 
-eventspersession_df.to_csv(os.path.join(swr_output_dir_path, 'eventspersession_df.csv'), index=True)
+eventspersession_df.to_csv(os.path.join(swr_output_dir_path, 'eventspersession_df.csv'), index=False, compression='gzip')
 print('Done all sessions.')

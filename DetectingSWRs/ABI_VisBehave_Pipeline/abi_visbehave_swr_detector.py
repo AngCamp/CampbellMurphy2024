@@ -618,16 +618,6 @@ def process_session(session_id):
         logging.error('Error in session: %s, probe id: %s', session_id, probe_id)
         logging.error(traceback.format_exc())
 
-# Initialize an empty list to store session_ids with 'CA1'
-sessions_with_CA1 = []
-
-# Iterate over each session_id in the DataFrame's index
-for session_id in sessions.index:
-    # Check if 'CA1' is in the structure_acronyms list for the current session_id
-    if 'CA1' in sessions.loc[session_id, 'structure_acronyms']:
-        # If 'CA1' is found, append the session_id to the list
-        sessions_with_CA1.append(session_id)
-
 queue = Queue()
 listener = Process(target=listener_process, args=(queue,))
 listener.start()
