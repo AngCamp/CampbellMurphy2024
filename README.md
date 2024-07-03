@@ -1,4 +1,4 @@
-# NeuropixelsLFPOnRamp
+# Mouse Hippocampal Sharp Wave Ripple Dataset Curated From Public Neuropixels Datasets
 
 ![](Images/Workflow_with_scripts1.png)
 
