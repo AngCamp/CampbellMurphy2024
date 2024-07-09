@@ -20,11 +20,7 @@ Notebooks include:
 ### conda_env_ymls
 YAML files for setting up the Conda environments used in this project.
 
-### Core
-Core funcitons used in many files here.
-
-### ExtractingSWRs
+### DetectingSWRs
 Code which loops through ABI and IBL sessions to generate the SWR dataset.  Because the IBL and ABI api's have conflicting requirements it is necessary to write scripts for each.  Multiprocessing is implemented.  Soon these will be put into a snakemake pipeline to provide an example of how to build reproducible workflows.
 
-![](Images/neurons.png)
 ![](Images/nplfptrace.png)
