@@ -55,4 +55,4 @@ Images for the repo.
 The code used to create the filters for the SWR detection pipelines.
 
 
-![](Images/figure_one_v6.svg)
+![](Images/figure_one_v6_opt.svg)
