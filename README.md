@@ -38,6 +38,10 @@ Contains the pipelines for running the detection scripts. Each pipeline contains
     python abi_visbehave_global_ripple_detector.py
     ```
 
+6.  Use ctrl+b, d to exit the tmux session without killing it. It is recomended to check htop to ensure the server is behaving appropriately.
+
+Note:  We have also created scripts for running the pipelines on slurm for shared computing clusters.  (Will be provided)
+
 ### Figures and Technical Validation
 
 Contains notebooks to create the images in the Background & Summary as well as the Technical Validation section. Includes methods for visualizing the ripples and methods for visualizing probe position in brainrender. In the IBL validation notebook, there are also methods for plotting the CSD plots.
