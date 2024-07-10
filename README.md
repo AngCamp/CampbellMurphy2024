@@ -3,24 +3,52 @@
 ![](Images/Workflow_with_scripts1.png)
 
 ## Description
-A Repo showcasing how to process and analyze Neuropixels LFP from the two largest publicly available datasets the ABI Visual Behaviour and the IBL dataset
-
-### CCF_reannotation
-Guide on how to reannotate CCF cooridnates to a more detailed brain atlas or brain atlas other than the Allen Institutes Atlas.
-
-### Example Notebooks (Tutorials)
-This directory contains jupyter example notebooks that demonstrate how each steps of the SWR extraction works and how to compare LFP to behavioural variables for running analyses.  Explains hwo to create and test your own filters, how to compute power, dimensionality reduction on LFP, and basic inferential statistical analyses that can be done using these methods.  Versions for the IBL and ABI are provided, or at least code for how to extract the same information.
-
-Notebooks include: 
-    Reannotation fo the brain atlas to other atalses or more detailed versions of ABI using the CCF values provided.
-    Visualization of steps in ExtractingSWRs code, example artifacts are shown and example LFP events.
-    Filters construction and testing notebook.
-    Statistical analysis notebook - tbd
+A repo showcasing how to process and analyze Neuropixels LFP from the two largest publicly available datasets: the ABI Visual Behaviour and the IBL dataset.
 
 ### conda_env_ymls
-YAML files for setting up the Conda environments used in this project.
+
+Contains the .yaml files for recreating the environments used to run the allensdk and associated codes, as well as the .yaml for the ONE_ibl_env conda environment to run the IBL associated code.
 
 ### DetectingSWRs
-Code which loops through ABI and IBL sessions to generate the SWR dataset.  Because the IBL and ABI api's have conflicting requirements it is necessary to write scripts for each.  Multiprocessing is implemented.  Soon these will be put into a snakemake pipeline to provide an example of how to build reproducible workflows.
 
-![](Images/nplfptrace.png)
+Contains the pipelines for running the detection scripts. Each pipeline contains a config file which sets input and output as well as parameters of the pipeline, such as ripple envelope threshold, and whether to include or exclude gamma band events when computing the global level events. If one wishes to rerun the detection pipelines, these config files can be modified accordingly.
+
+#### Example Usage
+1. Start a `tmux` session (as the code can take a while to run):
+    ```bash
+    tmux
+    ```
+
+2. Activate the `allensdk_env` conda environment:
+    ```bash
+    conda activate allensdk_env
+    ```
+
+3. Change directory to the pipeline folder:
+    ```bash
+    cd DetectingSWRs/ABI_VisBehave_Pipeline
+    ```
+
+4. Ensure the config file, `abi_visbehave_swr_config.yaml`, is set to use the appropriate number of cores that your machine can handle.
+
+5. Run the detection scripts in the following order:
+    ```bash
+    python abi_visbehave_swr_detector.py
+    python abi_visbehave_filtering_swr_events_karlsson_detector.py
+    python abi_visbehave_global_ripple_detector.py
+    ```
+
+### Figures and Technical Validation
+
+Contains notebooks to create the images in the Background & Summary as well as the Technical Validation section. Includes methods for visualizing the ripples and methods for visualizing probe position in brainrender. In the IBL validation notebook, there are also methods for plotting the CSD plots.
+
+### Images
+
+Images for the repo.
+
+### PowerBandFilters
+
+The code used to create the filters for the SWR detection pipelines.
+
+
+![](Images/figure_one_v6.png)
