@@ -6,7 +6,7 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2024-06-30T19:04:11.354283</dc:date>
+    <dc:date>2024-07-12T14:03:14.432750</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -65,7 +65,7 @@ C 339.806154 475.925187 348.628577 477.068371 356.990849 479.854001
 C 365.353121 482.639631 373.098661 487.015546 379.800364 492.740449 
 C 386.502066 498.465352 392.034443 505.432045 396.092429 513.256371 
 C 400.150415 521.080698 402.658024 529.616148 403.476982 538.39206 
-" clip-path="url(#p4e3881fcfb)" style="fill: #800080; opacity: 0.3; stroke: #800080; stroke-linejoin: miter"/>
+" clip-path="url(#pdecc77b41a)" style="fill: #800080; opacity: 0.3; stroke: #800080; stroke-linejoin: miter"/>
    </g>
    <g id="patch_3">
     <path d="M 403.476982 538.39206 
@@ -103,7 +103,7 @@ C 395.175641 520.428389 398.073583 524.331645 400.149042 528.677862
 C 402.224501 533.024078 403.438437 537.731502 403.72361 542.539392 
 C 403.698263 541.847346 403.665032 541.15561 403.623923 540.464321 
 C 403.582814 539.773032 403.533831 539.082234 403.476982 538.39206 
-" clip-path="url(#p4e3881fcfb)" style="fill: #800080; opacity: 0.5; stroke: #800080; stroke-linejoin: miter"/>
+" clip-path="url(#pdecc77b41a)" style="fill: #800080; opacity: 0.5; stroke: #800080; stroke-linejoin: miter"/>
    </g>
    <g id="patch_4">
     <path d="M 403.72361 542.539392 
@@ -127,7 +127,7 @@ C 403.761619 546.034106 403.767177 545.693592 403.770193 545.35305
 C 403.773209 545.012509 403.773681 544.67195 403.77161 544.331401 
 C 403.766546 544.032663 403.760014 543.733952 403.752014 543.435279 
 C 403.744014 543.136605 403.734546 542.837972 403.72361 542.539392 
-" clip-path="url(#p4e3881fcfb)" style="fill: #800080; opacity: 0.7; stroke: #800080; stroke-linejoin: miter"/>
+" clip-path="url(#pdecc77b41a)" style="fill: #800080; opacity: 0.7; stroke: #800080; stroke-linejoin: miter"/>
    </g>
    <g id="text_1">
     <text style="font: 700 8px 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle" x="244.536302" y="550.695574" transform="rotate(-0 244.536302 550.695574)">204259</text>
@@ -188,7 +188,7 @@ C 796.230553 478.59581 804.713576 479.698373 812.753393 482.380374
 C 820.79321 485.062375 828.239222 489.273576 834.680696 494.781679 
 C 841.122169 500.289783 846.438444 506.991613 850.336266 514.517487 
 C 854.234088 522.04336 856.640444 530.252304 857.422596 538.6915 
-" clip-path="url(#p651c428d1a)" style="fill: #0000ff; opacity: 0.3; stroke: #0000ff; stroke-linejoin: miter"/>
+" clip-path="url(#p5c3480afa3)" style="fill: #0000ff; opacity: 0.3; stroke: #0000ff; stroke-linejoin: miter"/>
    </g>
    <g id="patch_6">
     <path d="M 857.422596 538.6915 
@@ -226,7 +226,7 @@ C 849.612224 521.869413 852.339949 525.543924 854.293397 529.635364
 C 856.246845 533.726804 857.38927 538.158212 857.657393 542.684132 
 C 857.633373 542.017912 857.601792 541.351986 857.562656 540.686483 
 C 857.523519 540.02098 857.47683 539.355943 857.422596 538.6915 
-" clip-path="url(#p651c428d1a)" style="fill: #0000ff; opacity: 0.5; stroke: #0000ff; stroke-linejoin: miter"/>
+" clip-path="url(#p5c3480afa3)" style="fill: #0000ff; opacity: 0.5; stroke: #0000ff; stroke-linejoin: miter"/>
    </g>
    <g id="patch_7">
     <path d="M 857.657393 542.684132 
@@ -250,7 +250,7 @@ C 857.692806 545.973077 857.69793 545.65319 857.700718 545.333278
 C 857.703507 545.013366 857.703961 544.693438 857.70208 544.373519 
 C 857.697333 544.091891 857.691235 543.810288 857.683787 543.528718 
 C 857.676339 543.247149 857.667541 542.965617 857.657393 542.684132 
-" clip-path="url(#p651c428d1a)" style="fill: #0000ff; opacity: 0.7; stroke: #0000ff; stroke-linejoin: miter"/>
+" clip-path="url(#p5c3480afa3)" style="fill: #0000ff; opacity: 0.7; stroke: #0000ff; stroke-linejoin: miter"/>
    </g>
    <g id="text_8">
     <text style="font: 700 8px 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle" x="704.166747" y="550.56335" transform="rotate(-0 704.166747 550.56335)">193154</text>
@@ -311,7 +311,7 @@ C 342.471707 713.149852 352.850653 714.495458 362.688085 717.773355
 C 372.525517 721.051252 381.637212 726.200057 389.520683 732.935824 
 C 397.404153 739.671592 403.911768 747.868184 408.684647 757.073579 
 C 413.457527 766.278974 416.406291 776.320785 417.368323 786.64523 
-" clip-path="url(#p8edeadc4e8)" style="fill: #800080; opacity: 0.3; stroke: #800080; stroke-linejoin: miter"/>
+" clip-path="url(#p899d0abc49)" style="fill: #800080; opacity: 0.3; stroke: #800080; stroke-linejoin: miter"/>
    </g>
    <g id="patch_9">
     <path d="M 417.368323 786.64523 
@@ -349,7 +349,7 @@ C 407.674569 765.70477 411.059506 770.264544 413.483618 775.341706
 C 415.90773 780.418868 417.325417 785.917913 417.658153 791.534245 
 C 417.62845 790.71844 417.58944 789.903 417.54113 789.088084 
 C 417.49282 788.273169 417.435214 787.458831 417.368323 786.64523 
-" clip-path="url(#p8edeadc4e8)" style="fill: #800080; opacity: 0.5; stroke: #800080; stroke-linejoin: miter"/>
+" clip-path="url(#p899d0abc49)" style="fill: #800080; opacity: 0.5; stroke: #800080; stroke-linejoin: miter"/>
    </g>
    <g id="patch_10">
     <path d="M 417.658153 791.534245 
@@ -373,7 +373,7 @@ C 417.702318 795.613494 417.708758 795.216339 417.712256 794.819151
 C 417.715754 794.421964 417.716312 794.024757 417.713928 793.627561 
 C 417.708036 793.278595 417.700442 792.929659 417.691146 792.580767 
 C 417.68185 792.231875 417.670853 791.88303 417.658153 791.534245 
-" clip-path="url(#p8edeadc4e8)" style="fill: #800080; opacity: 0.7; stroke: #800080; stroke-linejoin: miter"/>
+" clip-path="url(#p899d0abc49)" style="fill: #800080; opacity: 0.7; stroke: #800080; stroke-linejoin: miter"/>
    </g>
    <g id="text_15">
     <text style="font: 700 8px 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle" x="230.319509" y="800.716586" transform="rotate(-0 230.319509 800.716586)">283523</text>
@@ -434,7 +434,7 @@ C 796.034385 717.547216 805.868226 718.802596 815.192682 721.889368
 C 824.517139 724.97614 833.157586 729.836496 840.637499 736.202386 
 C 848.117412 742.568276 854.296709 750.320481 858.8346 759.031462 
 C 863.37249 767.742444 866.183989 777.249067 867.114041 787.027034 
-" clip-path="url(#p6f807480c2)" style="fill: #0000ff; opacity: 0.3; stroke: #0000ff; stroke-linejoin: miter"/>
+" clip-path="url(#p1e76e60b09)" style="fill: #0000ff; opacity: 0.3; stroke: #0000ff; stroke-linejoin: miter"/>
    </g>
    <g id="patch_12">
     <path d="M 867.114041 787.027034 
@@ -472,7 +472,7 @@ C 858.663815 769.293495 861.637403 773.314258 863.763633 777.789271
 C 865.889864 782.264283 867.128701 787.109286 867.411462 792.055662 
 C 867.383329 791.216461 867.344469 790.377655 867.294893 789.539447 
 C 867.245317 788.70124 867.185028 787.863701 867.114041 787.027034 
-" clip-path="url(#p6f807480c2)" style="fill: #0000ff; opacity: 0.5; stroke: #0000ff; stroke-linejoin: miter"/>
+" clip-path="url(#p1e76e60b09)" style="fill: #0000ff; opacity: 0.5; stroke: #0000ff; stroke-linejoin: miter"/>
    </g>
    <g id="patch_13">
     <path d="M 867.411462 792.055662 
@@ -496,7 +496,7 @@ C 867.446051 795.549365 867.451061 795.213794 867.453854 794.878201
 C 867.456647 794.542608 867.457223 794.207001 867.455583 793.8714 
 C 867.451019 793.568717 867.44506 793.266057 867.437706 792.963429 
 C 867.430353 792.660802 867.421604 792.358209 867.411462 792.055662 
-" clip-path="url(#p6f807480c2)" style="fill: #0000ff; opacity: 0.7; stroke: #0000ff; stroke-linejoin: miter"/>
+" clip-path="url(#p1e76e60b09)" style="fill: #0000ff; opacity: 0.7; stroke: #0000ff; stroke-linejoin: miter"/>
    </g>
    <g id="text_22">
     <text style="font: 700 8px 'DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif', 'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica', 'Avant Garde', sans-serif; text-anchor: middle" x="693.04487" y="800.57228" transform="rotate(-0 693.04487 800.57228)">219177</text>
@@ -522,16 +522,16 @@ C 867.430353 792.660802 867.421604 792.358209 867.411462 792.055662
   </g>
  </g>
  <defs>
-  <clipPath id="p4e3881fcfb">
+  <clipPath id="pdecc77b41a">
    <rect x="135" y="426.875788" width="380.454545" height="237.048424"/>
   </clipPath>
-  <clipPath id="p651c428d1a">
+  <clipPath id="p5c3480afa3">
    <rect x="591.545455" y="430.87708" width="380.454545" height="229.04584"/>
   </clipPath>
-  <clipPath id="p8edeadc4e8">
+  <clipPath id="p899d0abc49">
    <rect x="135" y="655.35848" width="380.454545" height="279.043039"/>
   </clipPath>
-  <clipPath id="p6f807480c2">
+  <clipPath id="p1e76e60b09">
    <rect x="591.545455" y="666.790326" width="380.454545" height="256.179347"/>
   </clipPath>
  </defs>
