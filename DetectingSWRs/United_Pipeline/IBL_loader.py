@@ -44,8 +44,8 @@ class ibl_loader:
             Returns the instance for method chaining.
         """
         # Setup ONE API
-        ONE.setup(base_url="https://openalyx.internationalbrainlab.org", silent=True)
-        self.one = ONE(password="international")
+        ONE.setup(base_url='https://openalyx.internationalbrainlab.org', silent=True)
+        self.one = ONE(password='international', silent=True)
         self.one_exists = True
         
         # Setup Allen atlas and brain regions if not already provided
