@@ -2,10 +2,12 @@
 
 # General Settings
 run_name: 'on_the_cluster'
+# Unified output directory
+output_dir: '/space/scratch/SWR_final_pipeline/testing_dir'
 # Dataset-specific pool sizes
 pool_sizes:
   ibl: 2
-  allen: 6
+  abi: 6  # Changed from 'allen' to 'abi' to match code
 
 # Thresholds (common across both pipelines)
 gamma_event_thresh: 3
@@ -22,14 +24,13 @@ global_no_gamma: True
 filters:
   gamma_filters:
     ibl: '/home/acampbell/Stienmetz2019Reanalyzed/PowerBandFilters/swr_detection_script_filters_1500Hz/frank2008_gamma_1500hz_bandpass_filter.npz'
-    allen: '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/frank2008_gamma_1500hz_bandpass_filter.npz'
+    allen: '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/frank2008_gamma_1500hz_bandpass_filter.npz'  # Keep original key for backward compatibility
   theta_filter: '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/theta_1500hz_bandpass_filter.npz'
 
 # IBL-specific Settings
 ibl:
   # Cache and data directories
   oneapi_cache_dir: '/space/scratch/IBL_data_cache'
-  output_dir: '/space/scratch/IBL_swr_data/testing_dir'
   swr_output_dir: 'ibl_swr_murphylab2024'
   
   # Input files
@@ -41,21 +42,19 @@ ibl:
   
   # Filtering settings
   filtering:
-    input_dir: '/space/scratch/IBL_swr_data/ibl_swr_murphylab2024'
-    output_dir: '/space/scratch/IBL_swr_data'
+    input_dir: '${output_dir}/ibl_swr_murphylab2024'
     swr_output_dir: 'ibl_swr_murphylab2024'
   
   # Global ripple detection
   global_ripple:
-    input_dir: '/space/scratch/IBL_swr_data/ibl_swr_murphylab2024'
+    input_dir: '${output_dir}/ibl_swr_murphylab2024'
     output_dir: '.'
     global_rip_label: 'no_movement_no_gamma'
 
-# Allen-specific Settings
-allen:
+# ABI-specific Settings (Allen Brain Institute)
+abi:
   # Cache and data directories
   sdk_cache_dir: '/space/scratch/allen_visbehave_data'
-  output_dir: '/space/scratch/allen_visbehave_swr_data'
   swr_output_dir: 'allen_visbehave_swr_murphylab2024'
   
   # Session selection
@@ -66,12 +65,11 @@ allen:
   # Filtering settings
   filtering:
     sdk_cache_dir: '/space/scratch/allen_visbehave_data'
-    input_dir: '/space/scratch/allen_visbehave_swr_data/allen_visbehave_swr_murphylab2024'
-    output_dir: '/space/scratch/allen_visbehave_swr_data/'
+    input_dir: '${output_dir}/allen_visbehave_swr_murphylab2024'
     swr_output_dir: 'allen_visbehave_swr_murphylab2024'
   
   # Global ripple detection
   global_ripple:
-    input_dir: '/space/scratch/allen_visbehave_swr_data/allen_visbehave_swr_murphylab2024'
+    input_dir: '${output_dir}/allen_visbehave_swr_murphylab2024'
     output_dir: '.'
     global_rip_label: 'no_movement'

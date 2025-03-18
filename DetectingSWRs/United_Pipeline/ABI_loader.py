@@ -1,9 +1,20 @@
 # ABI Loaders
-# ABI Loader
 import time
+import os
 import numpy as np
+import yaml
 from scipy import signal, interpolate
+from allensdk.brain_observatory.behavior.behavior_project_cache import (
+    VisualBehaviorNeuropixelsProjectCache,
+)
 from allensdk.brain_observatory.ecephys.ecephys_project_cache import EcephysProjectCache
+
+# Use the Allen SDK to get sessions
+cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(cache_dir='/space/scratch/allen_visbehave_data')
+
+
+
+
 
 class abi_loader:
     def __init__(self, session_id):
@@ -36,11 +47,20 @@ class abi_loader:
             Returns the instance for method chaining.
         """
         # Set up the cache
-        manifest_path = "manifest.json"
+        config_path = os.environ.get('CONFIG_PATH', 'united_detector_config.yaml')
+        with open(config_path, "r") as f:
+            config_content = f.read()
+            full_config = yaml.safe_load(config_content)
+        dataset_config = full_config["abi"]
+        sdk_cache_dir = dataset_config["sdk_cache_dir"]
+        manifest_path = os.path.join(sdk_cache_dir, "manifest.json")
+        #cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(cache_dir=sdk_cache_dir)
+        
         if cache_directory is not None:
-            self.cache = EcephysProjectCache(manifest=manifest_path, fetch_api=EcephysProjectCache.from_warehouse(cache_directory))
+            #self.cache = EcephysProjectCache(manifest=manifest_path, fetch_api=EcephysProjectCache.from_warehouse(cache_directory))
+            self.cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(cache_dir=sdk_cache_dir)
         else:
-            self.cache = EcephysProjectCache(manifest=manifest_path)
+            self.cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(cache_dir=sdk_cache_dir)
             
         # Load the session
         self.session = self.cache.get_ecephys_session(ecephys_session_id=self.session_id)
@@ -161,7 +181,7 @@ class abi_loader:
             this_chan_id = None
             peakrippleband = None
             peakripchan_lfp_ca1 = None
-        
+        del lfp_ca1
         # Get control channels outside hippocampus
         idx = self.session.channels.probe_id == probe_id
         organisedprobechans = self.session.channels[idx].sort_values(
@@ -189,18 +209,17 @@ class abi_loader:
         for channel_outside_hp in take_two:
             movement_control_channel = lfp.sel(channel=channel_outside_hp)
             movement_control_channel = movement_control_channel.to_numpy()
-            
             # Resample to match CA1 data
-            interp_func = interpolate.interp1d(
-                lfp.time.values, movement_control_channel
-            )
+            interp_func = interpolate.interp1d(lfp.time.values, movement_control_channel)
+             # needed for ripple detector method
             movement_control_channel = interp_func(lfp_time_index)
+            movement_control_channel = movement_control_channel[:, None]
             control_channels.append(movement_control_channel)
         
         # Collect results
         results = {
             'probe_id': probe_id,
-            'lfp_ca1': lfp_ca1,
+            #'lfp_ca1': lfp_ca1,
             'lfp_time_index': lfp_time_index,
             'ca1_chans': lfp_ca1_chans,
             'control_lfps': control_channels,
@@ -213,7 +232,7 @@ class abi_loader:
         }
         
         return results
-    
+
     def resample_signal(self, signal_data, time_values, target_fs=1500.0):
         """
         Resamples a signal to the target sampling frequency.
@@ -248,7 +267,8 @@ class abi_loader:
             resampled = interp_func(new_time_values)
         else:
             # For multi-channel signals
-            resampled = np.zeros((signal_data.shape[0], len(new_time_values)))
+            #resampled = np.zeros((signal_data.shape[0], len(new_time_values)))
+            resampled = np.zeros((len(new_time_values), signal_data.shape[1]))
             for i in range(signal_data.shape[1]):
                 interp_func = interpolate.interp1d(
                     time_values, signal_data[:, i], bounds_error=False, fill_value="extrapolate"

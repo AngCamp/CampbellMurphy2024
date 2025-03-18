@@ -357,8 +357,9 @@ class ibl_loader:
         peak_channel_idx = highest_rip_power.argmax()
         peak_channel_id = ca1_chans[peak_channel_idx]
         peak_channel_raw_lfp = lfp_ca1[:, peak_channel_idx]
+        peakrippleband = lfp_ca1_rippleband[:, peak_channel_idx]
         print(f"Finding channel with highest ripple power...")
-        return peak_channel_idx, peak_channel_id, peak_channel_raw_lfp
+        return peak_channel_idx, peak_channel_id, peak_channel_raw_lfp, peakrippleband
     
     def process_probe(self, probe_idx, filter_ripple_band_func=None):
         """
@@ -436,7 +437,7 @@ class ibl_loader:
         
         # Step 12: Find channel with highest ripple power if function provided
         if filter_ripple_band_func is not None:
-            peak_idx, peak_id, peak_lfp = self.find_peak_ripple_channel(
+            peak_idx, peak_id, peak_lfp, peakrippleband = self.find_peak_ripple_channel(
                 lfp_ca1, ca1_chans, filter_ripple_band_func
             )
             
@@ -447,12 +448,13 @@ class ibl_loader:
             peak_id = None
             peak_lfp = None
             this_chan_id = None
-            
+            peakrippleband = None
+        del lfp_ca1
         # Collect results
         results = {
             'probe_id': probe_id,
             'probe_name': probe_name,
-            'lfp_ca1': lfp_ca1,
+            #'lfp_ca1': lfp_ca1,
             'lfp_time_index': lfp_time_index,
             'channels': channels,
             'ca1_chans': ca1_chans,
@@ -461,7 +463,8 @@ class ibl_loader:
             'peak_ripple_chan_idx': peak_idx,
             'peak_ripple_chan_id': peak_id,
             'peak_ripple_chan_raw_lfp': peak_lfp,
-            'chan_id_string': this_chan_id
+            'chan_id_string': this_chan_id,
+            'ripple_band': peakrippleband
         }
         
         return results
