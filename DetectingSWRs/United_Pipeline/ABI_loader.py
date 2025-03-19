@@ -140,48 +140,7 @@ class abi_loader:
         
         # Get LFP for the probe
         lfp = self.session.get_lfp(probe_id)
-        
-        # Get CA1 channels for this probe
-        ca1_chans = self.session.channels.probe_channel_number[
-            (self.session.channels.probe_id == probe_id)
-            & (self.session.channels.structure_acronym == "CA1")
-        ]
-        ca1_idx = np.isin(lfp.channel.values, ca1_chans.index.values)
-        ca1_idx = lfp.channel.values[ca1_idx]
-        
-        # Select CA1 channels
-        lfp_ca1 = lfp.sel(channel=ca1_idx)
-        lfp_ca1 = lfp_ca1.to_pandas()
-        lfp_ca1_chans = lfp_ca1.columns
-        lfp_ca1 = lfp_ca1.to_numpy()
-        
-        # Check for NaNs
-        if np.isnan(lfp_ca1).any():
-            print(f"NaN detected in LFP data for probe {probe_id}, skipping")
-            return None
-        
-        # Resample to 1500 Hz
-        lfp_ca1, lfp_time_index = self.resample_signal(
-            lfp_ca1, lfp.time.values, 1500.0
-        )
-        
-        # Find channel with highest ripple power if function provided
-        if filter_ripple_band_func is not None:
-            lfp_ca1_rippleband = filter_ripple_band_func(lfp_ca1)
-            highest_rip_power = np.abs(signal.hilbert(lfp_ca1_rippleband)) ** 2
-            highest_rip_power = highest_rip_power.max(axis=0)
-            
-            # Get channel with highest ripple power
-            peak_chan_idx = highest_rip_power.argmax()
-            this_chan_id = int(lfp_ca1_chans[peak_chan_idx])
-            peakrippleband = lfp_ca1_rippleband[:, peak_chan_idx]
-            peakripchan_lfp_ca1 = lfp_ca1[:, lfp_ca1_chans == this_chan_id]
-        else:
-            peak_chan_idx = None
-            this_chan_id = None
-            peakrippleband = None
-            peakripchan_lfp_ca1 = None
-        del lfp_ca1
+        og_lfp_obj_time_vals = lfp.time.values
         # Get control channels outside hippocampus
         idx = self.session.channels.probe_id == probe_id
         organisedprobechans = self.session.channels[idx].sort_values(
@@ -210,11 +169,55 @@ class abi_loader:
             movement_control_channel = lfp.sel(channel=channel_outside_hp)
             movement_control_channel = movement_control_channel.to_numpy()
             # Resample to match CA1 data
-            interp_func = interpolate.interp1d(lfp.time.values, movement_control_channel)
-             # needed for ripple detector method
-            movement_control_channel = interp_func(lfp_time_index)
+            movement_control_channel, lfp_time_index = self.resample_signal(movement_control_channel, lfp.time.values, 1500.0)
+            # needed for ripple detector method
+            #movement_control_channel = interp_func(lfp_time_index)
             movement_control_channel = movement_control_channel[:, None]
             control_channels.append(movement_control_channel)
+        
+        # Get CA1 channels for this probe
+        ca1_chans = self.session.channels.probe_channel_number[
+            (self.session.channels.probe_id == probe_id)
+            & (self.session.channels.structure_acronym == "CA1")
+        ]
+        ca1_idx = np.isin(lfp.channel.values, ca1_chans.index.values)
+        ca1_idx = lfp.channel.values[ca1_idx]
+        
+        # Select CA1 channels
+        lfp_ca1 = lfp.sel(channel=ca1_idx)
+        del lfp
+        lfp_ca1 = lfp_ca1.to_pandas()
+        lfp_ca1_chans = lfp_ca1.columns
+        lfp_ca1 = lfp_ca1.to_numpy()
+        
+        # Check for NaNs
+        if np.isnan(lfp_ca1).any():
+            print(f"NaN detected in LFP data for probe {probe_id}, skipping")
+            return None
+        
+        # Resample to 1500 Hz
+        lfp_ca1, lfp_time_index = self.resample_signal(
+            lfp_ca1, og_lfp_obj_time_vals, 1500.0
+        )
+        
+        # Find channel with highest ripple power if function provided
+        if filter_ripple_band_func is not None:
+            lfp_ca1_rippleband = filter_ripple_band_func(lfp_ca1)
+            highest_rip_power = np.abs(signal.hilbert(lfp_ca1_rippleband)) ** 2
+            highest_rip_power = highest_rip_power.max(axis=0)
+            
+            # Get channel with highest ripple power
+            peak_chan_idx = highest_rip_power.argmax()
+            this_chan_id = int(lfp_ca1_chans[peak_chan_idx])
+            peakrippleband = lfp_ca1_rippleband[:, peak_chan_idx]
+            peakripchan_lfp_ca1 = lfp_ca1[:, lfp_ca1_chans == this_chan_id]
+        else:
+            peak_chan_idx = None
+            this_chan_id = None
+            peakrippleband = None
+            peakripchan_lfp_ca1 = None
+        del lfp_ca1
+
         
         # Collect results
         results = {
