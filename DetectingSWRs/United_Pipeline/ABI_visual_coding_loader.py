@@ -4,15 +4,9 @@ import os
 import numpy as np
 import yaml
 from scipy import signal, interpolate
-from allensdk.brain_observatory.behavior.behavior_project_cache import (
-    VisualBehaviorNeuropixelsProjectCache,
-)
 from allensdk.brain_observatory.ecephys.ecephys_project_cache import EcephysProjectCache
 
-# Use the Allen SDK to get sessions
-cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(cache_dir='/space/scratch/allen_visbehave_data')
-
-class abi_loader:
+class abi_visual_coding_loader:
     def __init__(self, session_id):
         """
         Initialize the ABI loader with a session ID.
@@ -47,20 +41,19 @@ class abi_loader:
         with open(config_path, "r") as f:
             config_content = f.read()
             full_config = yaml.safe_load(config_content)
-        dataset_config = full_config["abi"]
+        dataset_config = full_config["abi_visual_coding"]
         sdk_cache_dir = dataset_config["sdk_cache_dir"]
         manifest_path = os.path.join(sdk_cache_dir, "manifest.json")
         #cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(cache_dir=sdk_cache_dir)
         
         if cache_directory is not None:
             #self.cache = EcephysProjectCache(manifest=manifest_path, fetch_api=EcephysProjectCache.from_warehouse(cache_directory))
-            self.cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(cache_dir=sdk_cache_dir)
+            self.cache = EcephysProjectCache.from_warehouse(manifest=manifest_path)
         else:
-            self.cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(cache_dir=sdk_cache_dir)
+            self.cache = EcephysProjectCache.from_warehouse(manifest=manifest_path)
             
         # Load the session
-        self.session = self.cache.get_ecephys_session(ecephys_session_id=self.session_id)
-        self.session.channels = self.session.get_channels()
+        self.session = self.cache.get_session_data(self.session_id)
         
         print(f"Session {self.session_id} loaded")
         return self
@@ -74,7 +67,7 @@ class abi_loader:
         bool
             True if CA1 channels exist, False otherwise
         """
-        has_ca1 = np.isin("CA1", list(self.session.channels.structure_acronym.unique()))
+        has_ca1 = np.isin("CA1", list(self.session.channels.ecephys_structure_acronym.unique()))
         
         if not has_ca1:
             print(f"Session {self.session_id} does not have CA1 channels")
@@ -90,14 +83,9 @@ class abi_loader:
         list
             List of probe IDs with CA1 channels
         """
-        # Get probes with LFP data
-        probes_table_df = self.cache.get_probe_table()
-        valid_lfp = probes_table_df[probes_table_df["has_lfp_data"]]
         
         # Get probes for this session
-        self.probe_id_list = list(
-            valid_lfp[valid_lfp.ecephys_session_id == self.session_id].index
-        )
+        self.probe_id_list = [int(item) for item in self.session.channels.probe_id.unique()]
         
         # Find probes with CA1 channels
         self.probes_of_interest = []
@@ -107,7 +95,7 @@ class abi_loader:
                 list(
                     self.session.channels[
                         self.session.channels.probe_id == probe_id
-                    ].structure_acronym.unique()
+                    ].ecephys_structure_acronym.unique()
                 ),
             )
             if has_ca1_and_exists:
@@ -149,7 +137,7 @@ class abi_loader:
         # Find channels outside hippocampus
         not_a_ca1_chan = np.logical_not(
             np.isin(
-                organisedprobechans.structure_acronym,
+                organisedprobechans.ecephys_structure_acronym,
                 ["CA3", "CA2", "CA1", "HPF", "EC", "DG"],
             )
         )

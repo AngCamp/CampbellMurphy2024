@@ -6,8 +6,9 @@ run_name: 'on_the_cluster'
 output_dir: '/space/scratch/SWR_final_pipeline/testing_dir'
 # Dataset-specific pool sizes
 pool_sizes:
+  aabi_visual_behaviour: 6  
+  abi_visual_coding: 6
   ibl: 2
-  abi: 6  # Changed from 'allen' to 'abi' to match code
 
 # Thresholds (common across both pipelines)
 gamma_event_thresh: 3
@@ -25,6 +26,53 @@ filters:
   gamma_filters: 'Filters/frank2008_gamma_1500hz_bandpass_filter.npz'
 #  gamma_filters: /home/acampbell/Stienmetz2019Reanalyzed/PowerBandFilters/swr_detection_script_filters_1500Hz/frank2008_gamma_1500hz_bandpass_filter.npz'
 #  theta_filter: '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/theta_1500hz_bandpass_filter.npz'
+
+# ABI-specific Settings (Allen Brain Institute)
+abi_visual_coding:
+  # Cache and data directories
+  sdk_cache_dir: '/space/scratch/allen_viscoding_data'
+  swr_output_dir: 'allen_viscoding_swr_murphylab2024'
+  
+  # Session selection
+  only_brain_observatory_sessions: False
+  dont_wipe_these_sessions: []
+  select_these_sessions: []
+  
+  # Filtering settings
+  filtering:
+    sdk_cache_dir: '/space/scratch/allen_viscoding_data'
+    input_dir: '${output_dir}/allen_viscoding_swr_murphylab2024'
+    swr_output_dir: 'allen_viscoding_swr_murphylab2024'
+  
+  # Global ripple detection
+  global_ripple:
+    input_dir: '${output_dir}/allen_viscoding_swr_murphylab2024'
+    output_dir: '.'
+    global_rip_label: 'no_movement'
+
+# ABI-specific Settings (Allen Brain Institute)
+abi_visual_behaviour:
+  # Cache and data directories
+  sdk_cache_dir: '/space/scratch/allen_visbehave_data'
+  swr_output_dir: 'allen_visbehave_swr_murphylab2024'
+  
+  # Session selection
+  only_brain_observatory_sessions: False
+  dont_wipe_these_sessions: []
+  select_these_sessions: []
+  
+  # Filtering settings
+  filtering:
+    sdk_cache_dir: '/space/scratch/allen_visbehave_data'
+    input_dir: '${output_dir}/allen_visbehave_swr_murphylab2024'
+    swr_output_dir: 'allen_visbehave_swr_murphylab2024'
+  
+  # Global ripple detection
+  global_ripple:
+    input_dir: '${output_dir}/allen_visbehave_swr_murphylab2024'
+    output_dir: '.'
+    global_rip_label: 'no_movement'
+
 
 # IBL-specific Settings
 ibl:
@@ -49,26 +97,3 @@ ibl:
     input_dir: '${output_dir}/ibl_swr_murphylab2024'
     output_dir: '.'
     global_rip_label: 'no_movement_no_gamma'
-
-# ABI-specific Settings (Allen Brain Institute)
-abi:
-  # Cache and data directories
-  sdk_cache_dir: '/space/scratch/allen_visbehave_data'
-  swr_output_dir: 'allen_visbehave_swr_murphylab2024'
-  
-  # Session selection
-  only_brain_observatory_sessions: False
-  dont_wipe_these_sessions: []
-  select_these_sessions: []
-  
-  # Filtering settings
-  filtering:
-    sdk_cache_dir: '/space/scratch/allen_visbehave_data'
-    input_dir: '${output_dir}/allen_visbehave_swr_murphylab2024'
-    swr_output_dir: 'allen_visbehave_swr_murphylab2024'
-  
-  # Global ripple detection
-  global_ripple:
-    input_dir: '${output_dir}/allen_visbehave_swr_murphylab2024'
-    output_dir: '.'
-    global_rip_label: 'no_movement'
