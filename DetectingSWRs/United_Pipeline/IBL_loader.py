@@ -1,16 +1,19 @@
 # IBL Loader
 import time
+import os
 import numpy as np
 from scipy import signal, interpolate
 from one.api import ONE
 import spikeglx
 from brainbox.io.one import SpikeSortingLoader, load_channel_locations
-from neurodsp.voltage import destripe_lfp
-import ibllib.atlas
+from ibldsp.voltage import destripe_lfp
+#from neurodsp.voltage import destripe_lfp
+#from ibllib.voltage import destripe_lfp
+#from ibllib.dsp.voltage import destripe_lfp
+#from ibllib.voltage.dsp import destripe_lfp
+#import ibllib.atlas
 from iblatlas.atlas import AllenAtlas
 from iblatlas.regions import BrainRegions
-
-
 
 class ibl_loader:
     def __init__(self, session_id):
@@ -81,7 +84,7 @@ class ibl_loader:
         """
         if self.probelist is None:
             self.get_probe_ids_and_names()
-            
+        print(probe_idx)
         probe_name = self.probenames[probe_idx]
         probe_id = self.probelist[probe_idx]
         print(f"Loading channel data for probe: {probe_id}")
@@ -274,7 +277,7 @@ class ibl_loader:
         # Extract data for these channels
         control_data = []
         for channel_idx in control_channels:
-            control_data.append(destriped[channel_idx, :])
+            control_data.append(destriped[channel_idx, :].flatten())
             
         return control_data, control_channels
     
@@ -302,7 +305,7 @@ class ibl_loader:
         dt_new = 1.0 / target_fs
         n_samples = int(np.ceil((t_end - t_start) / dt_new))
         new_time_index = t_start + np.arange(n_samples) * dt_new
-        
+
         # Check if lfp_data is 1D or 2D
         if lfp_data.ndim == 1:
             # For 1D array
@@ -380,26 +383,27 @@ class ibl_loader:
         if self.probelist is None:
             self.get_probe_ids_and_names()
             
-        # Step 1: Load channels
+        # Load channels
+        print(probe_idx)
         channels, probe_name, probe_id = self.load_channels(probe_idx)
         
-        # Step 2: Check for CA1 channels
+        # Check for CA1 channels
         if self.br is not None and not self.has_ca1_channels(channels):
             return None
             
-        # Step 3: Load bin file
+        # Load bin file
         bin_file = self.load_bin_file(probe_name)
         if bin_file is None:
             return None
-            
-        # Step 4: Read the data
+
+        # Read the data
         print(f"Reading LFP data for probe {probe_id}...")
         sr = spikeglx.Reader(bin_file)
         
-        # Step 5: Create time index
+        # Create time index
         lfp_time_index_og = self.create_time_index(sr, probe_id)
         
-        # Step 6: Extract raw data
+        # Extract raw data
         raw, fs_from_sr = self.extract_raw_data(sr)
         del sr  # Free memory
         
@@ -408,18 +412,14 @@ class ibl_loader:
         destriped = self.destripe_data(raw, fs_from_sr)
         del raw  # Free memory
         
-        # Step 8: Get CA1 channels
+        # Get CA1 channels
         lfp_ca1, ca1_chans = self.get_ca1_channels(channels, destriped)
         
-        # Step 9: Get non-hippocampal control channels for artifact detection
+        # Get non-hippocampal control channels for artifact detection
         print(f"Getting control channels for artifact detection probe {probe_id}...")
         control_data, control_channels = self.get_non_hippocampal_channels(channels, destriped)
         
-        # Step 10: Resample CA1 channels to 1500 Hz
-        print(f"Resampling CA1 channels to 1.5kHz probe {probe_id}...")
-        lfp_ca1, lfp_time_index = self.resample_signal(lfp_ca1, lfp_time_index_og, 1500.0)
-        
-        # Step 11: Resample control channels
+        #Resample control channels
         outof_hp_chans_lfp = []
         for channel_data in control_data:
             # Reshape to 2D array with shape (1, n_samples)
@@ -431,11 +431,15 @@ class ibl_loader:
             # Append to list, ensuring correct shape
             outof_hp_chans_lfp.append(lfp_control[:, None])
             del lfp_control  # Free memory
-        
-        del destriped  # Free memory for large array
         del control_data  # Free memory
         
-        # Step 12: Find channel with highest ripple power if function provided
+        # Resample CA1 channels to 1500 Hz
+        print(f"Resampling CA1 channels to 1.5kHz probe {probe_id}...")
+        lfp_ca1, lfp_time_index = self.resample_signal(lfp_ca1, lfp_time_index_og, 1500.0)
+        del destriped  # Free memory for large array
+        
+
+        #Find channel with highest ripple power if function provided
         if filter_ripple_band_func is not None:
             peak_idx, peak_id, peak_lfp, peakrippleband = self.find_peak_ripple_channel(
                 lfp_ca1, ca1_chans, filter_ripple_band_func
@@ -464,13 +468,32 @@ class ibl_loader:
             'peak_ripple_chan_id': peak_id,
             'peak_ripple_chan_raw_lfp': peak_lfp,
             'chan_id_string': this_chan_id,
-            'ripple_band': peakrippleband
+            'rippleband': peakrippleband
         }
         
         return results
-    
+
     def cleanup(self):
         """
         Cleans up resources to free memory.
         """
-        self.data_files = None
+        del self.one
+        s = str(self.data_files[0])
+
+        # Find the index of "raw_ephys_data" in the string
+        index = s.find("raw_ephys_data")
+
+        # Remove everything after "raw_ephys_data" including that string
+        s = s[:index]
+
+        # Remove the substring "PosixPath('"
+        s = s.replace("PosixPath('", "")
+
+        # Remove the trailing slash
+        s = s.rstrip("/")
+
+        # Define the bash command to delete the folder
+        cmd = f"rm -rf {s}"
+
+        # Execute the bash command
+        os.system(cmd)

@@ -22,10 +22,9 @@ global_no_gamma: True
 
 # Paths to Filters
 filters:
-  gamma_filters:
-    ibl: '/home/acampbell/Stienmetz2019Reanalyzed/PowerBandFilters/swr_detection_script_filters_1500Hz/frank2008_gamma_1500hz_bandpass_filter.npz'
-    allen: '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/frank2008_gamma_1500hz_bandpass_filter.npz'  # Keep original key for backward compatibility
-  theta_filter: '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/theta_1500hz_bandpass_filter.npz'
+  gamma_filters: 'Filters/frank2008_gamma_1500hz_bandpass_filter.npz'
+#  gamma_filters: /home/acampbell/Stienmetz2019Reanalyzed/PowerBandFilters/swr_detection_script_filters_1500Hz/frank2008_gamma_1500hz_bandpass_filter.npz'
+#  theta_filter: '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/theta_1500hz_bandpass_filter.npz'
 
 # IBL-specific Settings
 ibl:
