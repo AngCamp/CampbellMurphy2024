@@ -1,16 +1,16 @@
 # Consolidated SWR Detection Pipeline Configuration
 
 # General Settings
-run_name: 'on_the_cluster'
+run_name: $RUN_NAME 
 # Unified output directory
-output_dir: '/space/scratch/SWR_final_pipeline/testing_dir'
+output_dir: $OUTPUT_DIR
 # Dataset-specific pool sizes
 pool_sizes:
-  aabi_visual_behaviour: 6  
+  abi_visual_behaviour: 6  
   abi_visual_coding: 6
   ibl: 2
 
-# Thresholds (common across both pipelines)
+# Thresholds (common across all pipelines)
 gamma_event_thresh: 3
 ripple_band_threshold: 2
 movement_artifact_ripple_band_threshold: 2
@@ -30,7 +30,7 @@ filters:
 # ABI-specific Settings (Allen Brain Institute)
 abi_visual_coding:
   # Cache and data directories
-  sdk_cache_dir: '/space/scratch/allen_viscoding_data'
+  sdk_cache_dir: $ABI_VISUAL_CODING_SDK_CACHE
   swr_output_dir: 'allen_viscoding_swr_murphylab2024'
   
   # Session selection
@@ -40,7 +40,6 @@ abi_visual_coding:
   
   # Filtering settings
   filtering:
-    sdk_cache_dir: '/space/scratch/allen_viscoding_data'
     input_dir: '${output_dir}/allen_viscoding_swr_murphylab2024'
     swr_output_dir: 'allen_viscoding_swr_murphylab2024'
   
@@ -53,7 +52,7 @@ abi_visual_coding:
 # ABI-specific Settings (Allen Brain Institute)
 abi_visual_behaviour:
   # Cache and data directories
-  sdk_cache_dir: '/space/scratch/allen_visbehave_data'
+  sdk_cache_dir: $ABI_VISUAL_BEHAVIOUR_SDK_CACHE
   swr_output_dir: 'allen_visbehave_swr_murphylab2024'
   
   # Session selection
@@ -63,7 +62,6 @@ abi_visual_behaviour:
   
   # Filtering settings
   filtering:
-    sdk_cache_dir: '/space/scratch/allen_visbehave_data'
     input_dir: '${output_dir}/allen_visbehave_swr_murphylab2024'
     swr_output_dir: 'allen_visbehave_swr_murphylab2024'
   
@@ -77,7 +75,7 @@ abi_visual_behaviour:
 # IBL-specific Settings
 ibl:
   # Cache and data directories
-  oneapi_cache_dir: '/space/scratch/IBL_data_cache'
+  oneapi_cache_dir: $IBL_ONEAPI_CACHE
   swr_output_dir: 'ibl_swr_murphylab2024'
   
   # Input files
