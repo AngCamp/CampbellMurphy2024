@@ -7,11 +7,6 @@ from one.api import ONE
 import spikeglx
 from brainbox.io.one import SpikeSortingLoader, load_channel_locations
 from ibldsp.voltage import destripe_lfp
-#from neurodsp.voltage import destripe_lfp
-#from ibllib.voltage import destripe_lfp
-#from ibllib.dsp.voltage import destripe_lfp
-#from ibllib.voltage.dsp import destripe_lfp
-#import ibllib.atlas
 from iblatlas.atlas import AllenAtlas
 from iblatlas.regions import BrainRegions
 
