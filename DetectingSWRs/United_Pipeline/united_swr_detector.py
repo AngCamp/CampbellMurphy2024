@@ -43,8 +43,13 @@ else:
 # Load the configuration from a YAML file
 config_path = os.environ.get('CONFIG_PATH', 'united_detector_config.yaml')
 with open(config_path, "r") as f:
-    config_content = f.read()
-    full_config = yaml.safe_load(config_content)
+    # Parse the YAML content
+    raw_content = f.read()
+    # Replace environment variables
+    for key, value in os.environ.items():
+        raw_content = raw_content.replace(f"${key}", value)
+    # Load the YAML
+    full_config = yaml.safe_load(raw_content)
 
 # Extract the unified output directory first
 output_dir = full_config.get("output_dir", "")
@@ -479,10 +484,13 @@ def process_session(session_id):
             probelist, probenames = loader.get_probe_ids_and_names()
 
         process_stage = "Running through the probes in the session"
-        
+        icount = 0
         # Process each probe
         for this_probe in range(len(probelist)):
+            if icount > 0:
+                break
             icount = icount + 1
+            
             if DATASET_TO_PROCESS == 'ibl':
                 probe_name = probenames[this_probe]
             probe_id = probelist[this_probe]  # Always get the probe_id from probelist
@@ -729,7 +737,7 @@ elif DATASET_TO_PROCESS == "ibl":
 
 # run the processes with the specified number of cores:
 with Pool(pool_size, initializer=init_pool, initargs=(queue,)) as p:
-    p.map(process_session, all_sesh_with_ca1_eid[10:11])
+    p.map(process_session, all_sesh_with_ca1_eid[0:1])
 
 queue.put("kill")
 listener.join()

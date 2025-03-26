@@ -1,0 +1,20 @@
+name: ONE_ibl_env
+channels:
+  - edeno
+  - bioconda
+  - conda-forge
+  - r
+  - defaults
+dependencies:
+  - python=3.10.2
+  - ipykernel
+  - ripple_detection
+  - piso
+  - matplotlib
+  - statsmodels
+  - pyzmq[version='<25']
+  - jupyter_client[version='<8']
+  - notebook
+  - fitter
+  - vedo
+  - scipy
