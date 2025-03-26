@@ -46,7 +46,7 @@ class abi_visual_behaviour_loader:
         with open(config_path, "r") as f:
             config_content = f.read()
             full_config = yaml.safe_load(config_content)
-        dataset_config = full_config["abi"]
+        dataset_config = full_config["abi_visual_behaviour"]
         sdk_cache_dir = dataset_config["sdk_cache_dir"]
         manifest_path = os.path.join(sdk_cache_dir, "manifest.json")
         #cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(cache_dir=sdk_cache_dir)
