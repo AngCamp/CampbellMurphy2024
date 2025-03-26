@@ -1,0 +1,66 @@
+Config file united_detector_config.yaml is extended by additional config specified via the command line.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 8
+Rules claiming more threads will be scaled down.
+Job stats:
+job                count
+---------------  -------
+all                    1
+finalize               1
+process_dataset        3
+start                  1
+total                  6
+
+Select jobs to execute...
+
+[Tue Mar 25 22:46:48 2025]
+rule start:
+    output: results/start_marker.txt
+    jobid: 3
+    reason: Missing output files: results/start_marker.txt
+    resources: tmpdir=/tmp
+
+[Tue Mar 25 22:46:49 2025]
+Finished job 3.
+1 of 6 steps (17%) done
+Select jobs to execute...
+
+[Tue Mar 25 22:46:49 2025]
+rule process_dataset:
+    input: united_detector_config.yaml, results/start_marker.txt
+    output: results/ibl/processing_complete.txt
+    jobid: 2
+    reason: Missing output files: results/ibl/processing_complete.txt; Input files updated by another job: results/start_marker.txt
+    wildcards: dataset=ibl
+    threads: 2
+    resources: tmpdir=/tmp
+
+Activating conda environment: ONE_ibl_env
+Terminating processes on user request, this might take some time.
+[Tue Mar 25 22:47:42 2025]
+Error in rule process_dataset:
+    jobid: 2
+    input: united_detector_config.yaml, results/start_marker.txt
+    output: results/ibl/processing_complete.txt
+    conda-env: ONE_ibl_env
+    shell:
+        
+        echo "Starting processing ibl with 2 cores at $(date)"
+        
+        # Set environment variables
+        export DATASET_TO_PROCESS=ibl
+        export POOL_SIZE=2
+        
+        # Create output directory
+        mkdir -p results/ibl
+        
+        # Run the detector script with the dataset-specific pool size
+        python united_swr_detector.py
+        
+        # Create marker file to indicate completion
+        echo "Processing of ibl completed at $(date)" > results/ibl/processing_complete.txt
+        
+        (one of the commands exited with non-zero exit code; note that snakemake uses bash strict mode!)
+
+Complete log: .snakemake/log/2025-03-25T224643.543257.snakemake.log

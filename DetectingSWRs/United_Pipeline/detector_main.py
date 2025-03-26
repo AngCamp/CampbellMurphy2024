@@ -61,12 +61,18 @@ with open(config_path, "r") as f:
 output_dir = full_config.get("output_dir", "")
 
 # Load common settings
-pool_size = full_config["pool_sizes"][DATASET_TO_PROCESS]
+# pool_size = full_config["pool_sizes"][DATASET_TO_PROCESS]
 gamma_event_thresh = full_config["gamma_event_thresh"]
 ripple_band_threshold = full_config["ripple_band_threshold"]
 movement_artifact_ripple_band_threshold = full_config["movement_artifact_ripple_band_threshold"]
 run_name = full_config["run_name"]
 save_lfp = full_config["save_lfp"]
+
+# Check for environment variable override
+pool_size_env = os.environ.get('POOL_SIZE')
+if pool_size_env:
+    pool_size = int(pool_size_env)
+    print(f"Using pool size from environment variable: {pool_size}")
 
 # Load dataset-specific settings
 if DATASET_TO_PROCESS == 'ibl':

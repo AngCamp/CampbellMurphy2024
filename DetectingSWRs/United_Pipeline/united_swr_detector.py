@@ -660,9 +660,10 @@ def process_session(session_id):
         # in the session
         logging.log(MESSAGE, f"Processing complete for id {session_id}.")
     except Exception:
-
+        loader = None
         # removes saved files to save memory
-        loader.cleanup() 
+        if loader != None:
+            loader.cleanup() 
         
         # Check if the session subfolder is empty
         if os.path.exists(session_subfolder) and not os.listdir(session_subfolder):

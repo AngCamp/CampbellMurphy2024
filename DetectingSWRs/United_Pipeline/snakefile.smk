@@ -3,6 +3,9 @@
 # Configuration
 configfile: "united_detector_config.yaml"
 
+import os
+import numpy as np
+
 # Helper function to determine the appropriate conda environment
 def get_conda_env(dataset):
     if dataset in ["abi_visual_behaviour", "abi_visual_coding"]:
@@ -56,17 +59,19 @@ rule process_dataset:
         lambda wildcards: get_conda_env(wildcards.dataset)
     params:
         dataset = "{dataset}"
+    threads: lambda wildcards: config["pool_sizes"][wildcards.dataset]
     shell:
         """
-        echo "Starting processing {params.dataset} at $(date)"
+        echo "Starting processing {params.dataset} with {threads} cores at $(date)"
         
         # Set environment variables
         export DATASET_TO_PROCESS={params.dataset}
+        export POOL_SIZE={threads}
         
         # Create output directory
         mkdir -p results/{params.dataset}
         
-        # Run the detector script
+        # Run the detector script with the dataset-specific pool size
         python united_swr_detector.py
         
         # Create marker file to indicate completion
