@@ -686,7 +686,25 @@ def process_session(session_id):
 
 
 # set up the logging
+log_file = os.environ.get('LOG_FILE', f"{DATASET_TO_PROCESS}_detector_{swr_output_dir}_{run_name}_app.log")
 MESSAGE = 25  # Define a custom logging level, between INFO (20) and WARNING (30)
+logging.addLevelName(MESSAGE, "MESSAGE")
+
+# Set up file handler for logging
+file_handler = logging.FileHandler(log_file, mode="w")
+formatter = logging.Formatter("%(name)s - %(levelname)s - %(message)s")
+file_handler.setFormatter(formatter)
+
+# Set up root logger - but don't remove existing handlers
+root_logger = logging.getLogger()
+root_logger.setLevel(MESSAGE)  # Only log MESSAGE level and above
+root_logger.addHandler(file_handler)
+
+# Prevent propagation of lower-level warnings to the root logger
+for logger_name in ['hdmf', 'pynwb', 'spikeglx', 'ripple_detection']:
+    logger = logging.getLogger(logger_name)
+    logger.propagate = False  # Don't send these to the root logger
+
 
 # loading filters (crates artifacts in first and last ~ 3.5 seconds of recordings, remember to clip these off)
 # I don't think I need this it's at the start of my files
@@ -738,7 +756,29 @@ elif DATASET_TO_PROCESS == "ibl":
 
 # run the processes with the specified number of cores:
 with Pool(pool_size, initializer=init_pool, initargs=(queue,)) as p:
-    p.map(process_session, all_sesh_with_ca1_eid[0:1])
+    p.map(process_session, all_sesh_with_ca1_eid[10:11])
 
 queue.put("kill")
 listener.join()
+
+# Find and clean up empty session folders
+print(f"Checking for empty session folders in {swr_output_dir_path}")
+empty_folder_count = 0
+
+for folder_name in os.listdir(swr_output_dir_path):
+    folder_path = os.path.join(swr_output_dir_path, folder_name)
+    
+    # Check if it's a directory and starts with the session prefix
+    if os.path.isdir(folder_path) and folder_name.startswith("swrs_session_"):
+        # Check if the directory is empty
+        if not os.listdir(folder_path):
+            session_id = folder_name.replace("swrs_session_", "")
+            logging.log(MESSAGE, f"Empty session folder found and removed: {session_id}")
+            print(f"Removing empty session folder: {folder_path}")
+            
+            # Remove the empty directory
+            os.rmdir(folder_path)
+            empty_folder_count += 1
+
+print(f"Removed {empty_folder_count} empty session folders")
+logging.log(MESSAGE, f"Processing complete. Removed {empty_folder_count} empty session folders.")

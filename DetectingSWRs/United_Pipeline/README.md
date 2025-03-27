@@ -33,9 +33,9 @@ The pipeline uses several environment variables that you can override:
 
 | Variable | Description | Default Value |
 |----------|-------------|---------------|
-| `DATASET_TO_PROCESS` | The dataset type being processed | `"all"` |
 | `RUN_NAME` | Name for this processing run | `"on_the_cluster"` |
 | `OUTPUT_DIR` | Directory for output files | `"/space/scratch/SWR_final_pipeline/testing_dir"` |
+| `LOG_DIR` | Directory for log files | `"${OUTPUT_DIR}/logs"` |
 | `ABI_VISUAL_CODING_SDK_CACHE` | Cache dir for Allen Visual Coding data | `"/space/scratch/allen_viscoding_data"` |
 | `ABI_VISUAL_BEHAVIOUR_SDK_CACHE` | Cache dir for Allen Visual Behavior data | `"/space/scratch/allen_visbehave_data"` |
 | `IBL_ONEAPI_CACHE` | Cache dir for IBL data | `"/space/scratch/IBL_data_cache"` |
@@ -67,28 +67,38 @@ Dataset-specific settings are defined in `united_detector_config.yaml`:
 ### Basic Usage
 
 ```bash
-./run_pipeline.sh [dataset_type] [datasets_to_process] [max_cores]
-```
-
-Parameters:
-- `dataset_type`: Sets the `DATASET_TO_PROCESS` environment variable (default: "all")
-- `datasets_to_process`: Comma-separated list of datasets to process (default: "ibl,abi_visual_behaviour,abi_visual_coding")
-- `max_cores`: Maximum number of cores for Snakemake to use (default: 8)
-
-### Examples
-
-```bash
 # Run all datasets with default settings
 ./run_pipeline.sh
 
-# Run only IBL dataset
-./run_pipeline.sh ibl "ibl"
+# Explicitly run all datasets
+./run_pipeline.sh all
+```
 
-# Run Allen datasets with 12 cores
-./run_pipeline.sh all "abi_visual_behaviour,abi_visual_coding" 12
+### Running Specific Datasets
 
-# Run everything with a custom output directory
-OUTPUT_DIR="/path/to/output" ./run_pipeline.sh
+```bash
+# Run only the IBL dataset
+./run_pipeline.sh subset ibl
+
+# Run only the Allen Visual Behavior dataset
+./run_pipeline.sh subset abi_visual_behaviour
+
+# Run multiple specific datasets
+./run_pipeline.sh subset "ibl,abi_visual_coding"
+```
+
+### Additional Parameters
+
+The pipeline automatically handles resource allocation based on the settings in the configuration file. For advanced usage scenarios, additional parameters can be passed when running the script. Refer to the help information for details:
+
+```bash
+./run_pipeline.sh --help
+```
+
+### Getting Help
+
+```bash
+./run_pipeline.sh --help
 ```
 
 ## How It Works
@@ -100,19 +110,38 @@ OUTPUT_DIR="/path/to/output" ./run_pipeline.sh
    - Allen Visual Coding: 6 parallel sessions
 3. The sequence is enforced by Snakemake dependencies, while parallelism within datasets is managed by Python's multiprocessing.
 
+## Output Structure
+
+```
+OUTPUT_DIR/
+├── ibl_swr_murphylab2024/             # IBL dataset results
+│   └── swrs_session_[session_id]/     # Session-specific results
+├── allen_visbehave_swr_murphylab2024/ # Allen Visual Behavior results
+├── allen_viscoding_swr_murphylab2024/ # Allen Visual Coding results
+├── logs/                              # Log files
+└── results/                           # Snakemake results and markers
+```
+
 ## Troubleshooting
 
-### Previously Processed Sessions
+### Empty Session Directories
 
-If a session directory already exists, the script will skip that session. If you want to reprocess, you need to manually remove the session directories first.
+The pipeline automatically cleans up empty session directories and logs them.
 
 ### Memory Issues
 
-If you encounter memory issues, try reducing the pool sizes in the configuration file or running fewer datasets at once.
+If you encounter memory issues, try adjusting the pool sizes in the configuration file:
 
-### Logging
+```yaml
+pool_sizes:
+  abi_visual_behaviour: 6  # Reduce this number if needed
+  abi_visual_coding: 6     # Reduce this number if needed
+  ibl: 2                   # Reduce this number if needed
+```
 
-Logs are stored in dataset-specific log files. Check these files if you encounter issues during processing.
+### Log Files
+
+Check the log files in the `LOG_DIR` for detailed information about each dataset's processing.
 
 ## Citation
 

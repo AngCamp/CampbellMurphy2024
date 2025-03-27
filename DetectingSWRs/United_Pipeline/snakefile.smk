@@ -55,6 +55,8 @@ rule process_dataset:
         )
     output:
         marker = "results/{dataset}/processing_complete.txt"
+    log:
+        os.path.join(os.environ.get("LOG_DIR", "logs"), "{dataset}.log")
     conda:
         lambda wildcards: get_conda_env(wildcards.dataset)
     params:
@@ -67,12 +69,13 @@ rule process_dataset:
         # Set environment variables
         export DATASET_TO_PROCESS={params.dataset}
         export POOL_SIZE={threads}
+        export LOG_FILE={log}
         
         # Create output directory
         mkdir -p results/{params.dataset}
         
-        # Run the detector script with the dataset-specific pool size
-        python united_swr_detector.py
+        # Run the detector script with the dataset-specific pool size & log file specified
+        python united_swr_detector.py > {log} 2>&1
         
         # Create marker file to indicate completion
         echo "Processing of {params.dataset} completed at $(date)" > {output.marker}
