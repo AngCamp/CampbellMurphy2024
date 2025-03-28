@@ -231,12 +231,6 @@ if [ $PIPELINE_STATUS -eq 0 ]; then
         final_report.html \
         --cores 1
     
-    # Copy the report to the output directory if requested
-    if [ "$KEEP_REPORT" = true ] && [ -f "final_report.html" ]; then
-        cp final_report.html "$OUTPUT_DIR/"
-        echo "Report saved to: ${OUTPUT_DIR}/final_report.html"
-    fi
-    
     echo "========================================================"
     echo "Processing completed successfully!"
 else

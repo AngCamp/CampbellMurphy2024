@@ -44,14 +44,8 @@ class abi_visual_coding_loader:
         dataset_config = full_config["abi_visual_coding"]
         sdk_cache_dir = dataset_config["sdk_cache_dir"]
         manifest_path = os.path.join(sdk_cache_dir, "manifest.json")
-        #cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(cache_dir=sdk_cache_dir)
-        
-        if cache_directory is not None:
-            #self.cache = EcephysProjectCache(manifest=manifest_path, fetch_api=EcephysProjectCache.from_warehouse(cache_directory))
-            self.cache = EcephysProjectCache.from_warehouse(manifest=manifest_path)
-        else:
-            self.cache = EcephysProjectCache.from_warehouse(manifest=manifest_path)
-            
+        self.cache = EcephysProjectCache.from_warehouse(manifest=manifest_path)
+
         # Load the session
         self.session = self.cache.get_session_data(self.session_id)
         

@@ -8,9 +8,6 @@ from allensdk.brain_observatory.behavior.behavior_project_cache import (
     VisualBehaviorNeuropixelsProjectCache,
 )
 
-# Use the Allen SDK to get sessions
-#cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(cache_dir='/space/scratch/allen_visbehave_data')
-
 class abi_visual_behaviour_loader:
     def __init__(self, session_id):
         """
@@ -49,14 +46,8 @@ class abi_visual_behaviour_loader:
         dataset_config = full_config["abi_visual_behaviour"]
         sdk_cache_dir = dataset_config["sdk_cache_dir"]
         manifest_path = os.path.join(sdk_cache_dir, "manifest.json")
-        #cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(cache_dir=sdk_cache_dir)
-        
-        if cache_directory is not None:
-            #self.cache = EcephysProjectCache(manifest=manifest_path, fetch_api=EcephysProjectCache.from_warehouse(cache_directory))
-            self.cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(cache_dir=sdk_cache_dir)
-        else:
-            self.cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(cache_dir=sdk_cache_dir)
-            
+        self.cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(cache_dir=sdk_cache_dir)
+
         # Load the session
         self.session = self.cache.get_ecephys_session(ecephys_session_id=self.session_id)
         self.session.channels = self.session.get_channels()
