@@ -1,0 +1,5 @@
+root - ERROR - Traceback (most recent call last):
+  File "/home/acampbell/NeuropixelsLFPOnRamp/DetectingSWRs/United_Pipeline/united_swr_detector.py", line 454, in process_session
+    raise FileExistsError(f"The directory {session_subfolder} already exists.")
+FileExistsError: The directory /space/scratch/SWR_final_pipeline/testing_dir/allen_visbehave_swr_murphylab2024/swrs_session_1052533639 already exists.
+

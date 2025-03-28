@@ -9,7 +9,7 @@ from allensdk.brain_observatory.behavior.behavior_project_cache import (
 )
 
 # Use the Allen SDK to get sessions
-cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(cache_dir='/space/scratch/allen_visbehave_data')
+#cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(cache_dir='/space/scratch/allen_visbehave_data')
 
 class abi_visual_behaviour_loader:
     def __init__(self, session_id):

@@ -24,7 +24,8 @@ import yaml
 import string
 
 # Get loader type from environment variable with a default value
-DATASET_TO_PROCESS = os.environ.get('DATASET_TO_PROCESS').lower() # real code
+#DATASET_TO_PROCESS = os.environ.get('DATASET_TO_PROCESS', 'ibl').lower()
+DATASET_TO_PROCESS = 'abi_visual_behaviour'
 valid_datasets = ['ibl', 'abi_visual_behaviour', 'abi_visual_coding']
 if DATASET_TO_PROCESS not in valid_datasets:
     raise ValueError(f"DATASET_TO_PROCESS must be one of {valid_datasets}, got '{DATASET_TO_PROCESS}'")
