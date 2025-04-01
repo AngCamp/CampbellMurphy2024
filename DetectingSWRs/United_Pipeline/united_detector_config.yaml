@@ -23,9 +23,8 @@ global_no_gamma: True
 
 # Paths to Filters
 filters:
-  gamma_filters: 'Filters/frank2008_gamma_1500hz_bandpass_filter.npz'
-#  gamma_filters: /home/acampbell/Stienmetz2019Reanalyzed/PowerBandFilters/swr_detection_script_filters_1500Hz/frank2008_gamma_1500hz_bandpass_filter.npz'
-#  theta_filter: '/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/theta_1500hz_bandpass_filter.npz'
+  gamma_filter: 'Filters/frank2008_gamma_1500hz_bandpass_filter.npz'
+  sw_component_filter: 'Filters/sharpwave_componenet_8to40band_1500hz_band.npz'
 
 # ABI-specific Settings (Allen Brain Institute)
 abi_visual_coding:

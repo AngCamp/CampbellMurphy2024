@@ -121,6 +121,8 @@ OUTPUT_PARENT=$(dirname "$OUTPUT_DIR")
 export TEMP_WD="${OUTPUT_PARENT}/temp_wd_${RUN_ID}"
 export LOG_DIR="${OUTPUT_DIR}/logs/${RUN_ID}"
 export SNAKEMAKE_OUT="${TEMP_WD}/snakemake_output"
+# In your bash script
+export CONFIG_PATH="${TEMP_WD}/united_detector_config.yaml"
 
 # Set SDK/API cache locations
 export ABI_VISUAL_CODING_SDK_CACHE=${ABI_VISUAL_CODING_SDK_CACHE:-"/space/scratch/allen_viscoding_data"}

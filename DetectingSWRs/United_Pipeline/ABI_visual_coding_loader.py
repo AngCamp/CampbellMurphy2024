@@ -3,8 +3,16 @@ import time
 import os
 import numpy as np
 import yaml
+from scipy import io, signal, stats
+from scipy.signal import lfilter
+import scipy.ndimage
+from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter1d
+from scipy import interpolate
+import matplotlib.pyplot as plt
 from scipy import signal, interpolate
 from allensdk.brain_observatory.ecephys.ecephys_project_cache import EcephysProjectCache
+
 
 class abi_visual_coding_loader:
     def __init__(self, session_id):

@@ -2,7 +2,13 @@
 import time
 import os
 import numpy as np
-from scipy import signal, interpolate
+from scipy import io, signal, stats
+from scipy.signal import lfilter
+import scipy.ndimage
+from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter1d
+from scipy import interpolate
+import matplotlib.pyplot as plt
 from one.api import ONE
 import spikeglx
 from brainbox.io.one import SpikeSortingLoader, load_channel_locations

@@ -22,13 +22,19 @@ import sys
 from multiprocessing import Pool, Process, Queue, Manager, set_start_method
 import yaml
 import string
+from botocore.config import Config
+import boto3
+
+# to avoid time outs in some of the libraries
+my_config = Config(connect_timeout=60, read_timeout=1200)
+s3 = boto3.client('s3', config=my_config)
+
 
 # Get loader type from environment variable with a default value
 DATASET_TO_PROCESS = os.environ.get('DATASET_TO_PROCESS').lower() # real code
 valid_datasets = ['ibl', 'abi_visual_behaviour', 'abi_visual_coding']
 if DATASET_TO_PROCESS not in valid_datasets:
     raise ValueError(f"DATASET_TO_PROCESS must be one of {valid_datasets}, got '{DATASET_TO_PROCESS}'")
-
 
 # Lazy loading of the appropriate loader class
 if DATASET_TO_PROCESS == 'ibl':
@@ -40,8 +46,9 @@ elif DATASET_TO_PROCESS == 'abi_visual_coding':
 else:
     raise ValueError(f"Unknown dataset type: {DATASET_TO_PROCESS}")
 
-# Load the configuration from a YAML file
-config_path = os.environ.get('CONFIG_PATH', 'united_detector_config.yaml')
+# Create path to config file in the same directory
+config_path = os.environ.get('CONFIG_PATH', 'expanded_config.yaml')
+
 with open(config_path, "r") as f:
     # Parse the YAML content
     raw_content = f.read()
@@ -61,12 +68,13 @@ ripple_band_threshold = full_config["ripple_band_threshold"]
 movement_artifact_ripple_band_threshold = full_config["movement_artifact_ripple_band_threshold"]
 run_name = full_config["run_name"]
 save_lfp = full_config["save_lfp"]
+gamma_filters_path = full_config["filters"]["gamma_filter"]
+sharp_wave_component_path = full_config["filters"]["sw_component_filter"]
 
 # Load dataset-specific settings
 if DATASET_TO_PROCESS == 'ibl':
     # IBL specific settings
     dataset_config = full_config["ibl"]
-    gamma_filters_path = full_config["filters"]["gamma_filters"]
     oneapi_cache_dir = dataset_config["oneapi_cache_dir"]
     swr_output_dir = dataset_config["swr_output_dir"]
     dont_wipe_these_sessions = dataset_config["dont_wipe_these_sessions"]
@@ -76,7 +84,6 @@ if DATASET_TO_PROCESS == 'ibl':
 elif DATASET_TO_PROCESS == 'abi_visual_behaviour':
     # ABI (Allen) specific settings
     dataset_config = full_config["abi_visual_behaviour"]
-    gamma_filters_path = full_config["filters"]["gamma_filters"]
     #sdk_cache_dir = dataset_config["sdk_cache_dir"]
     swr_output_dir = dataset_config["swr_output_dir"]
     dont_wipe_these_sessions = dataset_config["dont_wipe_these_sessions"]
@@ -88,7 +95,6 @@ elif DATASET_TO_PROCESS == 'abi_visual_behaviour':
 elif DATASET_TO_PROCESS == 'abi_visual_coding':
     # ABI (Allen) specific settings
     dataset_config = full_config["abi_visual_coding"]
-    gamma_filters_path = full_config["filters"]["gamma_filters"]
     #sdk_cache_dir = dataset_config["sdk_cache_dir"]
     swr_output_dir = dataset_config["swr_output_dir"]
     dont_wipe_these_sessions = dataset_config["dont_wipe_these_sessions"]
@@ -363,6 +369,99 @@ def resample_signal(signal, times, new_rate):
 
     return new_signal, new_times
 
+def incorporate_sharp_wave_component_info(events_df, time_values, ripple_filtered, sharp_wave_lfp, sharpwave_filter):
+    """
+    Analyzes sharp wave components for each ripple event and adds metrics to the events dataframe.
+    
+    Parameters
+    ----------
+    events_df : pd.DataFrame
+        DataFrame containing detected ripple events (start_time, end_time, etc.)
+    time_values : np.array
+        Time values corresponding to the signal data
+    ripple_filtered : np.array
+        Filtered signal in the ripple band (150-250 Hz)
+    sharp_wave_lfp : np.array
+        Raw LFP from the sharp wave channel
+    sharpwave_filter : np.array
+        Filter coefficients for extracting the sharp wave component (8-40 Hz)
+        
+    Returns
+    -------
+    pd.DataFrame
+        Original events dataframe with added columns:
+        - sw_exceeds_threshold: Boolean indicating if sharp wave power exceeds 1 SD during ripple
+        - sw_peak_power: Peak z-scored sharp wave power during ripple
+        - sw_peak_time: Time of the peak sharp wave power during ripple
+        - sw_ripple_coherence: Phase coherence between ripple and sharp wave signals
+    """
+    
+    # Apply the sharp wave filter
+    sharp_wave_filtered = signal.fftconvolve(sharp_wave_lfp.reshape(-1), sharpwave_filter, mode="same")
+    
+    # Calculate power for sharp wave
+    sw_power = np.abs(signal.hilbert(sharp_wave_filtered)) ** 2
+    sw_power_z = stats.zscore(sw_power)
+    
+    # Get phases for coherence calculation
+    ripple_phase = np.angle(signal.hilbert(ripple_filtered))
+    sw_phase = np.angle(signal.hilbert(sharp_wave_filtered))
+    
+    # Create arrays for results
+    sw_exceeds_threshold = []
+    sw_peak_power = []
+    sw_peak_time = []
+    sw_ripple_coherence = []
+    
+    # Process each ripple event
+    for _, event in events_df.iterrows():
+        start_time = event['start_time']
+        end_time = event['end_time']
+        
+        # Find indices corresponding to the ripple event
+        ripple_idx = (time_values >= start_time) & (time_values <= end_time)
+        
+        # Get the z-scored sharp wave power during the ripple
+        sw_during_ripple = sw_power_z[ripple_idx]
+        
+        # Check if sharp wave power exceeds threshold during ripple
+        exceeds = np.any(sw_during_ripple > 1.0)
+        sw_exceeds_threshold.append(exceeds)
+        
+        # Get peak sharp wave power during ripple and its time
+        if len(sw_during_ripple) > 0:
+            peak_idx = np.argmax(sw_during_ripple)
+            peak_power = sw_during_ripple[peak_idx]
+            sw_time_points = time_values[ripple_idx]
+            peak_time = sw_time_points[peak_idx] if len(sw_time_points) > peak_idx else np.nan
+        else:
+            peak_power = np.nan
+            peak_time = np.nan
+        
+        sw_peak_power.append(peak_power)
+        sw_peak_time.append(peak_time)
+        
+        # Calculate phase coherence during ripple
+        ripple_phase_event = ripple_phase[ripple_idx]
+        sw_phase_event = sw_phase[ripple_idx]
+        
+        if len(ripple_phase_event) > 0:
+            # Phase Locking Value (PLV) = |mean(exp(1j*(phase1-phase2)))|
+            phase_diff = ripple_phase_event - sw_phase_event
+            coherence = np.abs(np.mean(np.exp(1j * phase_diff)))
+        else:
+            coherence = np.nan
+        
+        sw_ripple_coherence.append(coherence)
+    
+    # Add results to the dataframe
+    events_df['sw_exceeds_threshold'] = sw_exceeds_threshold
+    events_df['sw_peak_power'] = sw_peak_power
+    events_df['sw_peak_time'] = sw_peak_time
+    events_df['sw_ripple_coherence'] = sw_ripple_coherence
+    
+    return events_df
+
 def listener_process(queue):
     """
     This function listens for messages from the logging module and writes them to a log file.
@@ -460,8 +559,8 @@ def process_session(session_id):
             session_lfp_subfolder = os.path.join(lfp_output_dir_path, session_lfp_subfolder)
             os.makedirs(session_lfp_subfolder, exist_ok=True)
         
-        # Initialize and set up the IBL loader
-        process_stage = "Setting up IBL loader"
+        # Initialize and set up the loader
+        process_stage = "Setting up loader"
         
         if DATASET_TO_PROCESS == 'ibl':
             loader = ibl_loader(session_id)
@@ -470,7 +569,7 @@ def process_session(session_id):
         elif DATASET_TO_PROCESS == 'abi_visual_coding':
             loader = abi_visual_coding_loader(session_id)
         loader.set_up()
-        one_exists = True  # Mark that we have a connection for error handling
+
         
         # Get probe IDs and names
         process_stage = "Getting probe IDs and names"
@@ -582,6 +681,34 @@ def process_session(session_id):
                 col for col in Karlsson_ripple_times.columns if "speed" in col
             ]
             Karlsson_ripple_times = Karlsson_ripple_times.drop(columns=speed_cols)
+            # Extract the sharp wave channel data
+            sharp_wave_lfp = results['sharpwave_chan_raw_lfp']
+            sw_chan_id = results['sharpwave_chan_id']
+
+            # Save the sharp wave LFP to file
+            if save_lfp == True:
+                np.savez(
+                    os.path.join(
+                        session_lfp_subfolder,
+                        f"probe_{probe_id}_channel_{sw_chan_id}_lfp_ca1_sharpwave.npz",
+                    ),
+                    lfp_ca1=sharp_wave_lfp,
+                )
+
+            print("Incorporating sharp wave component information...")
+            # Load the sharp wave filter
+            sw_filter_data = np.load(sharp_wave_component_path)
+            sharpwave_filter = sw_filter_data['sharpwave_componenet_8to40band_1500hz_band']
+
+            # Analyze sharp wave components for each ripple
+            Karlsson_ripple_times = incorporate_sharp_wave_component_info(
+                events_df=Karlsson_ripple_times,
+                time_values=lfp_time_index,
+                ripple_filtered=peakrippleband,
+                sharp_wave_lfp=sharp_wave_lfp,
+                sharpwave_filter=sharpwave_filter
+            )
+
             csv_filename = (
                 f"probe_{probe_id}_channel_{this_chan_id}_karlsson_detector_events.csv"
             )
