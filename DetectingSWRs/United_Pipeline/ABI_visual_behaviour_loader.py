@@ -30,6 +30,7 @@ class abi_visual_behaviour_loader:
         self.session = None
         self.probe_id_list = None
         self.probes_of_interest = None
+        self.sw_channel_info = None
         
     def set_up(self, cache_directory=None):
         """
@@ -251,6 +252,8 @@ class abi_visual_behaviour_loader:
             'sharp_wave_lfp': sharp_wave_lfp,
             'sw_power_z': best_channel_power_z  # Include z-scored power of the selected channel
         }
+        
+        self.sw_channel_info
         
         return sw_results
 

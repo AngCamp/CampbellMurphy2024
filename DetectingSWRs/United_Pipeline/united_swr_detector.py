@@ -21,12 +21,14 @@ import logging.handlers
 import sys
 from multiprocessing import Pool, Process, Queue, Manager, set_start_method
 import yaml
+import json
+import gzip
 import string
 from botocore.config import Config
 import boto3
 
 # to avoid time outs in some of the libraries
-my_config = Config(connect_timeout=60, read_timeout=1200)
+my_config = Config(connect_timeout=600, read_timeout=1200)
 s3 = boto3.client('s3', config=my_config)
 
 
@@ -583,12 +585,12 @@ def process_session(session_id):
             probelist, probenames = loader.get_probe_ids_and_names()
 
         process_stage = "Running through the probes in the session"
-        icount = 0
+        #icount = 0
         # Process each probe
         for this_probe in range(len(probelist)):
-            if icount > 0:
-                break
-            icount = icount + 1
+            #if icount > 0:
+            #    break
+            #icount = icount + 1
             
             if DATASET_TO_PROCESS == 'ibl':
                 probe_name = probenames[this_probe]
@@ -708,6 +710,25 @@ def process_session(session_id):
                 sharp_wave_lfp=sharp_wave_lfp,
                 sharpwave_filter=sharpwave_filter
             )
+            
+            # save the info about sw band relation to the chosen channel for
+            # validation of the choices made 
+            if save_lfp == True:
+                np.savez(
+                    os.path.join(
+                        session_lfp_subfolder,
+                        f"probe_{probe_id}_channel_{sw_chan_id}_lfp_ca1_sharpwave.npz",
+                    ),
+                    lfp_ca1=sharp_wave_lfp,
+                )
+                
+                # Save loader.sw_channel_info as compressed JSON
+                channel_info_path = os.path.join(
+                    session_lfp_subfolder,
+                    f"probe_{probe_id}_channel_{sw_chan_id}_sw_channel_info.json.gz"
+                )
+                with gzip.open(channel_info_path, 'wt', encoding='utf-8') as f:
+                    json.dump(loader.sw_channel_info, f)
 
             csv_filename = (
                 f"probe_{probe_id}_channel_{this_chan_id}_karlsson_detector_events.csv"
@@ -883,7 +904,7 @@ elif DATASET_TO_PROCESS == "ibl":
 
 # run the processes with the specified number of cores:
 with Pool(pool_size, initializer=init_pool, initargs=(queue,)) as p:
-    p.map(process_session, all_sesh_with_ca1_eid[10:11])
+    p.map(process_session, all_sesh_with_ca1_eid[0:11])
 
 queue.put("kill")
 listener.join()
