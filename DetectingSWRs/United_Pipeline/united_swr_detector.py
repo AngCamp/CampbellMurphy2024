@@ -28,9 +28,8 @@ from botocore.config import Config
 import boto3
 
 # to avoid time outs in some of the libraries
-my_config = Config(connect_timeout=600, read_timeout=1200)
+my_config = Config(connect_timeout=1200, read_timeout=1200)
 s3 = boto3.client('s3', config=my_config)
-
 
 # Get loader type from environment variable with a default value
 DATASET_TO_PROCESS = os.environ.get('DATASET_TO_PROCESS').lower() # real code
@@ -529,10 +528,15 @@ def process_session(session_id):
     - The SWR detector used is the Karlsson ripple detector from the ripple_detection module.
     - The folders are titled by session and all files contain the name of the probe and the channel they originated from
     """
+    # to avoid time outs in some of the libraries
+    my_config = Config(connect_timeout=1200, read_timeout=1200)
+    s3 = boto3.client('s3', config=my_config)
+    
     
     process_stage = f"Starting the process, session{str(session_id)}"  # for debugging
     probe_id = "Not Loaded Yet"
     one_exists = False
+    
     # Add this near the beginning of the function
     data_files = None
     process_stage = "Starting the process"  # for debugging
@@ -891,6 +895,7 @@ if DATASET_TO_PROCESS == "abi_visual_behaviour":
     data = np.load(data_file_path)
     all_sesh_with_ca1_eid = data["data"]
     del data
+    all_sesh_with_ca1_eid = [1065905010, 1064415305, 1055403683]
     print(f"Loaded {len(all_sesh_with_ca1_eid)} sessions from {data_file_path}")
 
 elif DATASET_TO_PROCESS == "ibl":
@@ -904,7 +909,7 @@ elif DATASET_TO_PROCESS == "ibl":
 
 # run the processes with the specified number of cores:
 with Pool(pool_size, initializer=init_pool, initargs=(queue,)) as p:
-    p.map(process_session, all_sesh_with_ca1_eid[0:11])
+    p.map(process_session, all_sesh_with_ca1_eid[0:1])
 
 queue.put("kill")
 listener.join()
