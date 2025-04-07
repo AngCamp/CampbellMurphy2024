@@ -121,141 +121,167 @@ class abi_visual_behaviour_loader:
         print(f"Found {len(self.probes_of_interest)} probes with CA1 channels")
         return self.probes_of_interest
 
-    def select_sharpwave_channel(self, ca1_lfp, lfp_time_index, ca1_chan_ids, 
-                                this_chan_id, channel_positions, ripple_filtered, running_exclusion_periods=None):
+    def _compute_modulation_index(self, sw_phase, ripple_amp, valid_mask, n_bins=18):
         """
-        Selects the optimal sharp wave channel based on correlation with ripple power.
-        
+        Compute the circular-linear correlation between sharp wave phase and ripple amplitude.
+
         Parameters
         ----------
-        ca1_lfp : numpy.ndarray
-            LFP data for CA1 channels
-        lfp_time_index : numpy.ndarray
-            Time index for the LFP data
-        ca1_chan_ids : list
-            List of CA1 channel IDs
-        this_chan_id : int
-            Channel ID of the selected ripple channel
-        channel_positions : pandas.Series
-            Vertical positions of channels
-        ripple_filtered : numpy.ndarray
-            Already filtered signal in the ripple band
-        running_exclusion_periods : list, optional
-            List of (start, end) tuples for periods to exclude
-            
+        sw_phase : np.ndarray
+            Instantaneous phase of the sharp wave filtered signal (in radians).
+        ripple_amp : np.ndarray
+            Instantaneous amplitude envelope of the ripple filtered signal.
+        valid_mask : np.ndarray of bool
+            Boolean mask selecting valid time points to include (e.g., high power, no artifacts).
+
         Returns
         -------
-        dict
-            Dictionary with best sharpwave channel information
+        float
+            Circular-linear correlation coefficient. Returns np.nan if insufficient data is available.
         """
-        
-        # Load the pre-designed filter
+
+        sw_phase = sw_phase[valid_mask]
+        ripple_amp = ripple_amp[valid_mask]
+        if ripple_amp.size < 10:
+            return np.nan
+
+        bins = np.linspace(-np.pi, np.pi, n_bins + 1)
+        digitized = np.digitize(sw_phase, bins) - 1
+        amp_by_bin = np.array([
+            ripple_amp[digitized == j].mean() if np.any(digitized == j) else 0
+            for j in range(n_bins)
+        ])
+        if amp_by_bin.sum() == 0:
+            return np.nan
+
+        P = amp_by_bin / amp_by_bin.sum()
+        H = -np.sum(P * np.log(P + 1e-10))
+        H_max = np.log(n_bins)
+        return (H_max - H) / H_max
+
+
+    def _compute_circular_linear_corr(self, sw_phase, ripple_amp, valid_mask):
+        """
+        Compute the circular-linear correlation between sharp wave phase and ripple amplitude.
+
+        Parameters
+        ----------
+        sw_phase : np.ndarray
+            Instantaneous phase of the sharp wave filtered signal (in radians).
+        ripple_amp : np.ndarray
+            Instantaneous amplitude envelope of the ripple filtered signal.
+        valid_mask : np.ndarray of bool
+            Boolean mask selecting valid time points to include (e.g., high power, no artifacts).
+
+        Returns
+        -------
+        float
+            Circular-linear correlation coefficient. Returns np.nan if insufficient data is available.
+        """
+        sw_phase = sw_phase[valid_mask]
+        ripple_amp = ripple_amp[valid_mask]
+        if ripple_amp.size < 10:
+            return np.nan
+
+        weighted_cos = np.sum(ripple_amp * np.cos(sw_phase))
+        weighted_sin = np.sum(ripple_amp * np.sin(sw_phase))
+        R = np.sqrt(weighted_cos ** 2 + weighted_sin ** 2)
+        norm = np.sqrt(np.sum(ripple_amp ** 2))
+        return R / norm
+
+
+    def select_sharpwave_channel(
+            self,
+            ca1_lfp,
+            lfp_time_index,
+            ca1_chan_ids,
+            this_chan_id,
+            channel_positions,
+            ripple_filtered,
+            running_exclusion_periods=None,
+            selection_metric='modulation_index'):
+        """
+        Select the optimal sharp wave channel based on phase-amplitude coupling with ripple activity.
+
+        Parameters:
+        [existing parameters]
+
+        Returns:
+        tuple
+            (best_channel_id, best_channel_lfp) - The best channel ID and its raw LFP data
+        """
         filter_data = np.load(self.sw_component_filter_path)
         sharpwave_filter = filter_data['sharpwave_componenet_8to40band_1500hz_band']
-        
-        # Create exclusion mask
-        mask = np.ones_like(lfp_time_index, dtype=bool)
-        # Exclude first 3.5 seconds and last 3.5 seconds
-        mask &= (lfp_time_index > 3.5) & (lfp_time_index < (lfp_time_index[-1] - 3.5))
 
+        mask = (lfp_time_index > 3.5) & (lfp_time_index < lfp_time_index[-1] - 3.5)
         if running_exclusion_periods:
-            for start_time, end_time in running_exclusion_periods:
-                mask &= ~((lfp_time_index >= start_time) & (lfp_time_index <= end_time))
+            for start, end in running_exclusion_periods:
+                mask &= ~((lfp_time_index >= start) & (lfp_time_index <= end))
+
+        ripple_an = hilbert(ripple_filtered)
+        ripple_phase = np.angle(ripple_an)
+        ripple_amp = np.abs(ripple_an)
+        ripple_power = ripple_amp ** 2
+        ripple_power_z = (ripple_power - ripple_power[mask].mean()) / ripple_power[mask].std()
+
+        ref_depth = channel_positions.loc[this_chan_id]
+        below_ids = channel_positions[channel_positions > ref_depth].index
+        id_to_idx = {cid: i for i, cid in enumerate(ca1_chan_ids)}
+        below_idx = [id_to_idx[cid] for cid in below_ids if cid in id_to_idx]
+
+        # Create dictionary to store detailed results for selection logic
+        results = {}
         
-        # Find channels below the reference
-        this_chan_position = channel_positions.loc[this_chan_id]
-        below_channels_mask = channel_positions > this_chan_position
-        below_channel_ids = channel_positions[below_channels_mask].index.values
-        
-        # Map channel IDs to indices
-        chan_id_to_idx = {chan_id: i for i, chan_id in enumerate(ca1_chan_ids)}
-        below_channel_indices = [chan_id_to_idx[chan_id] for chan_id in below_channel_ids if chan_id in chan_id_to_idx]
-        
-        # Calculate ripple power from the filtered signal
-        ripple_power = np.abs(hilbert(ripple_filtered)) ** 2
-        
-        # Z-score the ripple power
-        ripple_power_z = (ripple_power - np.mean(ripple_power[mask])) / np.std(ripple_power[mask])
-        
-        # Get analytic signal and extract instantaneous phase of ripple band
-        ripple_analytic = hilbert(ripple_filtered)
-        ripple_phase = np.angle(ripple_analytic)
-        
-        # Create a dictionary to store results for each channel
-        channel_results = {}
-        
-        # Process all channels
-        for i, idx in enumerate(below_channel_indices):
-            chan_id = below_channel_ids[i]
-            
-            # Apply sharpwave filter using convolve
-            sw_filtered = fftconvolve(ca1_lfp[:, idx].reshape(-1), sharpwave_filter, mode="same")
-            
-            # Get power
-            sw_power = np.abs(hilbert(sw_filtered)) ** 2
-            
-            # Z-score the sharpwave power
-            sw_power_z = (sw_power - np.mean(sw_power[mask])) / np.std(sw_power[mask])
-            
-            # Calculate correlation for all valid points
-            valid_sw = sw_power[mask]
-            valid_ripple = ripple_power[mask]
-            correlation = np.corrcoef(valid_sw, valid_ripple)[0, 1]
-            
-            # Create masks for high-power periods
-            high_ripple_mask = (ripple_power_z > 1) & mask
-            high_sw_mask = (sw_power_z > 1) & mask
-            high_both_mask = high_ripple_mask & high_sw_mask
-            
-            # Calculate phase coherence during high power periods (both signals > 1 SD)
-            # Get instantaneous phase of sharpwave component
-            sw_analytic = hilbert(sw_filtered)
-            sw_phase = np.angle(sw_analytic)
-            
-            # Calculate phase coherence during high power periods (both signals > 1 SD)
-            phase_diff = ripple_phase - sw_phase
-            if np.sum(high_both_mask) > 10:  # Need at least some points for meaningful coherence
-                phase_coherence_high_power = np.abs(np.mean(np.exp(1j * phase_diff[high_both_mask])))
-            else:
-                phase_coherence_high_power = np.nan
-            
-            # Store results in dictionary without storing the filtered signal
-            channel_results[chan_id] = {
-                'vertical_position': channel_positions.loc[chan_id],
-                'correlation': correlation,
-                'phase_coherence_high_power': phase_coherence_high_power,
-                'idx': idx,  # Store the index for later use
-                'sw_power_z': sw_power_z  # Store z-scored power
-            }
-        
-        # Find the channel with best phase coherence during high ripple power
-        best_channel_id = max(
-            channel_results.keys(),
-            key=lambda k: channel_results[k]['phase_coherence_high_power'] 
-                        if not np.isnan(channel_results[k]['phase_coherence_high_power']) 
-                        else -float('inf')
-        )
-        
-        # Get the raw LFP for the best channel and re-compute filtered signal
-        best_channel_idx = channel_results[best_channel_id]['idx']
-        sharp_wave_lfp = ca1_lfp[:, best_channel_idx]
-        
-        # Re-apply sharpwave filter for the best channel
-        sharpwave_filtered = fftconvolve(sharp_wave_lfp.reshape(-1), sharpwave_filter, mode="same")
-        
-        # Get the z-scored power
-        best_channel_power_z = channel_results[best_channel_id]['sw_power_z']
-        
-        # Create a results dictionary
-        sw_results = {
-            'best_channel_id': best_channel_id,
-            'sharp_wave_lfp': sharp_wave_lfp,
-            'sw_power_z': best_channel_power_z  # Include z-scored power of the selected channel
+        # Create a separate dictionary for JSON-serializable summary stats
+        self.sw_component_summary_stats_dict = {
+            'channel_ids': [],
+            'modulation_indices': [],
+            'circular_linear_corrs': [],
+            'depths': [],
+            'selection_metric': selection_metric,
+            'best_channel_id': None  # Will be filled in after selection
         }
+
+        for cid, idx in zip(below_ids, below_idx):
+            sw_filt = fftconvolve(ca1_lfp[:, idx], sharpwave_filter, mode='same')
+            sw_an = hilbert(sw_filt)
+            sw_phase = np.angle(sw_an)
+            sw_power = np.abs(sw_an) ** 2
+            sw_power_z = (sw_power - sw_power[mask].mean()) / sw_power[mask].std()
+
+            high_mask = (ripple_power_z > 1) & (sw_power_z > 1) & mask
+
+            modulation_index = self._compute_modulation_index(sw_phase, ripple_amp, high_mask)
+            circular_linear_corr = self._compute_circular_linear_corr(sw_phase, ripple_amp, high_mask)
+
+            # Store detailed results for selection
+            results[cid] = {
+                'modulation_index': modulation_index,
+                'circular_linear_corr': circular_linear_corr,
+                'idx': idx,
+                'sw_power_z': sw_power_z
+            }
+            
+            # Store JSON-serializable summary stats
+            self.sw_component_summary_stats_dict['channel_ids'].append(int(cid))
+            self.sw_component_summary_stats_dict['modulation_indices'].append(float(modulation_index) if not np.isnan(modulation_index) else None)
+            self.sw_component_summary_stats_dict['circular_linear_corrs'].append(float(circular_linear_corr) if not np.isnan(circular_linear_corr) else None)
+            self.sw_component_summary_stats_dict['depths'].append(float(channel_positions.loc[cid]))
+
+        # Select best channel
+        best_cid = max(
+            results,
+            key=lambda k: results[k][selection_metric] if not np.isnan(results[k][selection_metric]) else -np.inf
+        )
+
+        best_idx = results[best_cid]['idx']
+        best_lfp = ca1_lfp[:, best_idx]
         
-        self.sw_channel_info
+        # Store best channel ID in summary stats
+        self.sw_component_summary_stats_dict['best_channel_id'] = int(best_cid)
         
-        return sw_results
+        # Return the best channel ID and its raw LFP
+        return best_cid, best_lfp
 
     def process_probe(self, probe_id, filter_ripple_band_func=None):
         """
@@ -352,19 +378,15 @@ class abi_visual_behaviour_loader:
             # Get channel positions for CA1 channels
             ca1_channel_positions = self.session.channels.loc[lfp_ca1_chans, 'probe_vertical_position']
 
-            sw_results = self.select_sharpwave_channel(
-                ca1_lfp=lfp_ca1,
-                lfp_time_index=lfp_time_index,  
-                ca1_chan_ids=lfp_ca1_chans,
-                this_chan_id=this_chan_id,
-                channel_positions=ca1_channel_positions,
-                ripple_filtered=peakrippleband
-            )
+            best_sw_chan_id, best_sw_chan_lfp = self.select_sharpwave_channel(ca1_lfp=lfp_ca1,
+                                                                                lfp_time_index=lfp_time_index,  
+                                                                                ca1_chan_ids=lfp_ca1_chans,
+                                                                                this_chan_id=this_chan_id,
+                                                                                channel_positions=ca1_channel_positions,
+                                                                                ripple_filtered=peakrippleband)
 
             # Extract sharpwave channel information
-            best_sw_chan_id = sw_results['best_channel_id']
-            best_sw_chan_lfp = sw_results['sharp_wave_lfp']
-            best_sw_power_z = sw_results['sw_power_z']
+            best_sw_power_z = scipy.stats.zscore(best_sw_chan_lfp)
         else:
             peak_chan_idx = None
             this_chan_id = None
