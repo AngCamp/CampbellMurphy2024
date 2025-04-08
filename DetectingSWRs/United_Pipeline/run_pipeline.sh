@@ -17,7 +17,7 @@ show_help() {
   echo ""
   echo "Options:"
   echo "  --keep-report    Keep report files in the output directory"
-  echo "  --cores N        Number of cores to use (default: 8)"
+  echo "  --cores N        Number of cores to use (default: 6)"
   echo ""
   echo "Examples:"
   echo "  ./run_pipeline.sh                          # Run all datasets"
@@ -39,7 +39,7 @@ show_help() {
 # Initialize default values
 COMMAND="all"
 DATASETS="ibl,abi_visual_behaviour,abi_visual_coding"
-CORES=8
+CORES=6
 KEEP_REPORT=false
 
 # Parse command line arguments

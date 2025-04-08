@@ -1,13 +1,8 @@
-# IBL Loader
-import time
+# ibl_loader.py
 import os
 import numpy as np
-from scipy import io, signal, stats
-from scipy.signal import lfilter
-import scipy.ndimage
-from scipy.ndimage import gaussian_filter
-from scipy.ndimage import gaussian_filter1d
-from scipy import interpolate
+from scipy import signal
+from scipy.stats import zscore
 import matplotlib.pyplot as plt
 from one.api import ONE
 import spikeglx
@@ -16,20 +11,14 @@ from ibldsp.voltage import destripe_lfp
 from iblatlas.atlas import AllenAtlas
 from iblatlas.regions import BrainRegions
 
-class ibl_loader:
+
+# Import the BaseLoader
+from swr_neuropixels_collection_core import BaseLoader
+
+class ibl_loader(BaseLoader):
     def __init__(self, session_id):
-        """
-        Initialize the IBL loader with a session ID.
-        
-        Parameters
-        ----------
-        session_id : str
-            The IBL session ID
-        br : BrainRegions, optional
-            An existing BrainRegions object to use. If None, brain regions
-            will need to be added externally.
-        """
-        self.session_id = session_id
+        """Initialize the IBL loader with a session ID."""
+        super().__init__(session_id)
         self.probe_id = "Not Loaded Yet"
         self.one_exists = False
         self.probelist = None
@@ -39,14 +28,7 @@ class ibl_loader:
         self.br = None
         
     def set_up(self):
-        """
-        Sets up the ONE API connection and brain atlas.
-        
-        Returns
-        -------
-        self : ibl_loader
-            Returns the instance for method chaining.
-        """
+        """Sets up the ONE API connection and brain atlas."""
         # Setup ONE API
         ONE.setup(base_url='https://openalyx.internationalbrainlab.org', silent=True)
         self.one = ONE(password='international', silent=True)
@@ -56,39 +38,49 @@ class ibl_loader:
         if self.br is None:
             self.ba = AllenAtlas()
             self.br = BrainRegions()
+        
+        # Load config if available for sharpwave filter path
+        try:
+            import yaml
+            config_path = os.environ.get('CONFIG_PATH', 'unified_detector_config.yaml')
+            with open(config_path, "r") as f:
+                full_config = yaml.safe_load(f.read())
+                if 'filters' in full_config and 'sw_component_filter' in full_config['filters']:
+                    self.sw_component_filter_path = full_config['filters']['sw_component_filter']
+        except Exception as e:
+            print(f"Warning: Could not load config for sharp wave filter: {e}")
+            self.sw_component_filter_path = None
             
         return self
         
     def get_probe_ids_and_names(self):
-        """
-        Gets the probe IDs and names for the session.        
-        """
+        """Gets the probe IDs and names for the session."""
         if not self.one_exists:
             self.set_up()
         self.probelist, self.probenames = self.one.eid2pid(self.session_id)
         print(f"Probe IDs: {self.probelist}, Probe names: {self.probenames}")
         return self.probelist, self.probenames
     
-    def load_channels(self, probe_idx):
-        """
-        Loads channel data for a specific probe.
+    def get_probes_with_ca1(self):
+        """Get list of probes with CA1 channels."""
+        self.get_probe_ids_and_names()
+        self.probes_of_interest = []
         
-        Parameters
-        ----------
-        probe_idx : int
-            Index of the probe in the probelist.
-            
-        Returns
-        -------
-        tuple
-            (channels, probe_name, probe_id)
-        """
+        for i, probe_id in enumerate(self.probelist):
+            channels, _, _ = self.load_channels(i)
+            if self.has_ca1_channels(channels):
+                self.probes_of_interest.append(i)  # Store probe index
+        
+        print(f"Found {len(self.probes_of_interest)} probes with CA1 channels")
+        return self.probes_of_interest
+    
+    def load_channels(self, probe_idx):
+        """Loads channel data for a specific probe."""
         if self.probelist is None:
             self.get_probe_ids_and_names()
-        print(probe_idx)
+        print(f"Loading channel data for probe index: {probe_idx}")
         probe_name = self.probenames[probe_idx]
         probe_id = self.probelist[probe_idx]
-        print(f"Loading channel data for probe: {probe_id}")
         
         # Get channels data
         collectionname = f"alf/{probe_name}/pykilosort"
@@ -97,19 +89,7 @@ class ibl_loader:
         return channels, probe_name, probe_id
     
     def has_ca1_channels(self, channels):
-        """
-        Checks if the channels include CA1.
-        
-        Parameters
-        ----------
-        channels : object
-            Channel information object
-            
-        Returns
-        -------
-        bool
-            True if CA1 channels exist, False otherwise
-        """
+        """Checks if the channels include CA1."""
         if self.br is None:
             raise ValueError("BrainRegions object (br) must be set to check for CA1 channels")
             
@@ -125,21 +105,153 @@ class ibl_loader:
             
         return has_ca1
     
-    def load_bin_file(self, probe_name):
-        """
-        Loads the binary file for a probe.
+    def _load_probe_data(self, probe_idx):
+        """Load all necessary data for a probe from API.
         
-        Parameters
-        ----------
-        probe_name : str
-            Name of the probe
-            
-        Returns
-        -------
-        pathlib.Path or None
-            Path to the binary file
+        This method encapsulates all API-specific data loading to separate
+        it from processing logic.
         """
-        # Find the relevant datasets and download them
+        # Load channels
+        channels, probe_name, probe_id = self.load_channels(probe_idx)
+        
+        # Load bin file
+        bin_file = self.load_bin_file(probe_name)
+        if bin_file is None:
+            return None
+
+        # Read the data
+        print(f"Reading LFP data for probe {probe_id}...")
+        sr = spikeglx.Reader(bin_file)
+        
+        # Create time index
+        lfp_time_index_og = self.create_time_index(sr, probe_id)
+        
+        # Extract raw data
+        raw, fs_from_sr = self.extract_raw_data(sr)
+        del sr  # Free memory
+        
+        # Destripe data
+        print(f"Destripping LFP data for probe {probe_id}...")
+        destriped = self.destripe_data(raw, fs_from_sr)
+        del raw  # Free memory
+        
+        # Get CA1 channels
+        lfp_ca1, ca1_chans = self.get_ca1_channels(channels, destriped)
+        
+        # Get non-hippocampal control channels for artifact detection
+        print(f"Getting control channels for artifact detection probe {probe_id}...")
+        control_data, control_channels = self.get_non_hippocampal_channels(channels, destriped)
+        
+        return {
+            'probe_id': probe_id,
+            'probe_name': probe_name,
+            'channels': channels,
+            'lfp_ca1': lfp_ca1,
+            'ca1_chans': ca1_chans,
+            'control_data': control_data,
+            'control_channels': control_channels,
+            'lfp_time_index_og': lfp_time_index_og,
+            'destriped': destriped
+        }
+    
+    def process_probe(self, probe_idx, filter_ripple_band_func=None):
+        """Processes a single probe completely."""
+        # Separate API access from processing logic
+        data = self._load_probe_data(probe_idx)
+        if data is None:
+            return None
+        
+        #Resample control channels
+        outof_hp_chans_lfp = []
+        for channel_data in data['control_data']:
+            # Reshape to 2D array with shape (1, n_samples)
+            channel_data = channel_data.reshape(1, -1)
+            
+            # Resample - using base class method
+            lfp_control, _ = super().resample_signal(channel_data, data['lfp_time_index_og'], 1500.0)
+            
+            # Append to list, ensuring correct shape
+            outof_hp_chans_lfp.append(lfp_control[:, None])
+            del lfp_control  # Free memory
+        del data['control_data']  # Free memory
+        
+        # Resample CA1 channels to 1500 Hz
+        print(f"Resampling CA1 channels to 1.5kHz probe {data['probe_id']}...")
+        lfp_ca1, lfp_time_index = super().resample_signal(data['lfp_ca1'], data['lfp_time_index_og'], 1500.0)
+        del data['destriped']  # Free memory for large array
+        
+        #Find channel with highest ripple power if function provided
+        if filter_ripple_band_func is not None:
+            peak_idx, peak_id, peak_lfp, peakrippleband = self.find_peak_ripple_channel(
+                lfp_ca1, data['ca1_chans'], filter_ripple_band_func
+            )
+            
+            # Create a channel ID string for naming files
+            this_chan_id = f"channelsrawInd_{peak_id}"
+            
+            # Add sharpwave channel detection if filter path is available
+            if hasattr(self, 'sw_component_filter_path') and self.sw_component_filter_path is not None:
+                # Get positions of CA1 channels
+                try:
+                    # Channel positions might be stored differently in IBL data
+                    # Try to extract a pandas Series mapping channel IDs to depths
+                    ca1_channel_positions = data['channels'].loc[data['ca1_chans']].y_um
+                    
+                    best_sw_chan_id, best_sw_chan_lfp = super().select_sharpwave_channel(
+                        ca1_lfp=lfp_ca1,
+                        lfp_time_index=lfp_time_index,  
+                        ca1_chan_ids=data['ca1_chans'],
+                        this_chan_id=peak_id,
+                        channel_positions=ca1_channel_positions,
+                        ripple_filtered=peakrippleband,
+                        filter_path=self.sw_component_filter_path
+                    )
+                    best_sw_power_z = zscore(best_sw_chan_lfp)
+                except Exception as e:
+                    print(f"Warning: Could not select sharpwave channel: {e}")
+                    best_sw_chan_id = None
+                    best_sw_chan_lfp = None
+                    best_sw_power_z = None
+            else:
+                best_sw_chan_id = None
+                best_sw_chan_lfp = None
+                best_sw_power_z = None
+        else:
+            peak_idx = None
+            peak_id = None
+            peak_lfp = None
+            this_chan_id = None
+            peakrippleband = None
+            best_sw_chan_id = None
+            best_sw_chan_lfp = None
+            best_sw_power_z = None
+        del lfp_ca1
+        
+        # Collect results
+        results = {
+            'probe_id': data['probe_id'],
+            'probe_name': data['probe_name'],
+            'lfp_time_index': lfp_time_index,
+            'ca1_chans': data['ca1_chans'],
+            'control_lfps': outof_hp_chans_lfp,
+            'control_channels': data['control_channels'],
+            'peak_ripple_chan_idx': peak_idx,
+            'peak_ripple_chan_id': peak_id,
+            'peak_ripple_chan_raw_lfp': peak_lfp,
+            'chan_id_string': this_chan_id,
+            'rippleband': peakrippleband,
+            'sharpwave_chan_id': best_sw_chan_id,
+            'sharpwave_chan_raw_lfp': best_sw_chan_lfp,
+            'sharpwave_power_z': best_sw_power_z,
+            'channels': data['channels']
+        }
+        
+        # Return standardized results
+        return super().standardize_results(results, 'ibl')
+    
+    # The remaining methods are IBL-specific and will be directly used by process_probe
+    def load_bin_file(self, probe_name):
+        """Loads the binary file for a probe."""
         dsets = self.one.list_datasets(
             self.session_id, collection=f"raw_ephys_data/{probe_name}", filename="*.lf.*"
         )
@@ -154,114 +266,38 @@ class ibl_loader:
         return bin_file
     
     def create_time_index(self, sr, probe_id):
-        """
-        Creates a time index for the LFP data.
-        
-        Parameters
-        ----------
-        sr : spikeglx.Reader
-            SpikeGLX reader object
-        probe_id : str
-            Probe ID
-            
-        Returns
-        -------
-        numpy.ndarray
-            Time index for the LFP data
-        """
-        # Make time index
-        start_time = time.time()
+        """Creates a time index for the LFP data."""
         ssl = SpikeSortingLoader(pid=probe_id, one=self.one)
         t0 = ssl.samples2times(0, direction="forward")
         dt = (ssl.samples2times(1, direction="forward") - t0) * 12
         lfp_time_index_og = np.arange(0, sr.shape[0]) * dt + t0
         del ssl
-        print(f"Time index created, time elapsed: {time.time() - start_time}")
         
         return lfp_time_index_og
     
     def extract_raw_data(self, sr):
-        """
-        Extracts raw data from the SpikeGLX reader.
-        
-        Parameters
-        ----------
-        sr : spikeglx.Reader
-            SpikeGLX reader object
-            
-        Returns
-        -------
-        tuple
-            (raw_data, sampling_rate)
-        """
-        # Extract raw data
-        start_time = time.time()
+        """Extracts raw data from the SpikeGLX reader."""
         raw = sr[:, : -sr.nsync].T
         fs_from_sr = sr.fs
-        print(f"Raw data extracted, time elapsed: {time.time() - start_time}")
         
         return raw, fs_from_sr
     
     def destripe_data(self, raw, fs):
-        """
-        Applies destriping to the raw data.
-        
-        Parameters
-        ----------
-        raw : numpy.ndarray
-            Raw data
-        fs : float
-            Sampling rate
-            
-        Returns
-        -------
-        numpy.ndarray
-            Destriped data
-        """
-        start_time = time.time()
+        """Applies destriping to the raw data."""
         destriped = destripe_lfp(raw, fs=fs)
         print(f"Destriped shape: {destriped.shape}")
-        print(f"Destriping done, time elapsed: {time.time() - start_time}")
         
         return destriped
     
     def get_ca1_channels(self, channels, destriped):
-        """
-        Gets the CA1 channels from the destriped data.
-        
-        Parameters
-        ----------
-        channels : object
-            Channel information object
-        destriped : numpy.ndarray
-            Destriped data
-            
-        Returns
-        -------
-        tuple
-            (ca1_lfp, ca1_channel_indices)
-        """
+        """Gets the CA1 channels from the destriped data."""
         ca1_chans = channels.rawInd[channels.allen2017_25um_acronym == "CA1"]
         lfp_ca1 = destriped[ca1_chans, :]
         
         return lfp_ca1, ca1_chans
     
     def get_non_hippocampal_channels(self, channels, destriped):
-        """
-        Gets two non-hippocampal channels for artifact detection.
-        
-        Parameters
-        ----------
-        channels : object
-            Channel information object
-        destriped : numpy.ndarray
-            Destriped data
-            
-        Returns
-        -------
-        tuple
-            (non_hippocampal_lfp_list, non_hippocampal_channel_indices)
-        """
+        """Gets two non-hippocampal channels for artifact detection."""
         # Find channels outside the hippocampal formation
         not_a_hp_chan = np.logical_not(
             np.isin(
@@ -282,78 +318,8 @@ class ibl_loader:
             
         return control_data, control_channels
     
-    def resample_signal(self, lfp_data, time_index_og, target_fs=1500.0):
-        """
-        Resamples the signal to a target frequency.
-        
-        Parameters
-        ----------
-        lfp_data : numpy.ndarray
-            LFP data
-        time_index_og : numpy.ndarray
-            Original time index
-        target_fs : float, optional
-            Target sampling frequency
-            
-        Returns
-        -------
-        tuple
-            (resampled_data, new_time_index)
-        """
-        # Create new time index at target sampling rate
-        t_start = time_index_og[0]
-        t_end = time_index_og[-1]
-        dt_new = 1.0 / target_fs
-        n_samples = int(np.ceil((t_end - t_start) / dt_new))
-        new_time_index = t_start + np.arange(n_samples) * dt_new
-
-        # Check if lfp_data is 1D or 2D
-        if lfp_data.ndim == 1:
-            # For 1D array
-            interp_func = interpolate.interp1d(
-                time_index_og,
-                lfp_data,
-                bounds_error=False,
-                fill_value="extrapolate",
-            )
-            resampled = interp_func(new_time_index)
-            resampled = resampled.T  # Transpose for standard orientation
-        else:
-            # For 2D array (multiple channels)
-            resampled = np.zeros((lfp_data.shape[0], len(new_time_index)))
-            for i in range(lfp_data.shape[0]):
-                interp_func = interpolate.interp1d(
-                    time_index_og,
-                    lfp_data[i, :],
-                    bounds_error=False,
-                    fill_value="extrapolate",
-                )
-                resampled[i, :] = interp_func(new_time_index)
-            
-            resampled = resampled.T  # Transpose for standard orientation
-        
-        print(f"Resampled probe")
-        return resampled, new_time_index
-    
     def find_peak_ripple_channel(self, lfp_ca1, ca1_chans, filter_ripple_band_func):
-        """
-        Finds the CA1 channel with the highest ripple power.
-        
-        Parameters
-        ----------
-        lfp_ca1 : numpy.ndarray
-            LFP data from CA1 channels
-        ca1_chans : numpy.ndarray
-            Indices of CA1 channels
-        filter_ripple_band_func : function
-            Function to filter signal to ripple band
-            
-        Returns
-        -------
-        tuple
-            (peak_channel_index, peak_channel_id, peak_channel_raw_lfp)
-        """
-        
+        """Finds the CA1 channel with the highest ripple power."""
         lfp_ca1_rippleband = filter_ripple_band_func(lfp_ca1)
         highest_rip_power = np.abs(signal.hilbert(lfp_ca1_rippleband)) ** 2
         highest_rip_power = highest_rip_power.max(axis=0)
@@ -365,136 +331,17 @@ class ibl_loader:
         print(f"Finding channel with highest ripple power...")
         return peak_channel_idx, peak_channel_id, peak_channel_raw_lfp, peakrippleband
     
-    def process_probe(self, probe_idx, filter_ripple_band_func=None):
-        """
-        Processes a single probe completely.
-        
-        Parameters
-        ----------
-        probe_idx : int
-            Index of the probe in the probelist
-        filter_ripple_band_func : function, optional
-            Function to filter for ripple band
-            
-        Returns
-        -------
-        dict
-            Dictionary with processing results
-        """
-        if self.probelist is None:
-            self.get_probe_ids_and_names()
-            
-        # Load channels
-        print(probe_idx)
-        channels, probe_name, probe_id = self.load_channels(probe_idx)
-        
-        # Check for CA1 channels
-        if self.br is not None and not self.has_ca1_channels(channels):
-            return None
-            
-        # Load bin file
-        bin_file = self.load_bin_file(probe_name)
-        if bin_file is None:
-            return None
-
-        # Read the data
-        print(f"Reading LFP data for probe {probe_id}...")
-        sr = spikeglx.Reader(bin_file)
-        
-        # Create time index
-        lfp_time_index_og = self.create_time_index(sr, probe_id)
-        
-        # Extract raw data
-        raw, fs_from_sr = self.extract_raw_data(sr)
-        del sr  # Free memory
-        
-        # Step 7: Destripe data
-        print(f"Destripping LFP data for probe {probe_id}...")
-        destriped = self.destripe_data(raw, fs_from_sr)
-        del raw  # Free memory
-        
-        # Get CA1 channels
-        lfp_ca1, ca1_chans = self.get_ca1_channels(channels, destriped)
-        
-        # Get non-hippocampal control channels for artifact detection
-        print(f"Getting control channels for artifact detection probe {probe_id}...")
-        control_data, control_channels = self.get_non_hippocampal_channels(channels, destriped)
-        
-        #Resample control channels
-        outof_hp_chans_lfp = []
-        for channel_data in control_data:
-            # Reshape to 2D array with shape (1, n_samples)
-            channel_data = channel_data.reshape(1, -1)
-            
-            # Resample
-            lfp_control, _ = self.resample_signal(channel_data, lfp_time_index_og, 1500.0)
-            
-            # Append to list, ensuring correct shape
-            outof_hp_chans_lfp.append(lfp_control[:, None])
-            del lfp_control  # Free memory
-        del control_data  # Free memory
-        
-        # Resample CA1 channels to 1500 Hz
-        print(f"Resampling CA1 channels to 1.5kHz probe {probe_id}...")
-        lfp_ca1, lfp_time_index = self.resample_signal(lfp_ca1, lfp_time_index_og, 1500.0)
-        del destriped  # Free memory for large array
-        
-
-        #Find channel with highest ripple power if function provided
-        if filter_ripple_band_func is not None:
-            peak_idx, peak_id, peak_lfp, peakrippleband = self.find_peak_ripple_channel(
-                lfp_ca1, ca1_chans, filter_ripple_band_func
-            )
-            
-            # Create a channel ID string for naming files
-            this_chan_id = f"channelsrawInd_{peak_id}"
-        else:
-            peak_idx = None
-            peak_id = None
-            peak_lfp = None
-            this_chan_id = None
-            peakrippleband = None
-        del lfp_ca1
-        # Collect results
-        results = {
-            'probe_id': probe_id,
-            'probe_name': probe_name,
-            #'lfp_ca1': lfp_ca1,
-            'lfp_time_index': lfp_time_index,
-            'channels': channels,
-            'ca1_chans': ca1_chans,
-            'control_lfps': outof_hp_chans_lfp,
-            'control_channels': control_channels,
-            'peak_ripple_chan_idx': peak_idx,
-            'peak_ripple_chan_id': peak_id,
-            'peak_ripple_chan_raw_lfp': peak_lfp,
-            'chan_id_string': this_chan_id,
-            'rippleband': peakrippleband
-        }
-        
-        return results
-
     def cleanup(self):
-        """
-        Cleans up resources to free memory.
-        """
+        """Cleans up resources to free memory."""
         del self.one
-        s = str(self.data_files[0])
-
-        # Find the index of "raw_ephys_data" in the string
-        index = s.find("raw_ephys_data")
-
-        # Remove everything after "raw_ephys_data" including that string
-        s = s[:index]
-
-        # Remove the substring "PosixPath('"
-        s = s.replace("PosixPath('", "")
-
-        # Remove the trailing slash
-        s = s.rstrip("/")
-
-        # Define the bash command to delete the folder
-        cmd = f"rm -rf {s}"
-
-        # Execute the bash command
-        os.system(cmd)
+        if hasattr(self, 'data_files') and self.data_files:
+            try:
+                s = str(self.data_files[0])
+                index = s.find("raw_ephys_data")
+                s = s[:index]
+                s = s.replace("PosixPath('", "")
+                s = s.rstrip("/")
+                cmd = f"rm -rf {s}"
+                os.system(cmd)
+            except Exception as e:
+                print(f"Warning: Could not clean up data files: {e}")
