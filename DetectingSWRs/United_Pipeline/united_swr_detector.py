@@ -1,3 +1,15 @@
+# debugging
+import multiprocessing as mp
+import os
+
+if os.getenv("DEBUG_MODE") == "true" and mp.current_process().name == "MainProcess":
+    import debugpy
+    print("Debug mode: starting debugpy listener on port 5678")
+    debugpy.listen(("0.0.0.0", 5678))      # or ("localhost", 5678)
+    print("Waiting for VS Code to attach…")
+    debugpy.wait_for_client()
+    print("Debugger attached!")
+
 # united_swr_detector.py
 import os
 import subprocess
@@ -25,7 +37,6 @@ import gzip
 import string
 from botocore.config import Config
 import boto3
-
 # Import utility functions from core
 from swr_neuropixels_collection_core import (
     BaseLoader,
@@ -127,12 +138,12 @@ def process_session(session_id):
             probelist, probenames = loader.get_probe_ids_and_names()
 
         process_stage = "Running through the probes in the session"
-        #icount = 0
+        icount = 0
         # Process each probe
         for this_probe in range(len(probelist)):
-            #if icount > 0:
-            #    break
-            #icount = icount + 1
+            if icount > 0:
+                break
+            icount = icount + 1
             
             if DATASET_TO_PROCESS == 'ibl':
                 probe_name = probenames[this_probe]
@@ -494,7 +505,7 @@ def main():
 
     # Run the processing with the specified number of cores
     with Pool(pool_size, initializer=init_pool) as p:
-        p.map(process_session, all_sesh_with_ca1_eid[0:6])
+        p.map(process_session, all_sesh_with_ca1_eid[1:2])
 
     # Signal listener to terminate and wait for it to complete
     queue.put("kill")

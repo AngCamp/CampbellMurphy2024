@@ -159,7 +159,7 @@ class BaseLoader:
                     interp_func = interpolate.interp1d(
                         time_values, signal_data[i, :], bounds_error=False, fill_value="extrapolate"
                     )
-                    resampled[i, :] = interp_func(new_time_index)
+                    resampled[i, :] = interp_func(new_time_values)
                 
                 # Transpose to our standard format (time, channels)
                 resampled = resampled.T

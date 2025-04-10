@@ -1,6 +1,7 @@
 # ibl_loader.py
 import os
 import numpy as np
+import pandas as pd
 from scipy import signal
 from scipy.stats import zscore
 import matplotlib.pyplot as plt
@@ -57,7 +58,9 @@ class ibl_loader(BaseLoader):
         """Gets the probe IDs and names for the session."""
         if not self.one_exists:
             self.set_up()
-        self.probelist, self.probenames = self.one.eid2pid(self.session_id)
+        probelist, probenames = self.one.eid2pid(self.session_id)
+        self.probelist = [str(probe_uuid) for probe_uuid in probelist]
+        self.probenames = probenames
         print(f"Probe IDs: {self.probelist}, Probe names: {self.probenames}")
         return self.probelist, self.probenames
     
@@ -84,6 +87,7 @@ class ibl_loader(BaseLoader):
         
         # Get channels data
         collectionname = f"alf/{probe_name}/pykilosort"
+        
         channels = self.one.load_object(self.session_id, "channels", collection=collectionname)
         
         return channels, probe_name, probe_id
@@ -132,7 +136,21 @@ class ibl_loader(BaseLoader):
         
         # Destripe data
         print(f"Destripping LFP data for probe {probe_id}...")
-        destriped = self.destripe_data(raw, fs_from_sr)
+        destriped = destripe_lfp(raw, fs=fs_from_sr)
+        print(f"Destriped shape: {destriped.shape}")
+        
+        fname = f"destriped_probe_{probe_id}.npz"
+        path = os.path.join(os.getcwd(), fname)
+
+        # save compressed
+        #np.savez_compressed(path, destriped=destriped)
+
+        # later, to load
+        #destriped_data = np.load(path)
+        #destriped = destriped_data["destriped"]
+        #del destriped_data
+        
+        # normal code...
         del raw  # Free memory
         
         # Get CA1 channels
@@ -157,7 +175,7 @@ class ibl_loader(BaseLoader):
     def process_probe(self, probe_idx, filter_ripple_band_func=None):
         """Processes a single probe completely."""
         # Separate API access from processing logic
-        data = self._load_probe_data(probe_idx)
+        data = self._load_probe_data(probe_idx) # loads control and destriped data
         if data is None:
             return None
         
@@ -165,7 +183,7 @@ class ibl_loader(BaseLoader):
         outof_hp_chans_lfp = []
         for channel_data in data['control_data']:
             # Reshape to 2D array with shape (1, n_samples)
-            channel_data = channel_data.reshape(1, -1)
+            channel_data = channel_data.flatten()
             
             # Resample - using base class method
             lfp_control, _ = super().resample_signal(channel_data, data['lfp_time_index_og'], 1500.0)
@@ -195,7 +213,7 @@ class ibl_loader(BaseLoader):
                 try:
                     # Channel positions might be stored differently in IBL data
                     # Try to extract a pandas Series mapping channel IDs to depths
-                    ca1_channel_positions = data['channels'].loc[data['ca1_chans']].y_um
+                    ca1_channel_positions = pd.Series(data['ca1_chans'] * 15, index=data['ca1_chans'])
                     
                     best_sw_chan_id, best_sw_chan_lfp = super().select_sharpwave_channel(
                         ca1_lfp=lfp_ca1,
@@ -206,6 +224,7 @@ class ibl_loader(BaseLoader):
                         ripple_filtered=peakrippleband,
                         filter_path=self.sw_component_filter_path
                     )
+                    best_sw_chan_lfp = best_sw_chan_lfp.flatten() # debugging
                     best_sw_power_z = zscore(best_sw_chan_lfp)
                 except Exception as e:
                     print(f"Warning: Could not select sharpwave channel: {e}")
@@ -281,16 +300,14 @@ class ibl_loader(BaseLoader):
         fs_from_sr = sr.fs
         
         return raw, fs_from_sr
-    
-    def destripe_data(self, raw, fs):
-        """Applies destriping to the raw data."""
-        destriped = destripe_lfp(raw, fs=fs)
-        print(f"Destriped shape: {destriped.shape}")
-        
-        return destriped
-    
+
     def get_ca1_channels(self, channels, destriped):
         """Gets the CA1 channels from the destriped data."""
+        # add acronyms to data
+        channels.allen2017_25um_acronym = self.br.id2acronym(
+            channels["brainLocationIds_ccf_2017"]
+        )
+        # filter for ca1 channels
         ca1_chans = channels.rawInd[channels.allen2017_25um_acronym == "CA1"]
         lfp_ca1 = destriped[ca1_chans, :]
         
