@@ -213,7 +213,7 @@ class ibl_loader(BaseLoader):
                 try:
                     # Channel positions might be stored differently in IBL data
                     # Try to extract a pandas Series mapping channel IDs to depths
-                    ca1_channel_positions = pd.Series(data['ca1_chans'] * 15, index=data['ca1_chans'])
+                    ca1_channel_positions = pd.Series(data['ca1_chans'] * 10, index=data['ca1_chans'])
                     
                     best_sw_chan_id, best_sw_chan_lfp = super().select_sharpwave_channel(
                         ca1_lfp=lfp_ca1,
