@@ -144,12 +144,12 @@ def process_session(session_id):
             probelist, probenames = loader.get_probe_ids_and_names()
 
         process_stage = "Running through the probes in the session"
-        icount = 0
+        #icount = 0
         # Process each probe
         for this_probe in range(len(probelist)):
-            if icount > 0:
-                break
-            icount = icount + 1
+            #if icount > 0:
+            #    break
+            #icount = icount + 1
             
             if DATASET_TO_PROCESS == 'ibl':
                 probe_name = probenames[this_probe]
