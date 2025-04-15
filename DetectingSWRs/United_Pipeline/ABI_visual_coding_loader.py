@@ -200,6 +200,47 @@ class abi_visual_coding_loader(BaseLoader):
         # Return standardized results
         return super().standardize_results(results, 'abi_visual_coding')
     
+    def global_events_probe_info(self):
+        """
+        Get probe-level information needed for global SWR detection.
+        
+        Returns
+        -------
+        dict
+            Dictionary mapping probe IDs to probe information dictionaries
+        """
+        
+        probe_info = {}
+        
+        for probe_id in self.probe_id_list:
+            # Get units for this probe
+            units = self.session.units[self.session.units.probe_id == probe_id]
+            
+            # Filter for good units based on quality metrics
+            good_units = units[
+                (units.isolation_distance >= 20) & 
+                (units.presence_ratio >= 0.9) &
+                (units.isi_violations < 0.5)
+            ]
+            
+            # Get all channels for this probe
+            probe_channels = self.session.channels[self.session.channels.probe_id == probe_id]
+            
+            # Filter for CA1 channels
+            ca1_channels = probe_channels[probe_channels.ecephys_structure_acronym == "CA1"]
+            
+            # Count good units in CA1 by checking if their peak channel is in CA1
+            ca1_good_units = 0
+            for _, unit in good_units.iterrows():
+                if unit.peak_channel_id in ca1_channels.index:
+                    ca1_good_units += 1
+            
+            probe_info[probe_id] = {
+                'good_unit_count': len(good_units),
+                'ca1_good_unit_count': ca1_good_units,
+            }
+        
+        return probe_info
     def cleanup(self):
         """Cleans up resources to free memory."""
         self.session = None

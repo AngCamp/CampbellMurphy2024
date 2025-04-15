@@ -211,6 +211,34 @@ class abi_visual_behaviour_loader(BaseLoader):
         # Return standardized results
         return super().standardize_results(results, 'abi_visual_behaviour')
     
+    def global_events_probe_info(self):
+        """
+        Get probe-level information needed for global SWR detection.
+        
+        Returns
+        -------
+        dict
+            Dictionary mapping probe IDs to probe information dictionaries
+        """
+        probe_info = {}
+        units = self.cache.get_unit_table()
+        for probe_id in self.probe_id_list:
+            # Get units for this probe
+            # Get units directly with quality metrics for this probe
+            
+            # Filter for good units based on quality metrics
+            good_units = units[(units.quality=='good') & (units.ecephys_probe_id == probe_id)]
+            
+            # Count good units from CA1
+            ca1_good_units = sum(good_units.structure_acronym == 'CA1')
+            
+            probe_info[probe_id] = {
+                'good_unit_count': len(good_units),
+                'ca1_good_unit_count': ca1_good_units
+            }
+        
+        return probe_info
+
     def cleanup(self):
         """Cleans up resources to free memory."""
         self.session = None
