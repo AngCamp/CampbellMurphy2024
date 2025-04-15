@@ -553,7 +553,7 @@ def main():
 
     # Run the processing with the specified number of cores
     with Pool(pool_size, initializer=init_pool) as p:
-        p.map(process_session, all_sesh_with_ca1_eid[1:2])
+        p.map(process_session, all_sesh_with_ca1_eid)
 
     # Signal listener to terminate and wait for it to complete
     queue.put("kill")
