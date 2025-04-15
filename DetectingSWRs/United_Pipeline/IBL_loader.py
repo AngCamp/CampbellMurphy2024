@@ -149,7 +149,7 @@ class ibl_loader(BaseLoader):
         # later, to load
         #destriped_data = np.load(path)
         #destriped = destriped_data["destriped"]
-        del destriped_data
+        #del destriped_data
         
         # normal code...
         del raw  # Free memory
