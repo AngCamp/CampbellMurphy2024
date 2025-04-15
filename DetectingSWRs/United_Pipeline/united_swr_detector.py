@@ -44,7 +44,10 @@ from swr_neuropixels_collection_core import (
     event_boundary_detector,
     event_boundary_times,
     peaks_time_of_events,
-    incorporate_sharp_wave_component_info
+    incorporate_sharp_wave_component_info,
+    check_gamma_overlap,
+    check_movement_overlap,
+    create_global_swr_events
 )
 
 # Custom logging level
@@ -103,6 +106,9 @@ def process_session(session_id):
     # Create session subfolder
     session_subfolder = "swrs_session_" + str(session_id)
     session_subfolder = os.path.join(swr_output_dir_path, session_subfolder)
+    
+    # At the very top of process_session, before the probe loop
+    probe_events_dict = {}  # Initialize dictionary to store probe events
     
     try:
         # Set up brain atlas
@@ -204,7 +210,7 @@ def process_session(session_id):
                     lfp_control_channel=outof_hp_chans_lfp[i],
                 )
 
-            # create a dummy speed vector
+            # create a dummy speed vector, we don't want to filter for speed here
             dummy_speed = np.zeros_like(peakrippleband)
             print("Detecting Putative Ripples")
             # we add a dimension to peakrippleband because the ripple detector needs it
@@ -222,7 +228,6 @@ def process_session(session_id):
                 Karlsson_ripple_times.duration < 0.25
             ]
             print("Done")
-            # adds some stuff we want to the file
 
             # ripple band power
             peakrippleband_power = np.abs(signal.hilbert(peakrippleband)) ** 2
@@ -285,9 +290,9 @@ def process_session(session_id):
             csv_filename = (
                 f"probe_{probe_id}_channel_{this_chan_id}_karlsson_detector_events.csv"
             )
-            csv_path = os.path.join(session_subfolder, csv_filename)
-            Karlsson_ripple_times.to_csv(csv_path, index=True, compression="gzip")
-            print("Writing to file.")
+            #csv_path = os.path.join(session_subfolder, csv_filename)
+            #Karlsson_ripple_times.to_csv(csv_path, index=True, compression="gzip")
+            #print("Writing to file.")
             print("Detecting gamma events.")
 
             # compute this later, I will have a seperate script called SWR filtering which will do this
@@ -311,6 +316,7 @@ def process_session(session_id):
 
             # movement artifact detection
             process_stage = f"Detecting Movement Artifacts on probe with id {probe_id}"
+            movement_control_list = []
             
             for i in [0, 1]:
                 channel_outside_hp = take_two[i]
@@ -349,7 +355,49 @@ def process_session(session_id):
                 csv_filename = f"probe_{probe_id}_channel_{channel_outside_hp}_movement_artifacts.csv"
                 csv_path = os.path.join(session_subfolder, csv_filename)
                 movement_controls.to_csv(csv_path, index=True, compression="gzip")
+                movement_control_list.append(movement_controls)
                 print("Done Probe id " + str(probe_id))
+
+            # Filtering
+            Karlsson_ripple_times = check_gamma_overlap(Karlsson_ripple_times, gamma_times)
+            Karlsson_ripple_times = check_movement_overlap(Karlsson_ripple_times, movement_control_list[0], movement_control_list[1])
+
+            csv_filename = (
+                f"probe_{probe_id}_channel_{this_chan_id}_karlsson_detector_events.csv"
+            )
+            csv_path = os.path.join(session_subfolder, csv_filename)
+            Karlsson_ripple_times.to_csv(csv_path, index=True, compression="gzip")
+            probe_events_dict[probe_id] = Karlsson_ripple_times # save to dict
+            print("Writing to file.")
+        
+        # Global Ripples
+        print("Detecting Global Ripples")
+        logging.log(MESSAGE, f"Detecting global ripples for session {session_id}")
+
+        # Get global SWR detection settings from config
+        global_ripple_config = full_config.get("global_swr_detection", {})
+
+        # Get probe information for global event detection
+        probe_info = loader.global_events_probe_info()
+
+        # Create global events
+        global_events = create_global_swr_events(
+            probe_events_dict, 
+            global_ripple_config, 
+            probe_info, 
+            session_subfolder, 
+            session_id
+        )
+        
+        # Save global events
+        csv_filename = f"session_{session_id}_global_swr_events.csv.gz"
+        csv_path = os.path.join(session_subfolder, csv_filename)
+
+        # Directly save the events, which will raise an error if global_events is None
+        global_events.to_csv(csv_path, index=True, compression="gzip")
+
+        logging.log(MESSAGE, f"Created {len(global_events)} global events for session {session_id}")
+        print(f"Created {len(global_events)} global events for session {session_id}")
 
         # Cleanup resources
         if 'loader' in locals() and loader is not None:
@@ -388,11 +436,11 @@ def main():
     global queue, swr_output_dir_path, lfp_output_dir_path, swr_output_dir
     global gamma_filter, save_lfp, gamma_event_thresh, ripple_band_threshold
     global movement_artifact_ripple_band_threshold, run_name, sharp_wave_component_path
-    global DATASET_TO_PROCESS
+    global DATASET_TO_PROCESS, full_config
 
     # Configure AWS timeout settings
-    my_config = Config(connect_timeout=1200, read_timeout=1200)
-    s3 = boto3.client('s3', config=my_config)
+    my_aws_config = Config(connect_timeout=1200, read_timeout=1200)
+    s3 = boto3.client('s3', config=my_aws_config)
 
     # Get loader type from environment variable
     DATASET_TO_PROCESS = os.environ.get('DATASET_TO_PROCESS', '').lower()

@@ -125,7 +125,7 @@ TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 RUN_ID="${RUN_NAME}_${TIMESTAMP}"
 
 # Output directory (default is /space/scratch/SWR_final_pipeline/testing_dir)
-export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/testing_dir"}
+export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/muckingabout"}
 
 # Log directory goes under $OUTPUT_DIR/logs/$RUN_ID
 export LOG_DIR="${OUTPUT_DIR}/logs/${RUN_ID}"

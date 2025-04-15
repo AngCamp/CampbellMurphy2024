@@ -42,12 +42,6 @@ abi_visual_coding:
     input_dir: '${output_dir}/allen_viscoding_swr_murphylab2024'
     swr_output_dir: 'allen_viscoding_swr_murphylab2024'
   
-  # Global ripple detection
-  global_ripple:
-    input_dir: '${output_dir}/allen_viscoding_swr_murphylab2024'
-    output_dir: '.'
-    global_rip_label: 'no_movement'
-
 # ABI-specific Settings (Allen Brain Institute)
 abi_visual_behaviour:
   # Cache and data directories
@@ -64,13 +58,6 @@ abi_visual_behaviour:
     input_dir: '${output_dir}/allen_visbehave_swr_murphylab2024'
     swr_output_dir: 'allen_visbehave_swr_murphylab2024'
   
-  # Global ripple detection
-  global_ripple:
-    input_dir: '${output_dir}/allen_visbehave_swr_murphylab2024'
-    output_dir: '.'
-    global_rip_label: 'no_movement'
-
-
 # IBL-specific Settings
 ibl:
   # Cache and data directories
@@ -89,8 +76,14 @@ ibl:
     input_dir: '${output_dir}/ibl_swr_murphylab2024'
     swr_output_dir: 'ibl_swr_murphylab2024'
   
-  # Global ripple detection
-  global_ripple:
-    input_dir: '${output_dir}/ibl_swr_murphylab2024'
-    output_dir: '.'
-    global_rip_label: 'no_movement_no_gamma'
+# Global SWR Detection Settings (common)
+global_swr_detection:
+  min_ca1_units: 0          # Minimum number of good units in CA1 to include a probe
+  min_events_per_probe: 100  # Minimum number of events per probe
+  min_filtered_events: 50    # Minimum number of events after filtering
+  min_sw_power: 1.0          # Minimum sharpwave power (z-score)
+  merge_window: 0.02         # Merge window for global events (in seconds)
+  min_probe_count: 0         # Minimum number of probes for a global event
+  exclude_gamma: true        # Whether to exclude events with gamma overlap
+  exclude_movement: true     # Whether to exclude events with movement artifact overlap
+  global_rip_label: "global" # Label to append to global event filenames

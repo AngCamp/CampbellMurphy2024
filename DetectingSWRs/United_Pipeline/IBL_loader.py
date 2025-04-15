@@ -68,9 +68,10 @@ class ibl_loader(BaseLoader):
         """Get list of probes with CA1 channels."""
         self.get_probe_ids_and_names()
         self.probes_of_interest = []
-        
+
         for i, probe_id in enumerate(self.probelist):
-            channels, _, _ = self.load_channels(i)
+            channels, _,_ = self.load_channels(i)
+            
             if self.has_ca1_channels(channels):
                 self.probes_of_interest.append(i)  # Store probe index
         
@@ -136,8 +137,8 @@ class ibl_loader(BaseLoader):
         
         # Destripe data
         print(f"Destripping LFP data for probe {probe_id}...")
-        destriped = destripe_lfp(raw, fs=fs_from_sr)
-        print(f"Destriped shape: {destriped.shape}")
+        #destriped = destripe_lfp(raw, fs=fs_from_sr)
+        #print(f"Destriped shape: {destriped.shape}")
         
         fname = f"destriped_probe_{probe_id}.npz"
         path = os.path.join(os.getcwd(), fname)
@@ -146,9 +147,9 @@ class ibl_loader(BaseLoader):
         #np.savez_compressed(path, destriped=destriped)
 
         # later, to load
-        #destriped_data = np.load(path)
-        #destriped = destriped_data["destriped"]
-        #del destriped_data
+        destriped_data = np.load(path)
+        destriped = destriped_data["destriped"]
+        del destriped_data
         
         # normal code...
         del raw  # Free memory
@@ -347,7 +348,43 @@ class ibl_loader(BaseLoader):
         peakrippleband = lfp_ca1_rippleband[:, peak_channel_idx]
         print(f"Finding channel with highest ripple power...")
         return peak_channel_idx, peak_channel_id, peak_channel_raw_lfp, peakrippleband
-    
+
+    def global_events_probe_info(self):
+        """
+        Get probe-level information needed for global SWR detection.
+        
+        Returns
+        -------
+        dict
+            Dictionary mapping probe IDs to probe information dictionaries
+        """
+        probe_info = {}
+        
+        for i, probe_id in enumerate(self.probelist):
+            # Get the probe name at this index
+            probe_name = self.probenames[i]
+            
+            # Load spike sorting data
+            sl = SpikeSortingLoader(eid=self.session_id, pname=probe_name, one=self.one)
+            spikes, clusters, channels = sl.load_spike_sorting()
+            
+            # Merge clusters
+            clusters = sl.merge_clusters(spikes, clusters, channels)
+
+            # Filter for good units
+
+            good_units_acronym = clusters.acronym[clusters.label==1.0]
+            
+            # Count good units in CA1
+            ca1_good_units = sum( good_units_acronym == 'CA1')
+
+            probe_info[probe_id] = {
+                'good_unit_count': len(good_units_acronym),
+                'ca1_good_unit_count': ca1_good_units,
+            }
+        
+        return probe_info
+
     def cleanup(self):
         """Cleans up resources to free memory."""
         del self.one

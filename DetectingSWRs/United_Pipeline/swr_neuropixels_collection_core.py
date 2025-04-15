@@ -1,4 +1,5 @@
 # Standard library imports
+# swr_neuropixels_collection_core
 import os
 import time
 import sys
@@ -424,7 +425,20 @@ class BaseLoader:
     def process_probe(self, probe_id, filter_ripple_band_func=None):
         """Process a single probe."""
         raise NotImplementedError("Subclasses must implement process_probe method")
+    # Add to BaseLoader class in swr_neuropixels_collection_core.py
+
+    def global_events_probe_info(self):
+        """
+        Get probe-level information needed for global SWR detection.
+        This is a base implementation that should be overridden by each dataset's loader.
         
+        Returns
+        -------
+        dict
+            Dictionary mapping probe IDs to probe information dictionaries
+        """
+        raise NotImplementedError("Each loader must implement global_events_probe_info")
+
     def cleanup(self):
         """Clean up resources."""
         raise NotImplementedError("Subclasses must implement cleanup method")
@@ -842,8 +856,363 @@ def incorporate_sharp_wave_component_info(
 #  -Thresholds applied here to probe level events
 # ===================================
 
+import pandas as pd
+import numpy as np
+
+def check_gamma_overlap(events_df, gamma_df):
+    """
+    Uses vectorized operations to find overlaps in gamma bursts and putative events.
+    """
+    annotated = []
+    
+    for _, event in events_df.iterrows():
+        event_start, event_end = event['start_time'], event['end_time']
+        event_duration = event_end - event_start
+        
+        # Check overlap using interval logic
+        overlaps = ((gamma_df['start_time'] <= event_end) & 
+                    (gamma_df['end_time'] >= event_start))
+        
+        has_overlap = overlaps.any()
+        
+        if has_overlap:
+            # Calculate overlapping segments
+            overlap_segments = gamma_df[overlaps].copy()
+            # Clip each segment to the event boundaries
+            overlap_segments['overlap_start'] = np.maximum(overlap_segments['start_time'], event_start)
+            overlap_segments['overlap_end'] = np.minimum(overlap_segments['end_time'], event_end)
+            overlap_segments['overlap_duration'] = overlap_segments['overlap_end'] - overlap_segments['overlap_start']
+            
+            # Calculate total overlap duration (accounting for potential overlapping segments)
+            # Sort segments by start time
+            overlap_segments = overlap_segments.sort_values('overlap_start')
+            
+            # Merge overlapping segments
+            merged_segments = []
+            for _, segment in overlap_segments.iterrows():
+                if not merged_segments or merged_segments[-1][1] < segment['overlap_start']:
+                    merged_segments.append([segment['overlap_start'], segment['overlap_end']])
+                else:
+                    merged_segments[-1][1] = max(merged_segments[-1][1], segment['overlap_end'])
+            
+            total_overlap = sum(end - start for start, end in merged_segments)
+            overlap_pct = 100.0 * total_overlap / event_duration
+        else:
+            overlap_pct = 0.0
+        
+        annotated.append({
+            'overlaps_with_gamma': has_overlap,
+            'gamma_overlap_percent': overlap_pct
+        })
+    
+    return pd.concat([events_df.reset_index(drop=True), pd.DataFrame(annotated)], axis=1)
+
+def check_movement_overlap(events_df, move_df1, move_df2):
+    """
+    Uses vectorized operations to find overlap in putative events and movement artifacts.
+    """
+    annotated = []
+    
+    for _, event in events_df.iterrows():
+        event_start, event_end = event['start_time'], event['end_time']
+        event_duration = event_end - event_start
+        
+        # Check overlap using interval logic for both movement dataframes
+        overlaps1 = ((move_df1['start_time'] <= event_end) & 
+                     (move_df1['end_time'] >= event_start))
+        overlaps2 = ((move_df2['start_time'] <= event_end) & 
+                     (move_df2['end_time'] >= event_start))
+        
+        has_overlap1 = overlaps1.any()
+        has_overlap2 = overlaps2.any()
+        both_overlap = has_overlap1 and has_overlap2
+        
+        # Calculate overlap percentage with either channel
+        segments_list = []  # Use a clearer name to avoid confusion
+        
+        # Process overlaps from first movement dataframe
+        if has_overlap1:
+            df1_overlaps = move_df1[overlaps1].copy()
+            df1_overlaps['overlap_start'] = np.maximum(df1_overlaps['start_time'], event_start)
+            df1_overlaps['overlap_end'] = np.minimum(df1_overlaps['end_time'], event_end)
+            for _, row in df1_overlaps.iterrows():
+                segments_list.append([row['overlap_start'], row['overlap_end']])
+        
+        # Process overlaps from second movement dataframe
+        if has_overlap2:
+            df2_overlaps = move_df2[overlaps2].copy()
+            df2_overlaps['overlap_start'] = np.maximum(df2_overlaps['start_time'], event_start)
+            df2_overlaps['overlap_end'] = np.minimum(df2_overlaps['end_time'], event_end)
+            for _, row in df2_overlaps.iterrows():
+                segments_list.append([row['overlap_start'], row['overlap_end']])
+        
+        if segments_list:
+            # Sort segments by start time using key function
+            segments_list.sort(key=lambda x: x[0])
+            
+            # Merge overlapping segments
+            merged_segments = []
+            for start, end in segments_list:
+                if not merged_segments or merged_segments[-1][1] < start:
+                    merged_segments.append([start, end])
+                else:
+                    merged_segments[-1][1] = max(merged_segments[-1][1], end)
+            
+            total_overlap = sum(end - start for start, end in merged_segments)
+            overlap_pct = 100.0 * total_overlap / event_duration
+        else:
+            overlap_pct = 0.0
+        
+        annotated.append({
+            'overlaps_with_movement': both_overlap,
+            'movement_overlap_percent': overlap_pct
+        })
+    
+    return pd.concat([events_df.reset_index(drop=True), pd.DataFrame(annotated)], axis=1)
+
+
 
 # ===================================
 #  GLOBAL EVENT DETECTOR
 #  -Probe level events are merged into 
 # ===================================
+
+def add_participating_probes(global_events, probe_events_dict, offset=0.02):
+    """
+    Add information about participating probes to global events.
+    
+    Parameters
+    ----------
+    global_events : pandas.DataFrame
+        Global events DataFrame
+    probe_events_dict : dict
+        Dictionary mapping probe IDs to event DataFrames
+    offset : float, optional
+        Time window (in seconds) to consider for participation
+        
+    Returns
+    -------
+    pandas.DataFrame
+        Global events DataFrame with probe information
+    """
+    # Initialize columns
+    global_events['participating_probes'] = [[] for _ in range(len(global_events))]
+    global_events['peak_times'] = [[] for _ in range(len(global_events))]
+    global_events['peak_powers'] = [[] for _ in range(len(global_events))]
+    
+    # Check each probe against each global event
+    for probe_id, probe_df in probe_events_dict.items():
+        for i, event in global_events.iterrows():
+            # Check if any probe event overlaps with this global event
+            overlap = ((probe_df['start_time'] <= event['end_time'] + offset) & 
+                      (probe_df['end_time'] >= event['start_time'] - offset))
+            
+            if any(overlap):
+                # Add this probe to the participating probes
+                global_events.at[i, 'participating_probes'].append(probe_id)
+                
+                # Get peak time and power from the strongest overlapping event
+                overlapping_events = probe_df[overlap]
+                if 'Peak_time' in overlapping_events.columns and 'max_zscore' in overlapping_events.columns:
+                    max_idx = overlapping_events['max_zscore'].idxmax()
+                    global_events.at[i, 'peak_times'].append(overlapping_events.loc[max_idx, 'Peak_time'])
+                    global_events.at[i, 'peak_powers'].append(overlapping_events.loc[max_idx, 'max_zscore'])
+                elif 'Peak_time' in overlapping_events.columns:
+                    max_idx = overlapping_events.index[0]
+                    global_events.at[i, 'peak_times'].append(overlapping_events.loc[max_idx, 'Peak_time'])
+                    global_events.at[i, 'peak_powers'].append(3.0)  # Default value
+    
+    # Add count of participating probes
+    global_events['probe_count'] = global_events['participating_probes'].apply(len)
+    
+    # Add global peak information
+    global_events['global_peak_time'] = global_events.apply(
+        lambda row: row['peak_times'][row['peak_powers'].index(max(row['peak_powers']))] 
+        if row['peak_powers'] else np.nan, axis=1)
+    
+    global_events['global_peak_power'] = global_events['peak_powers'].apply(
+        lambda x: max(x) if x else np.nan)
+    
+    global_events['peak_probe'] = global_events.apply(
+        lambda row: row['participating_probes'][row['peak_powers'].index(max(row['peak_powers']))]
+        if row['peak_powers'] else '', axis=1)
+    
+    return global_events
+
+def create_global_events(probe_events_dict, merge_window=0.02, min_probe_count=1):
+    """
+    Create global events by merging events across probes.
+    
+    Parameters
+    ----------
+    probe_events_dict : dict
+        Dictionary mapping probe IDs to event DataFrames
+    merge_window : float, optional
+        Time window (in seconds) to merge nearby events
+    min_probe_count : int, optional
+        Minimum number of probes required to define a global event
+        
+    Returns
+    -------
+    pandas.DataFrame
+        Global events DataFrame
+        
+    Raises
+    ------
+    ValueError
+        If no events are created or no probe events are provided
+    """
+    if not probe_events_dict:
+        raise ValueError("No probe events provided")
+    
+    # Convert to list of DataFrames
+    event_dfs = list(probe_events_dict.values())
+    
+    # Create initial intervals from probes
+    all_intervals = []
+    for df in event_dfs:
+        intervals = [(row['start_time'], row['end_time'], i) 
+                    for i, (_, row) in enumerate(df.iterrows())]
+        all_intervals.extend(intervals)
+    
+    if not all_intervals:
+        raise ValueError("No intervals found in any probe events")
+    
+    # Sort by start time
+    all_intervals.sort(key=lambda x: x[0])
+    
+    # Merge overlapping intervals
+    merged_intervals = []
+    current = all_intervals[0]
+    for interval in all_intervals[1:]:
+        if interval[0] <= current[1] + merge_window:
+            # Merge intervals
+            current = (current[0], max(current[1], interval[1]), current[2])
+        else:
+            merged_intervals.append(current)
+            current = interval
+    merged_intervals.append(current)
+    
+    # Create DataFrame for global events
+    global_events = pd.DataFrame({
+        'start_time': [interval[0] for interval in merged_intervals],
+        'end_time': [interval[1] for interval in merged_intervals],
+        'original_event_idx': [interval[2] for interval in merged_intervals]
+    })
+    
+    global_events['duration'] = global_events['end_time'] - global_events['start_time']
+    
+    # Add information about which probes participate in each event
+    global_events = add_participating_probes(global_events, probe_events_dict, merge_window)
+    
+    # Filter events based on minimum probe count
+    global_events = global_events[global_events['probe_count'] >= min_probe_count]
+    
+    if len(global_events) == 0:
+        raise ValueError(f"No events meet the minimum probe count criteria (min_probe_count={min_probe_count})")
+    
+    return global_events
+
+def save_global_events(global_events, session_dir, session_id, label="global"):
+    """
+    Save global events to a CSV file.
+    
+    Parameters
+    ----------
+    global_events : pandas.DataFrame
+        Global events DataFrame
+    session_dir : str
+        Path to session directory
+    session_id : str
+        Session ID
+    label : str, optional
+        Label to append to filename
+        
+    Returns
+    -------
+    str
+        Path to saved file
+    """
+    filename = f"session_{session_id}_global_swrs_{label}.csv.gz"
+    filepath = os.path.join(session_dir, filename)
+    global_events.to_csv(filepath, index=False, compression='gzip')
+    logging.info(f"Saved global events to {filepath}")
+    return filepath
+
+def create_global_swr_events(probe_events_dict, swr_config, probe_info, session_subfolder, session_id):
+    """
+    Create global SWR events from probe-level events.
+    
+    Parameters
+    ----------
+    probe_events_dict : dict
+        Dictionary mapping probe IDs to event DataFrames
+    swr_config : dict
+        Configuration parameters for global SWR detection
+    probe_info : dict
+        Dictionary mapping probe IDs to probe information dictionaries
+    session_subfolder : str
+        Path to session directory
+    session_id : str
+        Session ID
+        
+    Returns
+    -------
+    pandas.DataFrame
+        Global events DataFrame
+    
+    Raises
+    ------
+    ValueError
+        If no events pass filtering criteria
+    """
+    if not probe_events_dict:
+        raise ValueError("No probe events provided - probe_events_dict is empty")
+    
+    # Apply SW power filters to all collected events
+    filtered_probe_events_dict = {}
+    for probe_id, events in probe_events_dict.items():
+        # Apply SW power threshold
+        if 'sw_peak_power' in events.columns:
+            filtered_events = events[events['sw_peak_power'] >= swr_config['min_sw_power']]
+        elif 'SW_max_zscore' in events.columns:
+            filtered_events = events[events['SW_max_zscore'] >= swr_config['min_sw_power']]
+        else:
+            filtered_events = events
+            
+        # Store events if we have enough after filtering
+        if len(filtered_events) >= swr_config['min_filtered_events']:
+            filtered_probe_events_dict[probe_id] = filtered_events
+    
+    if not filtered_probe_events_dict:
+        raise ValueError(f"No probes have enough events after SW power filtering (min_filtered_events={swr_config['min_filtered_events']})")
+
+    # Filter probes based on unit count
+    unit_filtered_probe_events_dict = {}
+    for probe_id, events in filtered_probe_events_dict.items():
+        # Check if probe has enough CA1 units
+        if probe_id in probe_info and probe_info[probe_id].get('ca1_good_unit_count', 0) >= swr_config['min_ca1_units']:
+            unit_filtered_probe_events_dict[probe_id] = events
+
+    if not unit_filtered_probe_events_dict:
+        raise ValueError(f"No probes have enough CA1 units (min_ca1_units={swr_config['min_ca1_units']})")
+
+    # Create global events
+    global_events = create_global_events(
+        unit_filtered_probe_events_dict,
+        merge_window=swr_config['merge_window'],
+        min_probe_count=swr_config['min_probe_count']
+    )
+    
+    if global_events is None or len(global_events) == 0:
+        raise ValueError(f"No global events created after merging (min_probe_count={swr_config['min_probe_count']})")
+    
+    # Save global events
+    save_global_events(
+        global_events, 
+        session_subfolder, 
+        session_id, 
+        label=swr_config['global_rip_label']
+    )
+    
+    return global_events
