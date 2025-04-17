@@ -7,7 +7,7 @@ output_dir: $OUTPUT_DIR
 # Dataset-specific pool sizes
 pool_sizes:
   abi_visual_behaviour: 6  
-  abi_visual_coding: 1
+  abi_visual_coding: 6
   ibl: 2
 
 # Thresholds (common across all pipelines)

@@ -9,9 +9,9 @@ A repo showcasing how to process and analyze Neuropixels LFP from the two larges
 
 Contains the .yaml files for recreating the environments used to run the allensdk and associated codes, as well as the .yaml for the ONE_ibl_env conda environment to run the IBL associated code.
 
-### DetectingSWRs
+### SWR_Neuropixels_Detector
 
-Contains the pipelines for running the detection scripts. Each pipeline contains a config file which sets input and output as well as parameters of the pipeline, such as ripple envelope threshold, and whether to include or exclude gamma band events when computing the global level events. If one wishes to rerun the detection pipelines, these config files can be modified accordingly.
+Contains the main pipeline for running the detection scripts. It includes a config file (`united_detector_config.yaml`) which sets input and output paths, parameters for detection (e.g., ripple envelope threshold), and filtering options. If one wishes to rerun the detection pipelines, this config file can be modified accordingly. There is also a `run_pipeline.sh` script to execute the different stages of the pipeline.
 
 #### Example Usage
 1. Start a `tmux` session (as the code can take a while to run):
@@ -19,23 +19,22 @@ Contains the pipelines for running the detection scripts. Each pipeline contains
     tmux
     ```
 
-2. Activate the `allensdk_env` conda environment:
+2. Activate the appropriate conda environment (e.g., `allensdk_env` or `ONE_ibl_env` depending on the data source targeted in the config):
     ```bash
-    conda activate allensdk_env
+    conda activate allensdk_env 
+    # or conda activate ONE_ibl_env
     ```
 
 3. Change directory to the pipeline folder:
     ```bash
-    cd DetectingSWRs/ABI_VisBehave_Pipeline
+    cd SWR_Neuropixels_Detector
     ```
 
-4. Ensure the config file, `abi_visbehave_swr_config.yaml`, is set to use the appropriate number of cores that your machine can handle.
+4. Ensure the config file, `united_detector_config.yaml`, is set correctly, including the number of cores (`pool_size`) your machine can handle.
 
-5. Run the detection scripts in the following order:
+5. Run the pipeline script. Use flags to specify which stages to run (this will be implemented in a later step):
     ```bash
-    python abi_visbehave_swr_detector.py
-    python abi_visbehave_filtering_swr_events_karlsson_detector.py
-    python abi_visbehave_global_ripple_detector.py
+    ./run_pipeline.sh # Add flags like -p -f -g as needed later
     ```
 
 6.  Use ctrl+b, d to exit the tmux session without killing it. It is recomended to check htop to ensure the server is behaving appropriately.

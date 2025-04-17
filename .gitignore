@@ -2,3 +2,13 @@ __pycache__
 venv*
 .nfs*
 destriped_probe*
+CURSOR_INSTRUCTIONS.md
+.mypy_cache/
+.dmypy.json
+dmypy.json
+setup_allen_cache.py
+# Pyre type checker
+.pyre/
+
+# VS Code settings folder (including launch.json)
+.vscode/
