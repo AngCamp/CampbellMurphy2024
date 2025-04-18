@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from allensdk.brain_observatory.behavior.behavior_project_cache import (
     VisualBehaviorNeuropixelsProjectCache,
 )
+import pandas as pd
 
 # Import the BaseLoader
 from swr_neuropixels_collection_core import BaseLoader
@@ -155,34 +156,34 @@ class abi_visual_behaviour_loader(BaseLoader):
         
         # Find channel with highest ripple power if function provided
         if filter_ripple_band_func is not None:
-            lfp_ca1_rippleband = filter_ripple_band_func(lfp_ca1)
-            highest_rip_power = np.abs(signal.hilbert(lfp_ca1_rippleband)) ** 2
-            highest_rip_power = highest_rip_power.max(axis=0)
-            
-            # Get channel with highest ripple power
-            peak_chan_idx = highest_rip_power.argmax()
-            this_chan_id = int(lfp_ca1_chans[peak_chan_idx])
-            peakrippleband = lfp_ca1_rippleband[:, peak_chan_idx]
-            peakripchan_lfp_ca1 = lfp_ca1[:, lfp_ca1_chans == this_chan_id]
+            # --- Select Ripple Channel --- 
+            this_chan_id, peakrippleband, peakripchan_lfp_ca1 = self.select_ripple_channel(
+                ca1_lfp=lfp_ca1,
+                ca1_chan_ids=lfp_ca1_chans,
+                channel_positions=all_channel_positions, # Pass the extracted positions
+                ripple_filter_func=filter_ripple_band_func,
+                config=None # Pass config if needed
+            )
 
-            # Get channel positions for CA1 channels
-            ca1_channel_positions = self.session.channels.loc[lfp_ca1_chans, 'probe_vertical_position']
-
-            # Use the base class's implementation
+            # --- Select Sharp Wave Channel --- 
             best_sw_chan_id, best_sw_chan_lfp = super().select_sharpwave_channel(
                 ca1_lfp=lfp_ca1,
                 lfp_time_index=lfp_time_index,  
                 ca1_chan_ids=lfp_ca1_chans,
-                this_chan_id=this_chan_id,
-                channel_positions=ca1_channel_positions,
+                peak_ripple_chan_id=this_chan_id, # Pass selected ripple channel ID
+                channel_positions=all_channel_positions,
                 ripple_filtered=peakrippleband,
-                filter_path=self.sw_component_filter_path
+                config=None, # Pass config if needed
+                filter_path=getattr(self, 'sw_component_filter_path', None) # Use attribute if exists
             )
 
             # Extract sharpwave channel information
-            best_sw_power_z = zscore(best_sw_chan_lfp)
+            if best_sw_chan_lfp is not None:
+                best_sw_chan_lfp = best_sw_chan_lfp.flatten()
+                best_sw_power_z = zscore(best_sw_chan_lfp)
+            else:
+                best_sw_power_z = None
         else:
-            peak_chan_idx = None
             this_chan_id = None
             peakrippleband = None
             peakripchan_lfp_ca1 = None
@@ -191,25 +192,27 @@ class abi_visual_behaviour_loader(BaseLoader):
             best_sw_power_z = None
         del lfp_ca1
 
-        # Collect results
+        # Collect results using final, consistent key names
         results = {
             'probe_id': probe_id,
             'lfp_time_index': lfp_time_index,
-            'ca1_chans': lfp_ca1_chans,
-            'control_lfps': control_channels,
-            'control_channels': take_two,
-            'peak_ripple_chan_idx': peak_chan_idx,
+            'sampling_rate': 1500.0, # Explicitly add sampling rate
+            'dataset_type': 'abi_visual_behaviour', # Explicitly add dataset type
+            'ca1_channel_ids': lfp_ca1_chans, # Renamed
+            'control_lfps': control_channels, # LFP data for control channels
+            'control_channel_ids': take_two, # Renamed? (was control_channels_ids)
             'peak_ripple_chan_id': this_chan_id,
-            'peak_ripple_chan_raw_lfp': peakripchan_lfp_ca1,
-            'chan_id_string': str(this_chan_id) if this_chan_id is not None else None,
-            'rippleband': peakrippleband,
+            'peak_ripple_raw_lfp': peakripchan_lfp_ca1, # Renamed
+            # 'chan_id_string': str(this_chan_id), # Removed - Redundant
+            'ripple_band_filtered': peakrippleband, # Renamed
             'sharpwave_chan_id': best_sw_chan_id,
             'sharpwave_chan_raw_lfp': best_sw_chan_lfp,
-            'sharpwave_power_z': best_sw_power_z
+            'sharpwave_power_z': best_sw_power_z,
+            'channel_selection_metadata': self.channel_selection_metadata_dict
         }
         
-        # Return standardized results
-        return super().standardize_results(results, 'abi_visual_behaviour')
+        # Return results directly, without standardization call
+        return results
     
     def global_events_probe_info(self):
         """

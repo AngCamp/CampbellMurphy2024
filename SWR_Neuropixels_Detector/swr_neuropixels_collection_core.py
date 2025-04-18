@@ -8,6 +8,8 @@ import traceback
 import json
 import gzip
 import string
+import glob
+import re
 
 # Third-party data processing libraries
 import numpy as np
@@ -38,7 +40,49 @@ import ripple_detection.simulate as ripsim
 import logging
 import logging.handlers
 
+# United SWR detector
+import os
+import subprocess
+import numpy as np
+import pandas as pd
+from scipy import io, signal, stats
+from scipy.signal import lfilter
+import scipy.ndimage
+from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter1d
+from scipy import interpolate
+import matplotlib.pyplot as plt
+import ripple_detection
+from ripple_detection import filter_ripple_band
+import ripple_detection.simulate as ripsim  # for making our time vectors
+from tqdm import tqdm
+import time
+import traceback
+import logging
+import logging.handlers
+import sys
+from multiprocessing import Pool, Process, Queue, Manager, set_start_method
+import yaml
+import json
+import gzip
+import string
+from botocore.config import Config
+import boto3
 
+
+# ===================================
+# Helper functions
+# ===================================
+
+def read_json_file(file_path):
+    """Read a JSON file and return the loaded data."""
+    with open(file_path, 'r') as f:
+        return json.load(f)
+
+def get_filter(filter_path):
+    """Load filter coefficients from a file."""
+    filter_data = np.load(filter_path)
+    return filter_data["arr_0"]
 
 # ===================================
 # BASE LOADER CLASS
@@ -62,6 +106,30 @@ class BaseLoader:
     """
     def __init__(self, session_id):
         self.session_id = session_id
+
+        # Initialize dictionary to store channel selection metadata
+        self.channel_selection_metadata_dict = {
+            'probe_id': str(session_id), # Store probe ID here during setup/processing
+            'ripple_band': { # Metrics related to ripple channel selection
+                'channel_ids': [], # All CA1 channel IDs evaluated
+                'depths': [],      # Corresponding depths
+                'skewness': [],    # Skewness of ripple power per channel
+                'net_power': [],   # Net ripple power per channel
+                'selected_channel_id': None,
+                'selection_method': None
+            },
+            'sharp_wave_band': { # Metrics related to SW channel selection
+                'channel_ids': [], # Channel IDs below ripple chan evaluated
+                'depths': [],      # Corresponding depths
+                'net_sw_power': [],# Net SW power during co-activity
+                'modulation_index': [],
+                'circular_linear_corrs': [],
+                'selected_channel_id': None,
+                'selection_method': None
+            }
+            # Note: We might rename 'channel idx' and 'depths' from instructions
+            # to be nested under ripple/sw bands for clarity.
+        }
 
     @staticmethod
     def create(dataset_type, session_id):
@@ -238,40 +306,76 @@ class BaseLoader:
             ca1_lfp,
             lfp_time_index,
             ca1_chan_ids,
-            this_chan_id,
+            peak_ripple_chan_id,
             channel_positions,
             ripple_filtered,
+            config=None,
             filter_path=None,
             running_exclusion_periods=None,
             selection_metric='modulation_index'):
         """
-        Select the optimal sharp wave channel based on phase-amplitude coupling with ripple activity.
+        Selects the optimal sharp wave channel below the ripple channel based on 
+        phase-amplitude coupling and return metadata for all evaluated channels.
 
-        Parameters
+        This function aims to find the channel electrode that best captures the 
+        phase-amplitude coupling with the ripple activity. It calculates metrics 
+        for all CA1 channels below the reference channel and returns the best 
+        channel ID, its LFP, and the metadata for all evaluated channels.
+
+        Parameters:
         ----------
         ca1_lfp : np.ndarray
-            LFP data array (time x channels) for CA1 region.
+            LFP data array containing signals from channels located in the CA1 region.
+            Expected shape: (time, channels).
         lfp_time_index : np.ndarray
-            Time index array corresponding to ca1_lfp (in seconds).
+            1D array of timestamps (in seconds) corresponding to the rows of `ca1_lfp`.
         ca1_chan_ids : list of int
-            List of channel IDs corresponding to columns in ca1_lfp.
-        this_chan_id : int
-            Channel ID of the previously selected ripple-detection channel.
+            List of unique channel identifiers corresponding to the columns in `ca1_lfp`.
+        peak_ripple_chan_id : int
+            The channel ID previously identified as having the strongest ripple power.
+            This serves as the reference channel.
         channel_positions : pd.Series
-            Series mapping channel IDs to vertical probe positions (larger = deeper).
+            A pandas Series where the index contains channel IDs (including those in 
+            `ca1_chan_ids` and potentially others) and the values are the vertical
+            positions (depths) of those channels on the probe. Typically, larger
+            values mean deeper positions.
         ripple_filtered : np.ndarray
-            Ripple-band filtered signal from the selected ripple detection channel.
+            The ripple-band filtered signal (e.g., 150-250 Hz) from the 
+            `peak_ripple_chan_id`. Shape: (time,)
+        config : dict, optional
+            A configuration dictionary potentially containing parameters like 
+            filter paths (`config['filter_paths']['sharpwave_filter']`), 
+            analysis parameters (`config['analysis_params']` like thresholds, 
+            time buffers, MI bins).
         filter_path : str, optional
-            Path to the sharp wave filter file. If None, must be provided by the loader implementation.
+            Direct path to the sharp wave filter coefficients (.mat file). Overrides
+            path found in config.
         running_exclusion_periods : list of tuple, optional
-            List of (start_time, end_time) tuples for periods to exclude from analysis.
+            A list where each tuple contains (start_time, end_time) in seconds, 
+            indicating periods (e.g., due to animal movement) that should be excluded 
+            from the phase-amplitude coupling analysis. Overrides any found in config.
         selection_metric : {'modulation_index', 'circular_linear'}, optional
-            Metric used to select the best sharp wave channel. Default is 'modulation_index'.
+            Specifies the metric used to determine the "best" sharp wave channel from 
+            the candidates below the ripple channel. Overrides config.
+            - 'modulation_index': Uses the Tort Modulation Index (MI).
+            - 'circular_linear': Uses the circular-linear correlation.
+            Default is 'modulation_index'.
 
-        Returns
+        Returns:
         -------
         tuple
-            (best_channel_id, best_channel_lfp) - Best channel ID and its raw LFP
+            - best_sw_channel_id (int or None): The channel ID selected as the best 
+              sharp wave channel. None if no suitable channel is found below the 
+              reference or if errors occur.
+            - best_sw_channel_lfp (np.ndarray or None): The raw LFP signal (1D array)
+              from the `best_sw_channel_id`. None if no channel is selected.
+            Note: This method now directly populates the 'sharp_wave_band' section of
+            `self.channel_selection_metadata_dict` instead of returning separate metadata.
+
+        Raises
+        ------
+        ValueError
+            If no suitable channel is found below the reference channel or if errors occur.
         """
         # Get the filter - implementers must override this if filter_path is None
         if hasattr(self, 'sw_component_filter_path') and self.sw_component_filter_path is not None:
@@ -353,58 +457,6 @@ class BaseLoader:
         # Return the best channel ID and its raw LFP
         return best_cid, best_lfp
 
-    def standardize_results(self, results, dataset_type):
-        """
-        Standardize the results dictionary format across different loaders.
-        
-        Parameters
-        ----------
-        results : dict
-            Results dictionary from process_probe
-        dataset_type : str
-            Type of dataset
-            
-        Returns
-        -------
-        dict
-            Standardized results dictionary
-        """
-        # Add dataset type to results
-        results['dataset_type'] = dataset_type
-        
-        # Add sampling rate
-        if 'sampling_rate' not in results:
-            results['sampling_rate'] = 1500.0
-            
-        # Rename keys for consistency if needed
-        key_mapping = {
-            'ca1_chans': 'ca1_channel_ids',
-            'control_channels': 'control_channel_ids',
-            'peak_ripple_chan_raw_lfp': 'peak_ripple_raw_lfp',
-            'rippleband': 'ripple_band_filtered'
-        }
-        
-        for old_key, new_key in key_mapping.items():
-            if old_key in results and new_key not in results:
-                results[new_key] = results[old_key]
-                
-        # Create dataset-specific section for non-standard data
-        dataset_specific = {}
-        for key in list(results.keys()):
-            if key not in [
-                'probe_id', 'dataset_type', 'lfp_time_index', 'sampling_rate',
-                'ca1_channel_ids', 'peak_ripple_chan_id', 'peak_ripple_raw_lfp',
-                'ripple_band_filtered', 'sharpwave_chan_id', 'sharpwave_chan_raw_lfp',
-                'sharpwave_power_z', 'control_channel_ids', 'control_lfps',
-                'ca1_chans', 'control_channels', 'peak_ripple_chan_raw_lfp', 'rippleband'
-            ]:
-                dataset_specific[key] = results[key]
-                results.pop(key)
-                
-        results['dataset_specific'] = dataset_specific
-        
-        return results
-
     # Abstract method stubs that must be implemented by subclasses
     # Due to dependency conflicts in the apis, differences in metadata labels or conventions
     # the code is sufficiently different to implement all of these steps
@@ -443,40 +495,144 @@ class BaseLoader:
         """Clean up resources."""
         raise NotImplementedError("Subclasses must implement cleanup method")
 
+    def get_probe_unit_info(self, probe_id=None):
+        """
+        Returns information about units (neurons) for a specified probe.
+        Should return a DataFrame or similar structure with columns like:
+        'unit_id', 'quality_metric' (e.g., label, pass), 'structure_acronym'
+        
+        Parameters
+        ----------
+        probe_id : int or str, optional
+            The ID of the probe to get units for. If None, returns units for all probes.
+            
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame containing unit information
+        """
+        raise NotImplementedError("Subclasses must implement get_probe_unit_info")
+
+    def select_ripple_channel(self, 
+                              ca1_lfp, 
+                              ca1_chan_ids, 
+                              channel_positions, 
+                              ripple_filter_func, 
+                              config=None):
+        """
+        Selects the CA1 channel with the highest ripple power and populates metadata.
+
+        Parameters:
+        ----------
+        ca1_lfp : np.ndarray
+            LFP data array (time, channels) for CA1 channels.
+        ca1_chan_ids : list of int
+            List of channel IDs corresponding to columns in ca1_lfp.
+        channel_positions : pd.Series
+            Series mapping channel IDs to vertical positions.
+        ripple_filter_func : callable
+            Function (e.g., ripple_detection.filter_ripple_band) to apply ripple filter.
+        config : dict, optional
+            Configuration dictionary.
+
+        Returns:
+        -------
+        tuple
+            - peak_chan_id (int): ID of the selected channel.
+            - peak_ripple_band_lfp (np.ndarray): Ripple-filtered LFP of the selected channel.
+            - peak_ripple_chan_lfp (np.ndarray): Raw LFP of the selected channel.
+            Returns (None, None, None) if no suitable channel found.
+        """
+        # --- Input Validation --- 
+        if ca1_lfp is None or ca1_lfp.size == 0:
+             raise ValueError("Missing CA1 LFP data. Cannot select ripple channel.")
+        if not ca1_chan_ids:
+             raise ValueError("Missing CA1 channel IDs. Cannot select ripple channel.")
+            
+        # Ensure correct shape (time, channels)
+        if ca1_lfp.ndim == 1:
+             ca1_lfp = ca1_lfp[:, np.newaxis]
+        if ca1_lfp.shape[1] != len(ca1_chan_ids):
+             # Attempt transpose if shapes mismatch (e.g., channels, time)
+             if ca1_lfp.shape[0] == len(ca1_chan_ids):
+                 ca1_lfp = ca1_lfp.T
+             else:
+                  # Fail explicitly if shape is wrong
+                  raise ValueError(f"CA1 LFP shape {ca1_lfp.shape} inconsistent with channel IDs {len(ca1_chan_ids)}. Cannot select ripple channel.")
+
+        # --- Calculate Metrics for All CA1 Channels --- 
+        all_ripple_filtered = ripple_filter_func(ca1_lfp) # Apply filter to all CA1 channels
+        all_ripple_power = np.abs(signal.hilbert(all_ripple_filtered, axis=0)) ** 2
+        
+        ripple_metrics = {
+            'channel_ids': [],
+            'depths': [],
+            'skewness': [],
+            'net_power': [],
+            'max_power': [] # Store max power for selection
+        }
+        
+        for i, chan_id in enumerate(ca1_chan_ids):
+            power_trace = all_ripple_power[:, i]
+            skew = stats.skew(power_trace)
+            net_power = np.sum(power_trace)
+            max_power = np.max(power_trace)
+            
+            ripple_metrics['channel_ids'].append(int(chan_id))
+            # Directly access position - will raise KeyError if chan_id not found in channel_positions
+            ripple_metrics['depths'].append(float(channel_positions.loc[chan_id]))
+            # Removed try/except KeyError block
+
+            ripple_metrics['skewness'].append(float(skew) if pd.notna(skew) else None)
+            ripple_metrics['net_power'].append(float(net_power))
+            ripple_metrics['max_power'].append(float(max_power))
+
+        # --- Select Channel (Highest Max Power) --- 
+        # First, check for corrupted data (NaN or Inf in power metrics)
+        power_array = np.array(ripple_metrics['max_power'])
+        if np.isnan(power_array).any() or np.isinf(power_array).any():
+            raise ValueError(f"Corrupted LFP/power data (NaN or Inf detected) for channels {ripple_metrics['channel_ids']}. Cannot select ripple channel.")
+
+        # If data is clean, proceed with simple argmax
+        if power_array.size == 0:
+             # This case should ideally be caught earlier by input validation, but as a safeguard:
+             raise ValueError("No ripple power metrics calculated (empty array). Cannot select channel.")
+
+        peak_chan_idx = np.argmax(power_array)
+        peak_chan_id = ca1_chan_ids[peak_chan_idx]
+        peak_ripple_band_lfp = all_ripple_filtered[:, peak_chan_idx]
+        peak_ripple_chan_lfp = ca1_lfp[:, peak_chan_idx]
+        selection_method = "highest_max_power"
+
+        # --- Populate Metadata Dictionary --- 
+        self.channel_selection_metadata_dict['ripple_band']['channel_ids'] = ripple_metrics['channel_ids']
+        self.channel_selection_metadata_dict['ripple_band']['depths'] = ripple_metrics['depths']
+        self.channel_selection_metadata_dict['ripple_band']['skewness'] = ripple_metrics['skewness']
+        self.channel_selection_metadata_dict['ripple_band']['net_power'] = ripple_metrics['net_power']
+        self.channel_selection_metadata_dict['ripple_band']['selected_channel_id'] = int(peak_chan_id)
+        self.channel_selection_metadata_dict['ripple_band']['selection_method'] = selection_method
+
+        print(f"Selected ripple channel {peak_chan_id} based on {selection_method}.")
+
+        return peak_chan_id, peak_ripple_band_lfp, peak_ripple_chan_lfp
+
+    def get_metadata_for_probe(self, probe_id, config=None):
+        """
+        Generates metadata for a single specified probe.
+        """
+        # This method should return a dictionary containing metadata for the specified probe
+        # Implement the logic to retrieve metadata for the probe
+        # You might want to use the probe_id to fetch the corresponding data
+        # from your database or storage system
+        pass
+
 # ===================================
 #  PROBE LEVEL EVENT DETECTOR
 #  -Channel selection, artifact, and putative ripple event detection
 #  -intentionally overly permissive settings are used here
 #  -most computationally expensive
 # ===================================
-# United SWR detector
-import os
-import subprocess
-import numpy as np
-import pandas as pd
-from scipy import io, signal, stats
-from scipy.signal import lfilter
-import scipy.ndimage
-from scipy.ndimage import gaussian_filter
-from scipy.ndimage import gaussian_filter1d
-from scipy import interpolate
-import matplotlib.pyplot as plt
-import ripple_detection
-from ripple_detection import filter_ripple_band
-import ripple_detection.simulate as ripsim  # for making our time vectors
-from tqdm import tqdm
-import time
-import traceback
-import logging
-import logging.handlers
-import sys
-from multiprocessing import Pool, Process, Queue, Manager, set_start_method
-import yaml
-import json
-import gzip
-import string
-from botocore.config import Config
-import boto3
+
 
 
 # Assuming you have your signal_array, b, and a defined as before
@@ -1216,3 +1372,403 @@ def create_global_swr_events(probe_events_dict, swr_config, probe_info, session_
     )
     
     return global_events
+
+# --- Paste process_session here and modify --- 
+def process_session(session_id, config):
+    """
+    Process a single session using parameters passed in config dictionary.
+    
+    Parameters
+    ----------
+    session_id : str
+        The ID of the session to process
+    config : dict
+        Dictionary containing all necessary settings including:
+        - paths: containing output directories
+        - run_details: containing dataset info and run parameters
+        - flags: containing processing options like save_lfp, overwrite_existing
+        - ripple_detection: containing detection thresholds
+        - filters: containing filter arrays and paths
+    
+    Returns
+    -------
+    None
+        Results are saved to files in the specified output directory
+    """
+    # Set up logging
+    logger = logging.getLogger(f"session_{session_id}")
+    logger.setLevel(logging.INFO)
+    
+    # Extract necessary paths and settings from config
+    swr_output_dir_path = config['paths']['swr_output_dir']
+    lfp_output_dir_path = config['paths']['lfp_output_dir']
+    dataset_to_process = config['run_details']['dataset_to_process']
+    run_name = config['run_details']['run_name']
+    
+    # Extract processing flags
+    save_lfp = config['flags']['save_lfp']
+    save_channel_metadata = config['flags'].get('save_channel_metadata', False)
+    overwrite_existing = config['flags'].get('overwrite_existing', False)
+    cleanup_after = config['flags'].get('cleanup_cache', False)
+    
+    # Extract ripple detection settings
+    ripple_band_threshold = config['ripple_detection']['ripple_band_threshold']
+    movement_artifact_ripple_band_threshold = config['ripple_detection']['movement_artifact_ripple_band_threshold']
+    
+    # Extract artifact detection settings
+    gamma_event_thresh = config['artifact_detection']['gamma_event_thresh']
+    
+    # Extract filters
+    gamma_filter = config['filters']['gamma_filter']
+    sharp_wave_component_path = config['filters']['sharp_wave_component_path']
+    
+    # Global SWR detection settings
+    global_swr_config = config.get('global_swr', {})
+    
+    # Setup AWS client with extended timeout
+    my_config = Config(connect_timeout=1200, read_timeout=1200)
+    s3 = boto3.client('s3', config=my_config)
+    
+    # Initialize variables
+    process_stage = f"Starting processing for session {session_id}"
+    probe_id = None
+    probe_id_log = "Not Loaded Yet"
+    probe_events_dict = {}  # Initialize dictionary to store probe events
+    loader = None  # Initialize loader to None
+    
+    try:
+        # Create session subfolder paths
+        session_subfolder = os.path.join(swr_output_dir_path, f"swrs_session_{str(session_id)}")
+        
+        # Check if the session directory already exists and contains files
+        if os.path.exists(session_subfolder) and os.listdir(session_subfolder):
+            if not overwrite_existing:
+                logger.info(f"Session {session_id}: Output directory already exists and contains files. Skipping processing.")
+                return
+            else:
+                logger.info(f"Session {session_id}: Output directory already exists but will be overwritten (--overwrite-existing flag).")
+        
+        # Create LFP subfolder path
+        if save_lfp:
+            session_lfp_subfolder = os.path.join(lfp_output_dir_path, f"lfp_session_{str(session_id)}")
+        
+        # Set up logging
+        process_stage = "Setting up"
+        logger.info(f"Session {session_id}: Beginning processing, dataset {dataset_to_process}")
+        
+        # Initialize and set up the loader using the BaseLoader factory
+        process_stage = "Setting up loader"
+        loader = BaseLoader.create(dataset_to_process, session_id)
+        loader.set_up()
+        
+        # Get probe IDs and names
+        process_stage = "Getting probe IDs and names"
+        if dataset_to_process == 'abi_visual_coding' or dataset_to_process == 'abi_visual_behaviour':
+            probenames = None
+            probelist = loader.get_probes_with_ca1()
+        elif dataset_to_process == 'ibl':
+            probelist, probenames = loader.get_probe_ids_and_names()
+        
+        # If no probes with CA1, log and return
+        if not probelist:
+            logger.warning(f"Session {session_id}: No probes with CA1 found, skipping.")
+            return
+            
+        # Create directories once we know we'll process this session
+        logger.info(f"Session {session_id}: Creating output directories")
+        os.makedirs(session_subfolder, exist_ok=True)
+        
+        if save_lfp:
+            os.makedirs(session_lfp_subfolder, exist_ok=True)
+        
+        # Process probes
+        process_stage = "Running through the probes in the session"
+        icount = 0 # debugging
+        for this_probe in range(len(probelist)):
+            if icount > 0: # debugging
+                break # debugging
+            icount += 1 # debugging
+            if dataset_to_process == 'ibl':
+                probe_name = probenames[this_probe]
+            probe_id = probelist[this_probe]
+            probe_id_log = str(probe_id)
+            logger.info(f"Session {session_id}: Processing probe {probe_id_log}")
+            
+            # Process the probe and get results
+            process_stage = f"Processing probe with id {probe_id_log}"
+            if dataset_to_process == 'abi_visual_coding' or dataset_to_process == 'abi_visual_behaviour':
+                results = loader.process_probe(probe_id, filter_ripple_band)
+            elif dataset_to_process == 'ibl':
+                results = loader.process_probe(this_probe, filter_ripple_band)
+                
+            # Skip if no results
+            if results is None:
+                logger.warning(f"Session {session_id}: No results for probe {probe_id_log}, skipping...")
+                continue
+                
+            # Extract results
+            peakripple_chan_raw_lfp = results['peak_ripple_chan_raw_lfp']
+            lfp_time_index = results['lfp_time_index']
+            ca1_chans = results['ca1_chans']
+            outof_hp_chans_lfp = results['control_lfps']
+            take_two = results['control_channels']
+            peakrippleband = results['rippleband']
+            this_chan_id = results['peak_ripple_chan_id']
+            
+            # Save channel selection metadata only if the flag is enabled
+            if save_channel_metadata:
+                channel_metadata_path = os.path.join(
+                    session_subfolder,
+                    f"probe_{probe_id_log}_channel_selection_metadata.json.gz"
+                )
+                with gzip.open(channel_metadata_path, 'wt', encoding='utf-8') as f:
+                    json.dump(loader.channel_selection_metadata_dict, f)
+                logger.info(f"Session {session_id}: Saved channel selection metadata for probe {probe_id_log}")
+            
+            # Filter to gamma band
+            gamma_band_ca1 = np.convolve(
+                peakripple_chan_raw_lfp.reshape(-1), gamma_filter, mode="same"
+            )
+            
+            # Save LFP data if enabled
+            if save_lfp:
+                np.savez(
+                    os.path.join(
+                        session_lfp_subfolder,
+                        f"probe_{probe_id_log}_channel_{this_chan_id}_lfp_ca1_peakripplepower.npz",
+                    ),
+                    lfp_ca1=peakripple_chan_raw_lfp,
+                )
+                np.savez(
+                    os.path.join(
+                        session_lfp_subfolder,
+                        f"probe_{probe_id_log}_channel_{this_chan_id}_lfp_time_index_1500hz.npz",
+                    ),
+                    lfp_time_index=lfp_time_index,
+                )
+                
+                # Save control channel data
+                for i in range(2):
+                    channel_outside_hp = take_two[i]
+                    channel_outside_hp_str = f"channelsrawInd_{str(channel_outside_hp)}"
+                    np.savez(
+                        os.path.join(
+                            session_lfp_subfolder,
+                            f"probe_{probe_id_log}_channel_{channel_outside_hp_str}_lfp_control_channel.npz",
+                        ),
+                        lfp_control_channel=outof_hp_chans_lfp[i],
+                    )
+            
+            # Create dummy speed vector for ripple detection
+            dummy_speed = np.zeros_like(peakrippleband)
+            
+            # Detect putative ripples
+            process_stage = f"Detecting Putative Ripples on probe with id {probe_id_log}"
+            logger.info(f"Session {session_id}: Detecting putative ripples on probe {probe_id_log}")
+            
+            Karlsson_ripple_times = ripple_detection.Karlsson_ripple_detector(
+                time=lfp_time_index,
+                zscore_threshold=ripple_band_threshold,
+                filtered_lfps=peakrippleband[:, None],
+                speed=dummy_speed,
+                sampling_frequency=1500.0,
+            )
+            
+            # Filter by duration
+            Karlsson_ripple_times = Karlsson_ripple_times[
+                Karlsson_ripple_times.duration < 0.25
+            ]
+            
+            # Calculate ripple band power and peak times
+            peakrippleband_power = np.abs(signal.hilbert(peakrippleband)) ** 2
+            Karlsson_ripple_times["Peak_time"] = peaks_time_of_events(
+                events=Karlsson_ripple_times,
+                time_values=lfp_time_index,
+                signal_values=peakrippleband_power,
+            )
+            
+            # Remove speed columns
+            speed_cols = [
+                col for col in Karlsson_ripple_times.columns if "speed" in col
+            ]
+            Karlsson_ripple_times = Karlsson_ripple_times.drop(columns=speed_cols)
+            
+            # Extract sharp wave component info
+            sharp_wave_lfp = results['sharpwave_chan_raw_lfp']
+            sw_chan_id = results['sharpwave_chan_id']
+            
+            # Save sharp wave LFP if enabled
+            if save_lfp:
+                np.savez(
+                    os.path.join(
+                        session_lfp_subfolder,
+                        f"probe_{probe_id_log}_channel_{sw_chan_id}_lfp_ca1_sharpwave.npz",
+                    ),
+                    lfp_ca1=sharp_wave_lfp,
+                )
+            
+            # Incorporate sharp wave component info
+            logger.info(f"Session {session_id}: Incorporating sharp wave component information for probe {probe_id_log}")
+            sw_filter_data = np.load(sharp_wave_component_path)
+            sharpwave_filter = sw_filter_data['sharpwave_componenet_8to40band_1500hz_band']
+            
+            Karlsson_ripple_times = incorporate_sharp_wave_component_info(
+                events_df=Karlsson_ripple_times,
+                time_values=lfp_time_index,
+                ripple_filtered=peakrippleband,
+                sharp_wave_lfp=sharp_wave_lfp,
+                sharpwave_filter=sharpwave_filter
+            )
+            
+            # Save SW component metadata if enabled
+            if save_lfp and hasattr(loader, 'sw_component_summary_stats_dict'):
+                channel_info_path = os.path.join(
+                    session_lfp_subfolder,
+                    f"probe_{probe_id_log}_sw_component_summary.json.gz"
+                )
+                with gzip.open(channel_info_path, 'wt', encoding='utf-8') as f:
+                    json.dump(loader.sw_component_summary_stats_dict, f)
+            
+            # Detect gamma events
+            process_stage = f"Detecting Gamma Events on probe with id {probe_id_log}"
+            logger.info(f"Session {session_id}: Detecting gamma events on probe {probe_id_log}")
+            
+            gamma_power = np.abs(signal.hilbert(gamma_band_ca1)) ** 2
+            gamma_times = event_boundary_detector(
+                time=lfp_time_index,
+                threshold_sd=gamma_event_thresh,
+                envelope=False,
+                minimum_duration=0.015,
+                maximum_duration=float("inf"),
+                five_to_fourty_band_power_df=gamma_power,
+            )
+            
+            # Save gamma events
+            csv_filename = f"probe_{probe_id_log}_channel_{this_chan_id}_gamma_band_events.csv.gz"
+            csv_path = os.path.join(session_subfolder, csv_filename)
+            gamma_times.to_csv(csv_path, index=True, compression="gzip")
+            
+            # Detect movement artifacts
+            process_stage = f"Detecting Movement Artifacts on probe with id {probe_id_log}"
+            logger.info(f"Session {session_id}: Detecting movement artifacts on probe {probe_id_log}")
+            
+            movement_control_list = []
+            for i in [0, 1]:
+                channel_outside_hp = take_two[i]
+                process_stage = f"Detecting Movement Artifacts on control channel {channel_outside_hp} on probe {probe_id_log}"
+                
+                # Process control channel for movement artifacts
+                ripple_band_control = outof_hp_chans_lfp[i]
+                dummy_speed = np.zeros_like(ripple_band_control)
+                ripple_band_control = filter_ripple_band(ripple_band_control)
+                rip_power_controlchan = np.abs(signal.hilbert(ripple_band_control)) ** 2
+                
+                # Reshape arrays as needed for different datasets
+                if dataset_to_process == 'abi_visual_behaviour':
+                    lfp_time_index = lfp_time_index.reshape(-1)
+                    dummy_speed = dummy_speed.reshape(-1)
+                if dataset_to_process == 'ibl':
+                    # Reshape to ensure consistent (n_samples, n_channels) format for detector
+                    rip_power_controlchan = rip_power_controlchan.reshape(-1,1)
+                
+                # Detect movement artifacts
+                movement_controls = ripple_detection.Karlsson_ripple_detector(
+                    time=lfp_time_index.reshape(-1),
+                    filtered_lfps=rip_power_controlchan,
+                    speed=dummy_speed.reshape(-1),
+                    zscore_threshold=movement_artifact_ripple_band_threshold,
+                    sampling_frequency=1500.0,
+                )
+                
+                # Remove speed columns
+                speed_cols = [
+                    col for col in movement_controls.columns if "speed" in col
+                ]
+                movement_controls = movement_controls.drop(columns=speed_cols)
+                
+                # Save movement artifact events
+                channel_outside_hp_str = f"channelsrawInd_{str(channel_outside_hp)}"
+                csv_filename = f"probe_{probe_id_log}_channel_{channel_outside_hp_str}_movement_artifacts.csv.gz"
+                csv_path = os.path.join(session_subfolder, csv_filename)
+                movement_controls.to_csv(csv_path, index=True, compression="gzip")
+                movement_control_list.append(movement_controls)
+            
+            # Apply filtering to remove events with gamma/movement overlap
+            logger.info(f"Session {session_id}: Filtering events for probe {probe_id_log}")
+            Karlsson_ripple_times = check_gamma_overlap(Karlsson_ripple_times, gamma_times)
+            Karlsson_ripple_times = check_movement_overlap(Karlsson_ripple_times, movement_control_list[0], movement_control_list[1])
+            
+            # Save filtered ripple events
+            csv_filename = f"probe_{probe_id_log}_channel_{this_chan_id}_karlsson_detector_events.csv.gz"
+            csv_path = os.path.join(session_subfolder, csv_filename)
+            Karlsson_ripple_times.to_csv(csv_path, index=True, compression="gzip")
+            probe_events_dict[probe_id_log] = Karlsson_ripple_times
+            logger.info(f"Session {session_id}: Saved {len(Karlsson_ripple_times)} filtered events for probe {probe_id_log}")
+        
+        # Process global ripples if we have probe events
+        if probe_events_dict:
+            process_stage = "Detecting Global Ripples"
+            logger.info(f"Session {session_id}: Detecting global ripples")
+            
+            # Get probe information for global event detection
+            probe_info = loader.global_events_probe_info()
+            
+            if probe_info is None:
+                logger.warning(f"Session {session_id}: Probe info for global filtering not available, skipping global detection.")
+            else:
+                # Create global events
+                global_events = create_global_swr_events(
+                    probe_events_dict, 
+                    global_swr_config, 
+                    probe_info, 
+                    session_subfolder, 
+                    session_id
+                )
+                
+                # Save global events if not None
+                if global_events is not None:
+                    csv_filename = f"session_{session_id}_global_swr_events.csv.gz"
+                    csv_path = os.path.join(session_subfolder, csv_filename)
+                    global_events.to_csv(csv_path, index=True, compression="gzip")
+                    logger.info(f"Session {session_id}: Created {len(global_events)} global events")
+                else:
+                    logger.info(f"Session {session_id}: No global events found that meet criteria")
+        else:
+            logger.warning(f"Session {session_id}: No probe events available for global detection")
+        
+        # Cleanup resources
+        if loader is not None:
+            loader.cleanup()
+            logger.info(f"Session {session_id}: Loader cleanup finished")
+            
+            # Optional cache cleanup based on flag
+            if cleanup_after:
+                logger.info(f"Session {session_id}: Running cache cleanup")
+                try:
+                    loader.cleanup_cache(config=config)
+                except Exception as e_cache:
+                    logger.error(f"Session {session_id}: Error during cache cleanup - {e_cache}")
+        
+        logger.info(f"Session {session_id}: Processing completed successfully")
+        
+    except Exception as e_main:
+        # Log the error
+        tb_str = traceback.format_exc()
+        logger.error(f"Session {session_id}: Error during processing at stage '{process_stage}' for probe '{probe_id_log}': {e_main}")
+        logger.error(f"Traceback:\n{tb_str}")
+        
+        # Attempt loader cleanup if it exists
+        if loader is not None:
+            try:
+                loader.cleanup()
+                logger.info(f"Session {session_id}: Cleanup completed after error")
+            except Exception as e_cleanup:
+                logger.error(f"Session {session_id}: Error during loader cleanup after main exception: {e_cleanup}")
+        
+        # Check if session subfolder exists and is empty
+        if 'session_subfolder' in locals() and os.path.exists(session_subfolder) and not os.listdir(session_subfolder):
+            os.rmdir(session_subfolder)
+            logger.warning(f"Session {session_id}: Removed empty session folder after error")
+        
+        # Re-raise the exception to ensure the failure is explicit
+        raise

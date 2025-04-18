@@ -75,59 +75,109 @@ Key sections in the YAML configuration file include:
 
 ## Running the Pipeline
 
-Use the `run_pipeline.sh` script to execute the pipeline after configuring the paths at the top of the script and reviewing the YAML config file.
+### Important: Run from the SWR_Neuropixels_Detector directory
+
+All scripts and commands should be executed from the `SWR_Neuropixels_Detector` directory. The pipeline is designed to be run from this location and uses relative paths for accessing configuration files, filter files, and session lists.
 
 ```bash
+# Navigate to the SWR_Neuropixels_Detector directory
+cd /path/to/SWR_Neuropixels_Detector
+
 # Make the script executable (if needed)
 chmod +x run_pipeline.sh
 
-# Run with default settings (runs p,f,g stages)
+# Run with default settings (all datasets, all stages)
 ./run_pipeline.sh 
-
-# Run with specific flags
-./run_pipeline.sh [options]
 ```
 
-**Options (Flags for `run_pipeline.sh`):**
+### Dataset Selection
 
-*   `-c FILE, --config FILE`: Specify a different configuration YAML file (default: `united_detector_config.yaml`).
-*   `-p`: Run ONLY the Putative event detection stage.
-*   `-f`: Run ONLY the event Filtering stage.
-*   `-g`: Run ONLY the Global event consolidation stage.
-*   `-C, --cleanup-cache`: Run ONLY the Cache cleanup stage.
-*   `-s, --save-lfp`: Enable saving of LFP data for selected channels (overrides config setting).
-*   `-m, --save-channel-metadata`: Enable saving of detailed channel selection metadata (overrides config setting).
-*   `-d, --debug`: Enable debug mode (listens for debugger attachment).
-*   `-h, --help`: Display the help message and exit.
+There are two ways to specify which datasets to process:
 
-**Execution Logic Notes:**
+1. **Using positional arguments (preferred):**
+   ```bash
+   # Process all datasets
+   ./run_pipeline.sh all
+   
+   # Process only the IBL dataset
+   ./run_pipeline.sh subset ibl
+   
+   # Process multiple specific datasets
+   ./run_pipeline.sh subset "ibl,abi_visual_behaviour"
+   
+   # Debug mode for a specific dataset
+   ./run_pipeline.sh debug ibl
+   ```
 
-*   If no processing stage flags (`-p`, `-f`, `-g`) are provided, the script runs all processing stages (`p`, `f`, `g`) by default.
-*   If any processing stage flag (`-p`, `-f`, `-g`) is provided, only the specified stage(s) will be run.
-*   The cleanup flag (`-C` or `--cleanup-cache`) runs independently if specified.
-*   The save flags (`-s`, `-m`) and debug flag (`-d`) act as overrides/triggers and can be combined with other flags.
+2. **Using environment variables:**
+   ```bash
+   # Process only the IBL dataset
+   DATASET_TO_PROCESS=ibl ./run_pipeline.sh
+   
+   # Process multiple datasets
+   DATASET_TO_PROCESS="ibl,abi_visual_behaviour" ./run_pipeline.sh
+   ```
 
-**Examples:**
+### Command-Line Flags
+
+The `run_pipeline.sh` script accepts the following command-line flags, which can be combined with the dataset selection:
+
+| Flag | Long Form | Description |
+|------|-----------|-------------|
+| `-h` | `--help` | Display the help message and exit |
+| `-c FILE` | `--config FILE` | Specify a custom configuration YAML file (default: united_detector_config.yaml) |
+| `-p` | `--run-putative` | Run ONLY the Putative event detection stage |
+| `-f` | `--run-filter` | Run ONLY the event Filtering stage |
+| `-g` | `--run-global` | Run ONLY the Global event consolidation stage |
+| `-s` | `--save-lfp` | Enable saving of LFP data (overrides config) |
+| `-m` | `--save-channel-metadata` | Enable saving of channel selection metadata |
+| `-o` | `--overwrite-existing` | Overwrite existing session output folders |
+| `-X` | `--cleanup-after` | Clean up cache after processing each session |
+| `-d` | `--debug` | Enable debug mode (debugpy listening on port 5678) |
+
+**Notes:**
+- If no processing stage flags (`-p`, `-f`, `-g`) are provided, the script runs all processing stages by default.
+- If any processing stage flag is provided, only the specified stage(s) will be run.
+- The save flags (`-s`, `-m`) and debug flag (`-d`) act as overrides/triggers and can be combined with other flags.
+- Before running the script, ensure the correct conda environment is activated (e.g., `ONE_ibl_env` for IBL data, `allensdk_env` for Allen Brain Institute data).
+
+### Environment Variables
+
+You can also control other aspects of the pipeline behavior by setting environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OUTPUT_DIR` | Base output directory for results | Specified in config file |
+| `CONFIG_PATH` | Custom path to configuration YAML file | ./united_detector_config.yaml |
+
+### Examples
 
 ```bash
-# Run all processing stages using paths set in script & default config
-./run_pipeline.sh
-
 # Display help message
 ./run_pipeline.sh -h
 
-# Run only putative detection using a custom config, force LFP saving
-./run_pipeline.sh -c my_config.yaml -p --save-lfp
+# Run all datasets with all processing stages
+./run_pipeline.sh
 
-# Run filtering and global stages, saving channel metadata
-./run_pipeline.sh -f -g --save-channel-metadata
+# Run only the IBL dataset
+./run_pipeline.sh subset ibl
 
-# Clean the cache using paths set in script
-./run_pipeline.sh --cleanup-cache
+# Run only putative detection on IBL dataset with LFP saving
+./run_pipeline.sh subset ibl -p -s
 
-# Clean the cache AND run putative detection AND save LFP & channel metadata
-./run_pipeline.sh -p --cleanup-cache --save-lfp --save-channel-metadata
+# Run filtering and global stages on multiple datasets with metadata saving
+./run_pipeline.sh subset "ibl,abi_visual_behaviour" -f -g -m
+
+# Run all stages for Visual Coding dataset with overwriting and cleanup
+./run_pipeline.sh subset abi_visual_coding -o -X
+
+# Debug the IBL dataset (equivalent to ./run_pipeline.sh debug ibl)
+./run_pipeline.sh subset ibl -d
 ```
+
+Remember that you need to activate the correct conda environment for your dataset:
+- For IBL data: `conda activate ONE_ibl_env`
+- For Allen data (both visual behavior and coding): `conda activate allensdk_env`
 
 ## Output Files
 

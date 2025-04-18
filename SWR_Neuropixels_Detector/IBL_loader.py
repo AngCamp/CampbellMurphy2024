@@ -119,10 +119,8 @@ class ibl_loader(BaseLoader):
         # Load channels
         channels, probe_name, probe_id = self.load_channels(probe_idx)
         
-        # Load bin file
+        # Load bin file - load_bin_file now raises FileNotFoundError if missing
         bin_file = self.load_bin_file(probe_name)
-        if bin_file is None:
-            return None
 
         # Read the data
         print(f"Reading LFP data for probe {probe_id}...")
@@ -176,9 +174,11 @@ class ibl_loader(BaseLoader):
     def process_probe(self, probe_idx, filter_ripple_band_func=None):
         """Processes a single probe completely."""
         # Separate API access from processing logic
-        data = self._load_probe_data(probe_idx) # loads control and destriped data
-        if data is None:
-            return None
+        # _load_probe_data will now raise errors if essential data (like .cbin) is missing
+        data = self._load_probe_data(probe_idx) 
+        
+        # Extract channel positions into a Series (assuming keys 'id' and 'y')
+        all_channel_positions = pd.Series(data['channels']['y'], index=data['channels']['id'])
         
         #Resample control channels
         outof_hp_chans_lfp = []
@@ -201,43 +201,71 @@ class ibl_loader(BaseLoader):
         
         #Find channel with highest ripple power if function provided
         if filter_ripple_band_func is not None:
-            peak_idx, peak_id, peak_lfp, peakrippleband = self.find_peak_ripple_channel(
-                lfp_ca1, data['ca1_chans'], filter_ripple_band_func
+            # --- Select Ripple Channel --- 
+            peak_id, peakrippleband, peak_lfp = self.select_ripple_channel(
+                ca1_lfp=lfp_ca1,
+                ca1_chan_ids=data['ca1_chans'],
+                channel_positions=all_channel_positions, # Pass the extracted positions
+                ripple_filter_func=filter_ripple_band_func,
+                config=None # Pass config if needed by base method
             )
             
+            # select_ripple_channel should raise an error if it fails.
+            # Subsequent code will fail if peak_id is None (e.g. when passed to select_sharpwave_channel)
+            
             # Create a channel ID string for naming files
+            # This will fail if peak_id is None
             this_chan_id = f"channelsrawInd_{peak_id}"
             
-            # Add sharpwave channel detection if filter path is available
-            if hasattr(self, 'sw_component_filter_path') and self.sw_component_filter_path is not None:
+            # --- Select Sharp Wave Channel --- 
+            # Use the base class method directly
+            # Note: Pass peak_id, NOT this_chan_id (which is a string)
+            best_sw_chan_id, best_sw_chan_lfp = super().select_sharpwave_channel(
+                ca1_lfp=lfp_ca1,
+                lfp_time_index=lfp_time_index,  
+                ca1_chan_ids=data['ca1_chans'],
+                peak_ripple_chan_id=peak_id, # Pass selected ripple channel ID
+                channel_positions=all_channel_positions,
+                ripple_filtered=peakrippleband, # Pass ripple LFP from selected chan
+                config=None, # Pass config if needed
+                filter_path=getattr(self, 'sw_component_filter_path', None) # Use attribute if exists
+            )
+
+            if best_sw_chan_lfp is not None:
+                best_sw_chan_lfp = best_sw_chan_lfp.flatten()
+                best_sw_power_z = zscore(best_sw_chan_lfp) # Calculate Z-score if needed elsewhere
+            else:
+                best_sw_power_z = None
+
+            # --- Legacy section for sharpwave channel (now handled by base class) --- 
+            # if hasattr(self, 'sw_component_filter_path') and self.sw_component_filter_path is not None:
                 # Get positions of CA1 channels
-                try:
+                # try:
                     # Channel positions might be stored differently in IBL data
                     # Try to extract a pandas Series mapping channel IDs to depths
-                    ca1_channel_positions = pd.Series(data['ca1_chans'] * 10, index=data['ca1_chans'])
+                    # ca1_channel_positions = pd.Series(data['ca1_chans'] * 10, index=data['ca1_chans'])
                     
-                    best_sw_chan_id, best_sw_chan_lfp = super().select_sharpwave_channel(
-                        ca1_lfp=lfp_ca1,
-                        lfp_time_index=lfp_time_index,  
-                        ca1_chan_ids=data['ca1_chans'],
-                        this_chan_id=peak_id,
-                        channel_positions=ca1_channel_positions,
-                        ripple_filtered=peakrippleband,
-                        filter_path=self.sw_component_filter_path
-                    )
-                    best_sw_chan_lfp = best_sw_chan_lfp.flatten() # debugging
-                    best_sw_power_z = zscore(best_sw_chan_lfp)
-                except Exception as e:
-                    print(f"Warning: Could not select sharpwave channel: {e}")
-                    best_sw_chan_id = None
-                    best_sw_chan_lfp = None
-                    best_sw_power_z = None
-            else:
-                best_sw_chan_id = None
-                best_sw_chan_lfp = None
-                best_sw_power_z = None
+                    # best_sw_chan_id, best_sw_chan_lfp = super().select_sharpwave_channel(
+                    #     ca1_lfp=lfp_ca1,
+                    #     lfp_time_index=lfp_time_index,  
+                    #     ca1_chan_ids=data['ca1_chans'],
+                    #     this_chan_id=peak_id,
+                    #     channel_positions=ca1_channel_positions,
+                    #     ripple_filtered=peakrippleband,
+                    #     filter_path=self.sw_component_filter_path
+                    # )
+                    # best_sw_chan_lfp = best_sw_chan_lfp.flatten() # debugging
+                    # best_sw_power_z = zscore(best_sw_chan_lfp)
+                # except Exception as e:
+                    # print(f"Warning: Could not select sharpwave channel: {e}")
+                    # best_sw_chan_id = None
+                    # best_sw_chan_lfp = None
+                    # best_sw_power_z = None
+            # else:
+                # best_sw_chan_id = None
+                # best_sw_chan_lfp = None
+                # best_sw_power_z = None
         else:
-            peak_idx = None
             peak_id = None
             peak_lfp = None
             this_chan_id = None
@@ -247,27 +275,29 @@ class ibl_loader(BaseLoader):
             best_sw_power_z = None
         del lfp_ca1
         
-        # Collect results
+        # Collect results using final, consistent key names
         results = {
             'probe_id': data['probe_id'],
-            'probe_name': data['probe_name'],
+            'probe_name': data['probe_name'], # IBL specific?
             'lfp_time_index': lfp_time_index,
-            'ca1_chans': data['ca1_chans'],
-            'control_lfps': outof_hp_chans_lfp,
-            'control_channels': data['control_channels'],
-            'peak_ripple_chan_idx': peak_idx,
-            'peak_ripple_chan_id': peak_id,
-            'peak_ripple_chan_raw_lfp': peak_lfp,
-            'chan_id_string': this_chan_id,
-            'rippleband': peakrippleband,
-            'sharpwave_chan_id': best_sw_chan_id,
-            'sharpwave_chan_raw_lfp': best_sw_chan_lfp,
-            'sharpwave_power_z': best_sw_power_z,
-            'channels': data['channels']
+            'sampling_rate': 1500.0, # Explicitly add sampling rate
+            'dataset_type': 'ibl', # Explicitly add dataset type
+            'ca1_channel_ids': data['ca1_chans'], # Renamed
+            'control_lfps': outof_hp_chans_lfp, # This contains the LFP data for control channels
+            'control_channel_ids': data['control_channels'], # Renamed
+            'peak_ripple_chan_id': peak_id, # ID of the selected ripple channel
+            'peak_ripple_raw_lfp': peak_lfp, # Renamed - Raw LFP from selected ripple channel
+            # 'chan_id_string': this_chan_id, # Removed - Redundant info?
+            'ripple_band_filtered': peakrippleband, # Renamed - Filtered LFP from selected ripple channel
+            'sharpwave_chan_id': best_sw_chan_id, # ID of the selected SW channel
+            'sharpwave_chan_raw_lfp': best_sw_chan_lfp, # Raw LFP from selected SW channel
+            'sharpwave_power_z': best_sw_power_z, # Z-scored power (or None)
+            'channels': data['channels'], # IBL specific? Full channel info table?
+            'channel_selection_metadata': self.channel_selection_metadata_dict # Metadata dict added earlier
         }
         
-        # Return standardized results
-        return super().standardize_results(results, 'ibl')
+        # Return results directly, without standardization call
+        return results
     
     # The remaining methods are IBL-specific and will be directly used by process_probe
     def load_bin_file(self, probe_name):
@@ -281,7 +311,8 @@ class ibl_loader(BaseLoader):
         bin_file = next((df for df in self.data_files if df.suffix == ".cbin"), None)
         
         if bin_file is None:
-            print(f"No .cbin file found for probe {probe_name}, skipping...")
+            # Raise FileNotFoundError if the essential .cbin file is missing
+            raise FileNotFoundError(f"No .cbin file found for session {self.session_id}, probe {probe_name} in datasets: {dsets}")
             
         return bin_file
     
@@ -336,19 +367,15 @@ class ibl_loader(BaseLoader):
             
         return control_data, control_channels
     
-    def find_peak_ripple_channel(self, lfp_ca1, ca1_chans, filter_ripple_band_func):
-        """Finds the CA1 channel with the highest ripple power."""
-        lfp_ca1_rippleband = filter_ripple_band_func(lfp_ca1)
-        highest_rip_power = np.abs(signal.hilbert(lfp_ca1_rippleband)) ** 2
-        highest_rip_power = highest_rip_power.max(axis=0)
-        
-        peak_channel_idx = highest_rip_power.argmax()
-        peak_channel_id = ca1_chans[peak_channel_idx]
-        peak_channel_raw_lfp = lfp_ca1[:, peak_channel_idx]
-        peakrippleband = lfp_ca1_rippleband[:, peak_channel_idx]
-        print(f"Finding channel with highest ripple power...")
-        return peak_channel_idx, peak_channel_id, peak_channel_raw_lfp, peakrippleband
-
+    def select_ripple_channel(self, ca1_lfp, ca1_chan_ids, channel_positions, ripple_filter_func, config=None):
+        """IBL-specific ripple channel selection (if needed)."""
+        # --- IBL specific logic here --- 
+        # Filter, calculate power/skew, populate metadata dict, select channel
+        # ... 
+        # return peak_chan_id, peak_ripple_band_lfp, peak_ripple_chan_lfp
+        # Example: Use base class logic for now
+        return super().select_ripple_channel(ca1_lfp, ca1_chan_ids, channel_positions, ripple_filter_func, config)
+    
     def global_events_probe_info(self):
         """
         Get probe-level information needed for global SWR detection.

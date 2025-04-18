@@ -1,18 +1,33 @@
+#!/usr/bin/env python
+
 # debugging
 import multiprocessing as mp
 import os
 
 if os.getenv("DEBUG_MODE") == "true" and mp.current_process().name == "MainProcess":
     import debugpy
-    print("Debug mode: starting debugpy listener on port 5678")
+    print("Debug mode: starting debugpy listener on port 5678")
     debugpy.listen(("0.0.0.0", 5678))      # or ("localhost", 5678)
-    print("Waiting for VS Code to attach…")
+    print("Waiting for VS Code to attach…")
     debugpy.wait_for_client()
     print("Debugger attached!")
 
 # united_swr_detector.py
 import os
 import subprocess
+import sys
+import time
+import traceback
+import logging
+import logging.handlers
+import json
+import gzip
+import string
+import argparse
+from multiprocessing import Pool, Process, Queue, Manager, set_start_method
+from functools import partial
+
+# Third-party imports
 import numpy as np
 import pandas as pd
 from scipy import io, signal, stats
@@ -37,18 +52,30 @@ import gzip
 import string
 from botocore.config import Config
 import boto3
+
 # Import utility functions from core
 from swr_neuropixels_collection_core import (
     BaseLoader,
     finitimpresp_filter_for_LFP,
+    process_session,
     event_boundary_detector,
     event_boundary_times,
     peaks_time_of_events,
     incorporate_sharp_wave_component_info,
     check_gamma_overlap,
     check_movement_overlap,
-    create_global_swr_events
+    create_global_swr_events,
+    filter_ripple_band,
+    read_json_file,
+    get_filter
 )
+from functools import partial
+import argparse
+
+# Custom logging level
+MESSAGE = 25
+logging.addLevelName(MESSAGE, "MESSAGE")
+
 
 # Custom logging level
 MESSAGE = 25
@@ -77,359 +104,12 @@ def listener_process(queue):
         logger = logging.getLogger(message.name)
         logger.handle(message)
 
-def init_pool(*args):
+def init_pool(queue):
+    """Initialize logging in the worker process."""
     h = logging.handlers.QueueHandler(queue)
     root = logging.getLogger()
     root.addHandler(h)
     root.setLevel(MESSAGE)
-
-def process_session(session_id):
-    """
-    This function takes in a session_id (eid in the IBL) and loops through the probes in that session,
-    for each probe it finds the CA1 channel with the highest ripple power and uses that
-    channel to detect SWR events. It also detects gamma events and movement artifacts
-    on two channels outside of the brain.
-    """
-    # to avoid time outs in some of the libraries
-    my_config = Config(connect_timeout=1200, read_timeout=1200)
-    s3 = boto3.client('s3', config=my_config)
-    
-    process_stage = f"Starting the process, session{str(session_id)}"  # for debugging
-    probe_id = "Not Loaded Yet"
-    one_exists = False
-    
-    # Add this near the beginning of the function
-    data_files = None
-    process_stage = "Starting the process"  # for debugging
-    probe_id = "Not Loaded Yet"
-    
-    # Create session subfolder
-    session_subfolder = "swrs_session_" + str(session_id)
-    session_subfolder = os.path.join(swr_output_dir_path, session_subfolder)
-    
-    # At the very top of process_session, before the probe loop
-    probe_events_dict = {}  # Initialize dictionary to store probe events
-    
-    try:
-        # Set up brain atlas
-        process_stage = "Setting up brain atlas"
-        
-        process_stage = "Session loaded, checking if directory exists"
-        # Check if directory already exists
-        if os.path.exists(session_subfolder):
-            raise FileExistsError(f"The directory {session_subfolder} already exists.")
-        else:
-            os.makedirs(session_subfolder)
-            
-        if save_lfp == True:
-            # Create subfolder for lfp data
-            session_lfp_subfolder = "lfp_session_" + str(session_id)
-            session_lfp_subfolder = os.path.join(lfp_output_dir_path, session_lfp_subfolder)
-            os.makedirs(session_lfp_subfolder, exist_ok=True)
-        
-        # Initialize and set up the loader using the BaseLoader factory
-        process_stage = "Setting up loader"
-        loader = BaseLoader.create(DATASET_TO_PROCESS, session_id)
-        loader.set_up()
-        
-        # Get probe IDs and names
-        process_stage = "Getting probe IDs and names"
-        if DATASET_TO_PROCESS == 'abi_visual_coding':
-            probenames = None
-            probelist = loader.get_probes_with_ca1()
-        elif DATASET_TO_PROCESS == 'abi_visual_behaviour':
-            probenames = None
-            probelist = loader.get_probes_with_ca1()
-        elif DATASET_TO_PROCESS == 'ibl':
-            probelist, probenames = loader.get_probe_ids_and_names()
-
-        process_stage = "Running through the probes in the session"
-        #icount = 0
-        # Process each probe
-        for this_probe in range(len(probelist)):
-            #if icount > 0:
-            #    break
-            #icount = icount + 1
-            
-            if DATASET_TO_PROCESS == 'ibl':
-                probe_name = probenames[this_probe]
-            probe_id = probelist[this_probe]  # Always get the probe_id from probelist
-            print(f"Processing probe: {str(probe_id)}")
-
-            # Process the probe and get results
-            process_stage = f"Processing probe with id {str(probe_id)}"
-            if DATASET_TO_PROCESS == 'abi_visual_coding':
-                results = loader.process_probe(probe_id, filter_ripple_band)  # Use probe_id, not this_probe
-            elif DATASET_TO_PROCESS == 'abi_visual_behaviour':
-                results = loader.process_probe(probe_id, filter_ripple_band)  # Use probe_id, not this_probe
-            elif DATASET_TO_PROCESS == 'ibl':
-                results = loader.process_probe(this_probe, filter_ripple_band)  # Use probe_id, not this_probe
-            # Skip if no results (no CA1 channels or no bin file)
-            if results is None:
-                print(f"No results for probe {probe_id}, skipping...")
-                continue
-
-            # Extract results
-            peakripple_chan_raw_lfp = results['peak_ripple_chan_raw_lfp']
-            lfp_time_index = results['lfp_time_index']
-            ca1_chans = results['ca1_chans']
-            outof_hp_chans_lfp = results['control_lfps']
-            take_two = results['control_channels']
-            peakrippleband = results['rippleband']
-            this_chan_id = results['peak_ripple_chan_id']
-
-            # Filter to gamma band
-            gamma_band_ca1 = np.convolve(
-                peakripple_chan_raw_lfp.reshape(-1), gamma_filter, mode="same"
-            )
-
-            # write our lfp to file
-            np.savez(
-                os.path.join(
-                    session_lfp_subfolder,
-                    f"probe_{probe_id}_channel_{this_chan_id}_lfp_ca1_peakripplepower.npz",
-                ),
-                lfp_ca1=peakripple_chan_raw_lfp,
-            )
-            np.savez(
-                os.path.join(
-                    session_lfp_subfolder,
-                    f"probe_{probe_id}_channel_{this_chan_id}_lfp_time_index_1500hz.npz",
-                ),
-                lfp_time_index = lfp_time_index,
-            )
-            print(f"outof_hp_chans_lfp : {outof_hp_chans_lfp}")
-            for i in range(2):
-                channel_outside_hp = take_two[i]
-                channel_outside_hp = "channelsrawInd_" + str(channel_outside_hp)
-                np.savez(
-                    os.path.join(
-                        session_lfp_subfolder,
-                        f"probe_{probe_id}_channel_{channel_outside_hp}_lfp_control_channel.npz",
-                    ),
-                    lfp_control_channel=outof_hp_chans_lfp[i],
-                )
-
-            # create a dummy speed vector, we don't want to filter for speed here
-            dummy_speed = np.zeros_like(peakrippleband)
-            print("Detecting Putative Ripples")
-            # we add a dimension to peakrippleband because the ripple detector needs it
-            process_stage = f"Detecting Putative Ripples on probe with id {str(probe_id)}"
-            
-            Karlsson_ripple_times = ripple_detection.Karlsson_ripple_detector(
-                time=lfp_time_index,
-                zscore_threshold=ripple_band_threshold,
-                filtered_lfps=peakrippleband[:, None],
-                speed=dummy_speed,
-                sampling_frequency=1500.0,
-            )
-
-            Karlsson_ripple_times = Karlsson_ripple_times[
-                Karlsson_ripple_times.duration < 0.25
-            ]
-            print("Done")
-
-            # ripple band power
-            peakrippleband_power = np.abs(signal.hilbert(peakrippleband)) ** 2
-            Karlsson_ripple_times["Peak_time"] = peaks_time_of_events(
-                events=Karlsson_ripple_times,
-                time_values=lfp_time_index,
-                signal_values=peakrippleband_power,
-            )
-            speed_cols = [
-                col for col in Karlsson_ripple_times.columns if "speed" in col
-            ]
-            Karlsson_ripple_times = Karlsson_ripple_times.drop(columns=speed_cols)
-            # Extract the sharp wave channel data
-            sharp_wave_lfp = results['sharpwave_chan_raw_lfp']
-            sw_chan_id = results['sharpwave_chan_id']
-
-            # Save the sharp wave LFP to file
-            if save_lfp == True:
-                np.savez(
-                    os.path.join(
-                        session_lfp_subfolder,
-                        f"probe_{probe_id}_channel_{sw_chan_id}_lfp_ca1_sharpwave.npz",
-                    ),
-                    lfp_ca1=sharp_wave_lfp,
-                )
-
-            print("Incorporating sharp wave component information...")
-            # Load the sharp wave filter
-            sw_filter_data = np.load(sharp_wave_component_path)
-            sharpwave_filter = sw_filter_data['sharpwave_componenet_8to40band_1500hz_band']
-
-            # Analyze sharp wave components for each ripple
-            Karlsson_ripple_times = incorporate_sharp_wave_component_info(
-                events_df=Karlsson_ripple_times,
-                time_values=lfp_time_index,
-                ripple_filtered=peakrippleband,
-                sharp_wave_lfp=sharp_wave_lfp,
-                sharpwave_filter=sharpwave_filter
-            )
-            
-            # save the info about sw band relation to the chosen channel for
-            # validation of the choices made 
-            if save_lfp == True:
-                np.savez(
-                    os.path.join(
-                        session_lfp_subfolder,
-                        f"probe_{probe_id}_channel_{sw_chan_id}_lfp_ca1_sharpwave.npz",
-                    ),
-                    lfp_ca1=sharp_wave_lfp,
-                )
-                
-                # Save loader.sw_channel_info as compressed JSON
-                channel_info_path = os.path.join(
-                    session_lfp_subfolder,
-                    f"probe_{probe_id}_sw_component_summary.json.gz"
-                )
-                with gzip.open(channel_info_path, 'wt', encoding='utf-8') as f:
-                    json.dump(loader.sw_component_summary_stats_dict, f)
-
-            csv_filename = (
-                f"probe_{probe_id}_channel_{this_chan_id}_karlsson_detector_events.csv"
-            )
-            #csv_path = os.path.join(session_subfolder, csv_filename)
-            #Karlsson_ripple_times.to_csv(csv_path, index=True, compression="gzip")
-            #print("Writing to file.")
-            print("Detecting gamma events.")
-
-            # compute this later, I will have a seperate script called SWR filtering which will do this
-            process_stage = f"Detecting Gamma Events on probe with id {str(probe_id)}"
-            
-            gamma_power = np.abs(signal.hilbert(gamma_band_ca1)) ** 2
-            gamma_times = event_boundary_detector(
-                time=lfp_time_index,
-                threshold_sd=gamma_event_thresh,
-                envelope=False,
-                minimum_duration=0.015,
-                maximum_duration=float("inf"),
-                five_to_fourty_band_power_df=gamma_power,
-            )
-            print("Done")
-            csv_filename = (
-                f"probe_{probe_id}_channel_{this_chan_id}_gamma_band_events.csv"
-            )
-            csv_path = os.path.join(session_subfolder, csv_filename)
-            gamma_times.to_csv(csv_path, index=True, compression="gzip")
-
-            # movement artifact detection
-            process_stage = f"Detecting Movement Artifacts on probe with id {probe_id}"
-            movement_control_list = []
-            
-            for i in [0, 1]:
-                channel_outside_hp = take_two[i]
-                process_stage = f"Detecting Movement Artifacts on control channel {channel_outside_hp} on probe {probe_id}"
-                # process control channel ripple times
-                ripple_band_control = outof_hp_chans_lfp[i]
-                dummy_speed = np.zeros_like(ripple_band_control)
-                ripple_band_control = filter_ripple_band(ripple_band_control)
-                rip_power_controlchan = np.abs(signal.hilbert(ripple_band_control)) ** 2
-                
-                print(f"ripple_band_control shape: {ripple_band_control.shape}, length: {len(ripple_band_control)}")
-                print(f"lfp_time_index shape: {lfp_time_index.shape}, length: {len(lfp_time_index)}")
-                print(f"dummy_speed shape: {dummy_speed.shape}, length: {len(dummy_speed)}")
-                
-                if DATASET_TO_PROCESS == 'abi_visual_behaviour':
-                    lfp_time_index = lfp_time_index.reshape(-1)
-                    dummy_speed = dummy_speed.reshape(-1)
-                if DATASET_TO_PROCESS == 'ibl':
-                    # Reshape to ensure consistent (n_samples, n_channels) format for detector
-                    # Prevents memory error when pd.notnull() creates boolean arrays with shape (n, n)
-                    rip_power_controlchan = rip_power_controlchan.reshape(-1,1)
-                
-                movement_controls = ripple_detection.Karlsson_ripple_detector(
-                    time=lfp_time_index.reshape(-1),
-                    filtered_lfps=rip_power_controlchan,
-                    speed=dummy_speed.reshape(-1),
-                    zscore_threshold=movement_artifact_ripple_band_threshold,
-                    sampling_frequency=1500.0,
-                )
-                speed_cols = [
-                    col for col in movement_controls.columns if "speed" in col
-                ]
-                movement_controls = movement_controls.drop(columns=speed_cols)
-                # write to file name
-                channel_outside_hp = "channelsrawInd_" + str(channel_outside_hp)
-                csv_filename = f"probe_{probe_id}_channel_{channel_outside_hp}_movement_artifacts.csv"
-                csv_path = os.path.join(session_subfolder, csv_filename)
-                movement_controls.to_csv(csv_path, index=True, compression="gzip")
-                movement_control_list.append(movement_controls)
-                print("Done Probe id " + str(probe_id))
-
-            # Filtering
-            Karlsson_ripple_times = check_gamma_overlap(Karlsson_ripple_times, gamma_times)
-            Karlsson_ripple_times = check_movement_overlap(Karlsson_ripple_times, movement_control_list[0], movement_control_list[1])
-
-            csv_filename = (
-                f"probe_{probe_id}_channel_{this_chan_id}_karlsson_detector_events.csv"
-            )
-            csv_path = os.path.join(session_subfolder, csv_filename)
-            Karlsson_ripple_times.to_csv(csv_path, index=True, compression="gzip")
-            probe_events_dict[probe_id] = Karlsson_ripple_times # save to dict
-            print("Writing to file.")
-        
-        # Global Ripples
-        print("Detecting Global Ripples")
-        logging.log(MESSAGE, f"Detecting global ripples for session {session_id}")
-
-        # Get global SWR detection settings from config
-        global_ripple_config = full_config.get("global_swr_detection", {})
-
-        # Get probe information for global event detection
-        probe_info = loader.global_events_probe_info()
-
-        # Create global events
-        global_events = create_global_swr_events(
-            probe_events_dict, 
-            global_ripple_config, 
-            probe_info, 
-            session_subfolder, 
-            session_id
-        )
-        
-        # Save global events
-        csv_filename = f"session_{session_id}_global_swr_events.csv.gz"
-        csv_path = os.path.join(session_subfolder, csv_filename)
-
-        # Directly save the events, which will raise an error if global_events is None
-        global_events.to_csv(csv_path, index=True, compression="gzip")
-
-        logging.log(MESSAGE, f"Created {len(global_events)} global events for session {session_id}")
-        print(f"Created {len(global_events)} global events for session {session_id}")
-
-        # Cleanup resources
-        if 'loader' in locals() and loader is not None:
-            loader.cleanup()
-        process_stage = "All processing done, Deleting the session folder"
-
-        # in the session
-        logging.log(MESSAGE, f"Processing complete for id {session_id}.")
-    except Exception:
-        loader = None
-        # removes saved files to save memory
-        if 'loader' in locals() and loader is not None:
-            loader.cleanup() 
-        
-        # Check if the session subfolder is empty
-        if os.path.exists(session_subfolder) and not os.listdir(session_subfolder):
-            # If it is, delete it
-            os.rmdir(session_subfolder)
-            logging.log(
-                MESSAGE,
-                "PROCESSING FAILED REMOVING EMPTY SESSION SWR DIR: session id %s ",
-                session_id,
-            )
-        # if there is an error we want to know about it, but we dont want it to stop the loop
-        # so we will print the error to a file and continue
-        logging.error(
-            "Error in session: %s, probe id: %s, Process Error at: ",
-            session_id,
-            probe_id,
-            process_stage,
-        )
-        logging.error(traceback.format_exc())
 
 def main():
     """Main function to handle configuration and orchestrate processing"""
@@ -448,20 +128,49 @@ def main():
     if DATASET_TO_PROCESS not in valid_datasets:
         raise ValueError(f"DATASET_TO_PROCESS must be one of {valid_datasets}, got '{DATASET_TO_PROCESS}'")
 
+    # Parse command-line arguments for flags
+    parser = argparse.ArgumentParser(description="Run SWR Pipeline Stages.")
+    parser.add_argument("-p", "--run-putative", action="store_true", help="Run Putative event detection stage.")
+    parser.add_argument("-f", "--run-filter", action="store_true", help="Run event Filtering stage.")
+    parser.add_argument("-g", "--run-global", action="store_true", help="Run Global event consolidation stage.")
+    parser.add_argument("-C", "--cleanup-cache", action="store_true", help="Run cache cleanup after processing each session.")
+    parser.add_argument("-s", "--save-lfp", action="store_true", help="Enable saving of LFP data.")
+    parser.add_argument("-m", "--save-channel-metadata", action="store_true", help="Enable saving of channel selection metadata.")
+    parser.add_argument("-o", "--overwrite-existing", action="store_true", help="Overwrite existing session output.")
+    parser.add_argument("-d", "--debug", action="store_true", help="Enable debug mode (for internal script use).")
+    # Add argument for config path if needed, overriding env var
+    parser.add_argument("--config", type=str, default=os.environ.get('CONFIG_PATH', 'united_detector_config.yaml'), help="Path to configuration YAML file.")
+    args = parser.parse_args()
+
+    # Assign flags from args to variables used later
+    save_lfp = args.save_lfp
+
+    # Determine dataset from environment (still needed for config loading)
+    DATASET_TO_PROCESS = os.environ.get('DATASET_TO_PROCESS', '').lower()
+    if not DATASET_TO_PROCESS or DATASET_TO_PROCESS not in valid_datasets:
+        raise ValueError(f"DATASET_TO_PROCESS environment variable must be set to one of {valid_datasets}, got '{DATASET_TO_PROCESS}'")
+
     # Create path to config file in the same directory
-    config_path = os.environ.get('CONFIG_PATH', 'expanded_config.yaml')
+    config_path = args.config # Use path from args or default env var
 
     with open(config_path, "r") as f:
-        # Parse the YAML content
-        raw_content = f.read()
-        # Replace environment variables
-        for key, value in os.environ.items():
-            raw_content = raw_content.replace(f"${key}", value)
-        # Load the YAML
-        full_config = yaml.safe_load(raw_content)
+        # Read the raw YAML content as a string
+        raw_yaml_content = f.read()
+        
+        # Expand environment variables (handles $VAR or ${VAR})
+        expanded_yaml_content = os.path.expandvars(raw_yaml_content)
+        
+        # Load the YAML from the expanded string
+        full_config = yaml.safe_load(expanded_yaml_content)
 
     # Extract the unified output directory first
     output_dir = full_config.get("output_dir", "")
+    # --- Path Setup based on Config/Env Vars --- 
+    # Use environment variables if set, otherwise use config values as defaults
+    output_dir = os.environ.get('OUTPUT_DIR', full_config.get("output_dir", "./swr_output"))
+    log_dir = os.environ.get('LOG_DIR', os.path.join(output_dir, 'logs')) # Default logs subdir
+    swr_output_dir_path = output_dir # Main output is SWR output base
+    lfp_output_dir_path = os.path.join(output_dir, f"{DATASET_TO_PROCESS}_lfp_data") # LFP subdir
 
     # Load common settings
     pool_size = full_config["pool_sizes"][DATASET_TO_PROCESS]
@@ -469,7 +178,7 @@ def main():
     ripple_band_threshold = full_config["ripple_band_threshold"]
     movement_artifact_ripple_band_threshold = full_config["movement_artifact_ripple_band_threshold"]
     run_name = full_config["run_name"]
-    save_lfp = full_config["save_lfp"]
+    # save_lfp = full_config["save_lfp"] # Replaced by flag
     gamma_filters_path = full_config["filters"]["gamma_filter"]
     sharp_wave_component_path = full_config["filters"]["sw_component_filter"]
 
@@ -477,14 +186,18 @@ def main():
     if DATASET_TO_PROCESS == 'ibl':
         # IBL specific settings
         dataset_config = full_config["ibl"]
-        oneapi_cache_dir = dataset_config["oneapi_cache_dir"]
+        oneapi_cache_dir = os.environ.get('IBL_ONEAPI_CACHE') # Rely only on Env Var
         swr_output_dir = dataset_config["swr_output_dir"]
         dont_wipe_these_sessions = dataset_config["dont_wipe_these_sessions"]
         session_npz_filepath = dataset_config["session_npz_filepath"]
-        
     elif DATASET_TO_PROCESS == 'abi_visual_behaviour' or DATASET_TO_PROCESS == 'abi_visual_coding':
         # ABI (Allen) specific settings
         dataset_config = full_config[DATASET_TO_PROCESS]
+        # Use Env Vars for cache paths
+        if DATASET_TO_PROCESS == 'abi_visual_behaviour':
+            abi_cache_dir = os.environ.get('ABI_VISUAL_BEHAVIOUR_SDK_CACHE') # Rely only on Env Var
+        else: # abi_visual_coding
+            abi_cache_dir = os.environ.get('ABI_VISUAL_CODING_SDK_CACHE') # Rely only on Env Var
         swr_output_dir = dataset_config["swr_output_dir"]
         dont_wipe_these_sessions = dataset_config["dont_wipe_these_sessions"]
         only_brain_observatory_sessions = dataset_config["only_brain_observatory_sessions"]
@@ -495,22 +208,13 @@ def main():
     print(f"SWR output directory: {swr_output_dir}")
 
     # Setup logging
-    log_file = os.environ.get('LOG_FILE', f"{DATASET_TO_PROCESS}_detector_{swr_output_dir}_{run_name}_app.log")
-
-    # Set up file handler for logging
-    file_handler = logging.FileHandler(log_file, mode="w")
-    formatter = logging.Formatter("%(name)s - %(levelname)s - %(message)s")
-    file_handler.setFormatter(formatter)
-
-    # Set up root logger - but don't remove existing handlers
-    root_logger = logging.getLogger()
-    root_logger.setLevel(MESSAGE)  # Only log MESSAGE level and above
-    root_logger.addHandler(file_handler)
-
-    # Prevent propagation of lower-level warnings to the root logger
-    for logger_name in ['hdmf', 'pynwb', 'spikeglx', 'ripple_detection']:
-        logger = logging.getLogger(logger_name)
-        logger.propagate = False  # Don't send these to the root logger
+    # logging.basicConfig(level=MESSAGE)
+    queue = Queue()
+    # Ensure log directory exists (moved earlier)
+    # os.makedirs(log_dir, exist_ok=True)
+    # log_file_path = os.path.join(log_dir, f"{DATASET_TO_PROCESS}_detector_{run_name}.log")
+    listener = Process(target=listener_process, args=(queue,)) # Reverted to original args
+    listener.start()
 
     # loading filters
     gamma_filter = np.load(gamma_filters_path)
@@ -520,14 +224,17 @@ def main():
     swr_output_dir_path = os.path.join(output_dir, swr_output_dir)
     os.makedirs(swr_output_dir_path, exist_ok=True)
     
+    # LFP output dir creation moved here, depends on save_lfp flag
     if save_lfp:
         lfp_output_dir_path = os.path.join(output_dir, swr_output_dir + "_lfp_data")
         os.makedirs(lfp_output_dir_path, exist_ok=True)
+    else:
+        lfp_output_dir_path = None # Ensure it's None if not saving LFP
 
-    # Set up multiprocessing queue for logging
-    queue = Queue()
-    listener = Process(target=listener_process, args=(queue,))
-    listener.start()
+    # Set up multiprocessing queue for logging (This block seems redundant, listener already started)
+    # queue = Queue()
+    # listener = Process(target=listener_process, args=(queue,))
+    # listener.start()
 
     # Load session IDs based on dataset type
     if DATASET_TO_PROCESS == "abi_visual_coding":
@@ -551,10 +258,67 @@ def main():
         del data
         print(f"Loaded {len(all_sesh_with_ca1_eid)} sessions from {session_file_path}")
 
-    # Run the processing with the specified number of cores
-    with Pool(pool_size, initializer=init_pool) as p:
-        p.map(process_session, all_sesh_with_ca1_eid)
+    # --- Consolidate Config Dictionary --- 
+    config = {
+        "paths": {
+            "output_dir": output_dir,
+            "log_dir": log_dir,
+            "swr_output_dir": swr_output_dir_path, # Base path for SWR output
+            "lfp_output_dir": lfp_output_dir_path, # Base path for LFP output
+            "ibl_cache_dir": oneapi_cache_dir if DATASET_TO_PROCESS == 'ibl' else None,
+            "abi_vb_cache_dir": abi_cache_dir if DATASET_TO_PROCESS == 'abi_visual_behaviour' else None,
+            "abi_vc_cache_dir": abi_cache_dir if DATASET_TO_PROCESS == 'abi_visual_coding' else None,
+        },
+        "run_details": {
+            "dataset_to_process": DATASET_TO_PROCESS,
+            "run_name": run_name,
+            # Add other relevant details from dataset_config?
+            "dont_wipe_these_sessions": dont_wipe_these_sessions,
+            "only_brain_observatory_sessions": only_brain_observatory_sessions if DATASET_TO_PROCESS != 'ibl' else None,
+        },
+        "flags": {
+            "save_lfp": args.save_lfp, # From command line args
+            "save_channel_metadata": args.save_channel_metadata,
+            "overwrite_existing": args.overwrite_existing,
+            "cleanup_cache": args.cleanup_cache,
+            "run_putative": args.run_putative,
+            "run_filter": args.run_filter,
+            "run_global": args.run_global,
+        },
+        "pool_size": pool_size,
+        "ripple_detection": {
+            "ripple_band_threshold": ripple_band_threshold,
+            "movement_artifact_ripple_band_threshold": movement_artifact_ripple_band_threshold,
+            # Add other ripple detection params from full_config if needed
+        },
+        "artifact_detection": {
+            "gamma_event_thresh": gamma_event_thresh,
+            # Add other artifact params if needed
+        },
+        "filters": {
+            "gamma_filter": gamma_filter, # Loaded filter array
+            "sharp_wave_component_path": sharp_wave_component_path, # Path to SW filter
+            # Add other filter details if needed
+        },
+        "global_swr": full_config.get("global_swr_detection", {}), # Pass the whole sub-dict
+        # Add other top-level or dataset-specific configs from full_config if needed by process_session
+        # e.g., sampling rates:
+        "sampling_rates": full_config.get("sampling_rates", {"target_fs": 1500.0}) # Example default
+    }
 
+    # Start multiprocessing
+    # ==============================================================================
+    # Create a partially applied function with the consolidated configuration
+    process_func_partial = partial(process_session, config=config)
+    
+    # Run the processing with the specified number of cores
+    print(f"Starting processing pool with {config['pool_size']} workers...")
+    with Pool(processes=config['pool_size'], initializer=init_pool, initargs=(queue,)) as p:
+        # Use imap for progress bar with tqdm
+        list(tqdm(p.imap(process_func_partial, all_sesh_with_ca1_eid), total=len(all_sesh_with_ca1_eid)))
+
+    # Clean up
+    # ==============================================================================
     # Signal listener to terminate and wait for it to complete
     queue.put("kill")
     listener.join()
