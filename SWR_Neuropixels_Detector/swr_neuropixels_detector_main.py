@@ -258,6 +258,8 @@ def main():
         del data
         print(f"Loaded {len(all_sesh_with_ca1_eid)} sessions from {session_file_path}")
 
+    # for debugging..
+    all_sesh_with_ca1_eid = all_sesh_with_ca1_eid[:2]
     # --- Consolidate Config Dictionary --- 
     config = {
         "paths": {
