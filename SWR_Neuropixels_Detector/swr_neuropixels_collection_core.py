@@ -398,7 +398,7 @@ class BaseLoader:
         ripple_power = ripple_amp ** 2
         ripple_power_z = (ripple_power - ripple_power[mask].mean()) / ripple_power[mask].std()
 
-        ref_depth = channel_positions.loc[this_chan_id]
+        ref_depth = channel_positions.loc[peak_ripple_chan_id]
         below_ids = channel_positions[channel_positions > ref_depth].index
         id_to_idx = {cid: i for i, cid in enumerate(ca1_chan_ids)}
         below_idx = [id_to_idx[cid] for cid in below_ids if cid in id_to_idx]
@@ -406,15 +406,12 @@ class BaseLoader:
         # Create dictionary to store detailed results for selection logic
         results = {}
         
-        # Create a separate dictionary for JSON-serializable summary stats
-        self.sw_component_summary_stats_dict = {
-            'channel_ids': [],
-            'modulation_indices': [],
-            'circular_linear_corrs': [],
-            'depths': [],
-            'selection_metric': selection_metric,
-            'best_channel_id': None  # Will be filled in after selection
-        }
+        # Initialize lists in the target metadata dictionary
+        self.channel_selection_metadata_dict['sharp_wave_band']['channel_ids'] = []
+        self.channel_selection_metadata_dict['sharp_wave_band']['depths'] = []
+        self.channel_selection_metadata_dict['sharp_wave_band']['net_sw_power'] = []
+        self.channel_selection_metadata_dict['sharp_wave_band']['modulation_index'] = []
+        self.channel_selection_metadata_dict['sharp_wave_band']['circular_linear_corrs'] = []
 
         for cid, idx in zip(below_ids, below_idx):
             sw_filt = fftconvolve(ca1_lfp[:, idx], sharpwave_filter, mode='same')
@@ -427,8 +424,11 @@ class BaseLoader:
 
             modulation_index = self._compute_modulation_index(sw_phase, ripple_amp, high_mask)
             circular_linear_corr = self._compute_circular_linear_corr(sw_phase, ripple_amp, high_mask)
+            
+            # Calculate net SW power across whole recording
+            net_sw_power_val = np.sum(sw_power)
 
-            # Store detailed results for selection
+            # Store detailed results for selection logic
             results[cid] = {
                 'modulation_index': modulation_index,
                 'circular_linear_corr': circular_linear_corr,
@@ -436,11 +436,12 @@ class BaseLoader:
                 'sw_power_z': sw_power_z
             }
             
-            # Store JSON-serializable summary stats
-            self.sw_component_summary_stats_dict['channel_ids'].append(int(cid))
-            self.sw_component_summary_stats_dict['modulation_indices'].append(float(modulation_index) if not np.isnan(modulation_index) else None)
-            self.sw_component_summary_stats_dict['circular_linear_corrs'].append(float(circular_linear_corr) if not np.isnan(circular_linear_corr) else None)
-            self.sw_component_summary_stats_dict['depths'].append(float(channel_positions.loc[cid]))
+            # Append results to the correct metadata dictionary
+            self.channel_selection_metadata_dict['sharp_wave_band']['channel_ids'].append(int(cid))
+            self.channel_selection_metadata_dict['sharp_wave_band']['depths'].append(float(channel_positions.loc[cid]))
+            self.channel_selection_metadata_dict['sharp_wave_band']['net_sw_power'].append(float(net_sw_power_val))
+            self.channel_selection_metadata_dict['sharp_wave_band']['modulation_index'].append(float(modulation_index) if not np.isnan(modulation_index) else None)
+            self.channel_selection_metadata_dict['sharp_wave_band']['circular_linear_corrs'].append(float(circular_linear_corr) if not np.isnan(circular_linear_corr) else None)
 
         # Select best channel
         best_cid = max(
@@ -451,8 +452,9 @@ class BaseLoader:
         best_idx = results[best_cid]['idx']
         best_lfp = ca1_lfp[:, best_idx]
         
-        # Store best channel ID in summary stats
-        self.sw_component_summary_stats_dict['best_channel_id'] = int(best_cid)
+        # Store selection info in the metadata dictionary
+        self.channel_selection_metadata_dict['sharp_wave_band']['selected_channel_id'] = int(best_cid)
+        self.channel_selection_metadata_dict['sharp_wave_band']['selection_method'] = selection_metric
         
         # Return the best channel ID and its raw LFP
         return best_cid, best_lfp
@@ -544,21 +546,6 @@ class BaseLoader:
             Returns (None, None, None) if no suitable channel found.
         """
         # --- Input Validation --- 
-        if ca1_lfp is None or ca1_lfp.size == 0:
-             raise ValueError("Missing CA1 LFP data. Cannot select ripple channel.")
-        if not ca1_chan_ids:
-             raise ValueError("Missing CA1 channel IDs. Cannot select ripple channel.")
-            
-        # Ensure correct shape (time, channels)
-        if ca1_lfp.ndim == 1:
-             ca1_lfp = ca1_lfp[:, np.newaxis]
-        if ca1_lfp.shape[1] != len(ca1_chan_ids):
-             # Attempt transpose if shapes mismatch (e.g., channels, time)
-             if ca1_lfp.shape[0] == len(ca1_chan_ids):
-                 ca1_lfp = ca1_lfp.T
-             else:
-                  # Fail explicitly if shape is wrong
-                  raise ValueError(f"CA1 LFP shape {ca1_lfp.shape} inconsistent with channel IDs {len(ca1_chan_ids)}. Cannot select ripple channel.")
 
         # --- Calculate Metrics for All CA1 Channels --- 
         all_ripple_filtered = ripple_filter_func(ca1_lfp) # Apply filter to all CA1 channels
@@ -1513,7 +1500,7 @@ def process_session(session_id, config):
             outof_hp_chans_lfp = results['control_lfps']
             take_two = results['control_channels']
             peakrippleband = results['rippleband']
-            this_chan_id = results['peak_ripple_chan_id']
+            peak_ripple_chan_id = results['peak_ripple_chan_id']
             
             # Save channel selection metadata only if the flag is enabled
             if save_channel_metadata:
@@ -1535,14 +1522,14 @@ def process_session(session_id, config):
                 np.savez(
                     os.path.join(
                         session_lfp_subfolder,
-                        f"probe_{probe_id_log}_channel_{this_chan_id}_lfp_ca1_peakripplepower.npz",
+                        f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_lfp_ca1_peakripplepower.npz",
                     ),
                     lfp_ca1=peakripple_chan_raw_lfp,
                 )
                 np.savez(
                     os.path.join(
                         session_lfp_subfolder,
-                        f"probe_{probe_id_log}_channel_{this_chan_id}_lfp_time_index_1500hz.npz",
+                        f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_lfp_time_index_1500hz.npz",
                     ),
                     lfp_time_index=lfp_time_index,
                 )
@@ -1644,7 +1631,7 @@ def process_session(session_id, config):
             )
             
             # Save gamma events
-            csv_filename = f"probe_{probe_id_log}_channel_{this_chan_id}_gamma_band_events.csv.gz"
+            csv_filename = f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_gamma_band_events.csv.gz"
             csv_path = os.path.join(session_subfolder, csv_filename)
             gamma_times.to_csv(csv_path, index=True, compression="gzip")
             
@@ -1699,7 +1686,7 @@ def process_session(session_id, config):
             Karlsson_ripple_times = check_movement_overlap(Karlsson_ripple_times, movement_control_list[0], movement_control_list[1])
             
             # Save filtered ripple events
-            csv_filename = f"probe_{probe_id_log}_channel_{this_chan_id}_karlsson_detector_events.csv.gz"
+            csv_filename = f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_karlsson_detector_events.csv.gz"
             csv_path = os.path.join(session_subfolder, csv_filename)
             Karlsson_ripple_times.to_csv(csv_path, index=True, compression="gzip")
             probe_events_dict[probe_id_log] = Karlsson_ripple_times

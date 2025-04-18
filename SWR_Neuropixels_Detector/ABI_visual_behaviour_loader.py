@@ -95,6 +95,13 @@ class abi_visual_behaviour_loader(BaseLoader):
         lfp = self.session.get_lfp(probe_id)
         og_lfp_obj_time_vals = lfp.time.values
         
+        # --- Define all_channel_positions --- 
+        # Get channel info for this probe
+        probe_channels = self.session.channels[self.session.channels.probe_id == probe_id]
+        # Create Series mapping channel ID to vertical position
+        all_channel_positions = pd.Series(probe_channels['probe_vertical_position'].values, index=probe_channels.index)
+        # --- End definition ---
+
         # Get control channels outside hippocampus
         idx = self.session.channels.probe_id == probe_id
         organisedprobechans = self.session.channels[idx].sort_values(

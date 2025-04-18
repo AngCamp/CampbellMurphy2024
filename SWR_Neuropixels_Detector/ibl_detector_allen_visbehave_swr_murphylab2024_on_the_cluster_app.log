@@ -1,6 +1,6 @@
 session_1044385384 - INFO - Session 1044385384: Beginning processing, dataset abi_visual_behaviour
 session_1044594870 - INFO - Session 1044594870: Beginning processing, dataset abi_visual_behaviour
-session_1047969464 - INFO - Session 1047969464: Beginning processing, dataset abi_visual_behaviour
-session_1047977240 - INFO - Session 1047977240: Beginning processing, dataset abi_visual_behaviour
-session_1048189115 - INFO - Session 1048189115: Beginning processing, dataset abi_visual_behaviour
-session_1048196054 - INFO - Session 1048196054: Beginning processing, dataset abi_visual_behaviour
+session_1044594870 - INFO - Session 1044594870: Creating output directories
+session_1044594870 - INFO - Session 1044594870: Processing probe 1044791094
+session_1044385384 - INFO - Session 1044385384: Creating output directories
+session_1044385384 - INFO - Session 1044385384: Processing probe 1044506933

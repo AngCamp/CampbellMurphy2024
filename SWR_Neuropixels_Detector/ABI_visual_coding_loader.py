@@ -6,6 +6,7 @@ from scipy import signal
 from scipy.stats import zscore
 import matplotlib.pyplot as plt
 from allensdk.brain_observatory.ecephys.ecephys_project_cache import EcephysProjectCache
+import pandas as pd
 
 # Import the BaseLoader
 from swr_neuropixels_collection_core import BaseLoader
@@ -79,6 +80,14 @@ class abi_visual_coding_loader(BaseLoader):
         # Get LFP for the probe
         lfp = self.session.get_lfp(probe_id)
         og_lfp_obj_time_vals = lfp.time.values
+        
+        # --- Define all_channel_positions --- 
+        # Get channel info for this probe
+        probe_channels = self.session.channels[self.session.channels.probe_id == probe_id] # Filter channels DataFrame
+        # Create Series mapping channel ID to vertical position
+        # Check column name for Visual Coding - might be ecephys_probe_vertical_position? Assuming probe_vertical_position for now.
+        all_channel_positions = pd.Series(probe_channels['probe_vertical_position'].values, index=probe_channels.index)
+        # --- End definition ---
         
         # Get control channels outside hippocampus
         idx = self.session.channels.probe_id == probe_id
