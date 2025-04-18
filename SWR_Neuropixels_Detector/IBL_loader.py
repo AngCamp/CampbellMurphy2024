@@ -11,6 +11,7 @@ from brainbox.io.one import SpikeSortingLoader, load_channel_locations
 from ibldsp.voltage import destripe_lfp
 from iblatlas.atlas import AllenAtlas
 from iblatlas.regions import BrainRegions
+import logging
 
 
 # Import the BaseLoader
@@ -199,80 +200,44 @@ class ibl_loader(BaseLoader):
         lfp_ca1, lfp_time_index = super().resample_signal(data['lfp_ca1'], data['lfp_time_index_og'], 1500.0)
         del data['destriped']  # Free memory for large array
         
-        #Find channel with highest ripple power if function provided
-        if filter_ripple_band_func is not None:
-            # --- Select Ripple Channel --- 
-            peak_id, peakrippleband, peak_lfp = self.select_ripple_channel(
-                ca1_lfp=lfp_ca1,
-                ca1_chan_ids=data['ca1_chans'],
-                channel_positions=all_channel_positions, # Pass the extracted positions
-                ripple_filter_func=filter_ripple_band_func,
-                config=None # Pass config if needed by base method
-            )
-            
-            # select_ripple_channel should raise an error if it fails.
-            # Subsequent code will fail if peak_id is None (e.g. when passed to select_sharpwave_channel)
-            
-            # Create a channel ID string for naming files
-            # This will fail if peak_id is None
-            this_chan_id = f"channelsrawInd_{peak_id}"
-            
-            # --- Select Sharp Wave Channel --- 
-            # Use the base class method directly
-            # Note: Pass peak_id, NOT this_chan_id (which is a string)
-            best_sw_chan_id, best_sw_chan_lfp = super().select_sharpwave_channel(
-                ca1_lfp=lfp_ca1,
-                lfp_time_index=lfp_time_index,  
-                ca1_chan_ids=data['ca1_chans'],
-                peak_ripple_chan_id=peak_id, # Pass selected ripple channel ID
-                channel_positions=all_channel_positions,
-                ripple_filtered=peakrippleband, # Pass ripple LFP from selected chan
-                config=None, # Pass config if needed
-                filter_path=getattr(self, 'sw_component_filter_path', None) # Use attribute if exists
-            )
+        # Check for NaNs - Log and return None to skip probe
+        if np.isnan(lfp_ca1).any():
+            # Log error (ensure logger is accessible or use print as fallback)
+            # ADD PROBE HAS NaNs to metadata table and skip probe
+            logging.warning(f"Session {self.session_id} Probe {data['probe_id']}: NaN detected in resampled CA1 LFP data. Skipping probe.")
+            return None # Signal to process_session to skip this probe
 
-            if best_sw_chan_lfp is not None:
-                best_sw_chan_lfp = best_sw_chan_lfp.flatten()
-                best_sw_power_z = zscore(best_sw_chan_lfp) # Calculate Z-score if needed elsewhere
-            else:
-                best_sw_power_z = None
+        # --- Select Ripple Channel (Now runs unconditionally) --- 
+        peak_id, peakrippleband, peak_lfp = self.select_ripple_channel(
+            ca1_lfp=lfp_ca1,
+            ca1_chan_ids=data['ca1_chans'],
+            channel_positions=all_channel_positions, # Pass the extracted positions
+            ripple_filter_func=filter_ripple_band_func,
+            config=None # Pass config if needed by base method
+        )
+        
+        # Create a channel ID string for naming files
+        # This will fail explicitly if peak_id is None (e.g., if select_ripple_channel failed)
+        this_chan_id = f"channelsrawInd_{peak_id}"
+        
+        # --- Select Sharp Wave Channel (Now runs unconditionally) --- 
+        best_sw_chan_id, best_sw_chan_lfp = super().select_sharpwave_channel(
+            ca1_lfp=lfp_ca1,
+            lfp_time_index=lfp_time_index,  
+            ca1_chan_ids=data['ca1_chans'],
+            peak_ripple_chan_id=peak_id, # Pass selected ripple channel ID
+            channel_positions=all_channel_positions,
+            ripple_filtered=peakrippleband, # Pass ripple LFP from selected chan
+            config=None, # Pass config if needed
+            filter_path=getattr(self, 'sw_component_filter_path', None) # Use attribute if exists
+        )
 
-            # --- Legacy section for sharpwave channel (now handled by base class) --- 
-            # if hasattr(self, 'sw_component_filter_path') and self.sw_component_filter_path is not None:
-                # Get positions of CA1 channels
-                # try:
-                    # Channel positions might be stored differently in IBL data
-                    # Try to extract a pandas Series mapping channel IDs to depths
-                    # ca1_channel_positions = pd.Series(data['ca1_chans'] * 10, index=data['ca1_chans'])
-                    
-                    # best_sw_chan_id, best_sw_chan_lfp = super().select_sharpwave_channel(
-                    #     ca1_lfp=lfp_ca1,
-                    #     lfp_time_index=lfp_time_index,  
-                    #     ca1_chan_ids=data['ca1_chans'],
-                    #     this_chan_id=peak_id,
-                    #     channel_positions=ca1_channel_positions,
-                    #     ripple_filtered=peakrippleband,
-                    #     filter_path=self.sw_component_filter_path
-                    # )
-                    # best_sw_chan_lfp = best_sw_chan_lfp.flatten() # debugging
-                    # best_sw_power_z = zscore(best_sw_chan_lfp)
-                # except Exception as e:
-                    # print(f"Warning: Could not select sharpwave channel: {e}")
-                    # best_sw_chan_id = None
-                    # best_sw_chan_lfp = None
-                    # best_sw_power_z = None
-            # else:
-                # best_sw_chan_id = None
-                # best_sw_chan_lfp = None
-                # best_sw_power_z = None
-        else:
-            peak_id = None
-            peak_lfp = None
-            this_chan_id = None
-            peakrippleband = None
-            best_sw_chan_id = None
-            best_sw_chan_lfp = None
-            best_sw_power_z = None
+        # Extract sharpwave channel information - Remove None check
+        # Assumes select_sharpwave_channel raises error or returns valid LFP.
+        # If it returns None unexpectedly, the next lines will raise an explicit error.
+        best_sw_chan_lfp = best_sw_chan_lfp.flatten()
+        best_sw_power_z = zscore(best_sw_chan_lfp) # Calculate Z-score if needed elsewhere
+
         del lfp_ca1
         
         # Collect results using final, consistent key names
@@ -426,3 +391,80 @@ class ibl_loader(BaseLoader):
                 os.system(cmd)
             except Exception as e:
                 print(f"Warning: Could not clean up data files: {e}")
+
+    def get_metadata_for_probe(self, probe_id, config=None):
+        """
+        Generates metadata for a single specified probe (IBL).
+        Note: Requires loading SpikeSorting data, which can be slow.
+
+        Parameters
+        ----------
+        probe_id : str
+            The unique identifier (UUID string) for the probe being processed.
+        config : dict, optional
+            Configuration dictionary (not used in this implementation).
+
+        Returns
+        -------
+        dict
+            Standardized probe metadata.
+        """
+        # --- Basic Setup ---
+        # Assume ONE API and probe list/names are loaded via set_up / get_probe_ids_and_names
+        # Let access fail explicitly if they aren't.
+        metadata = {
+            'probe_id': probe_id,
+            'has_ca1_channels': False,
+            'ca1_channel_count': 0,
+            'ca1_span_microns': 0.0,
+            'total_unit_count': 0,
+            'good_unit_count': 0,
+            'ca1_total_unit_count': 0,
+            'ca1_good_unit_count': 0,
+            # 'has_nan_lfp': False # Placeholder if we add this later
+        }
+
+        # --- Find probe name corresponding to probe_id (UUID) ---
+        # Allow ValueError/IndexError to propagate if probe_id not found
+        probe_idx = self.probelist.index(probe_id)
+        probe_name = self.probenames[probe_idx]
+
+        # --- Load Spike Sorting Data ---
+        # Allow exceptions during loading to propagate
+        print(f"Loading spike sorting data for probe {probe_name} ({probe_id})...")
+        # Assume atlas (self.ba) is loaded if needed by SpikeSortingLoader/merge_clusters implicitly
+        # Let access fail if self.ba is None
+        sl = SpikeSortingLoader(eid=self.session_id, pname=probe_name, one=self.one, atlas=self.ba)
+        spikes, clusters, channels = sl.load_spike_sorting(dataset_types=['clusters.metrics']) # Load metrics too
+        clusters = sl.merge_clusters(spikes, clusters, channels) # Adds 'acronym' if missing? Check docs.
+        print(f"Spike sorting data loaded for probe {probe_id}")
+
+        # --- Calculate Metadata (Allow KeyErrors/AttributeErrors to propagate) ---
+        metadata['total_unit_count'] = len(clusters)
+
+        # Good units (label == 1)
+        good_clusters = clusters[clusters.label == 1]
+        metadata['good_unit_count'] = len(good_clusters)
+
+        # CA1 channels
+        # Assume 'acronym' column exists. Let access fail if missing.
+        ca1_channels = channels[channels.acronym == 'CA1']
+        metadata['has_ca1_channels'] = True # Set directly, as this runs only for probes with CA1
+        metadata['ca1_channel_count'] = len(ca1_channels)
+
+        # Calculate CA1 span (unconditionally, assuming >1 channel)
+        ca1_depths = ca1_channels['y']
+        metadata['ca1_span_microns'] = float(ca1_depths.max() - ca1_depths.min())
+
+        # Calculate CA1 unit counts (unconditionally)
+        ca1_channel_rawInds = ca1_channels['id']
+        units_in_ca1 = clusters[clusters['channels'].isin(ca1_channel_rawInds)]
+        metadata['ca1_total_unit_count'] = len(units_in_ca1)
+
+        good_units_in_ca1 = good_clusters[good_clusters['channels'].isin(ca1_channel_rawInds)]
+        metadata['ca1_good_unit_count'] = len(good_units_in_ca1)
+
+        # Cleanup SpikeSortingLoader explicitly
+        del sl, spikes, clusters, channels
+
+        return metadata

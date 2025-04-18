@@ -378,12 +378,8 @@ class BaseLoader:
             If no suitable channel is found below the reference channel or if errors occur.
         """
         # Get the filter - implementers must override this if filter_path is None
-        if hasattr(self, 'sw_component_filter_path') and self.sw_component_filter_path is not None:
-            filter_path = self.sw_component_filter_path
-            
-        if filter_path is None:
-            raise ValueError("Sharp wave filter path must be provided or set in the loader instance")
-            
+        filter_path = self.sw_component_filter_path
+                       
         filter_data = np.load(filter_path)
         sharpwave_filter = filter_data['sharpwave_componenet_8to40band_1500hz_band']
 
@@ -605,13 +601,35 @@ class BaseLoader:
 
     def get_metadata_for_probe(self, probe_id, config=None):
         """
-        Generates metadata for a single specified probe.
+        Generates metadata for a single specified probe, focusing on unit counts
+        and CA1 properties.
+
+        Parameters
+        ----------
+        probe_id : str or int
+            The unique identifier for the probe being processed.
+        config : dict, optional
+            Configuration dictionary, potentially needed for specific dataset logic.
+
+        Returns
+        -------
+        dict
+            A dictionary containing standardized probe metadata:
+            - 'probe_id': Copied from input.
+            - 'has_ca1_channels': bool
+            - 'ca1_channel_count': int
+            - 'ca1_span_microns': float
+            - 'total_unit_count': int
+            - 'good_unit_count': int
+            - 'ca1_total_unit_count': int
+            - 'ca1_good_unit_count': int
+
+        Raises
+        ------
+        NotImplementedError
+            This base method must be implemented by each dataset-specific loader subclass.
         """
-        # This method should return a dictionary containing metadata for the specified probe
-        # Implement the logic to retrieve metadata for the probe
-        # You might want to use the probe_id to fetch the corresponding data
-        # from your database or storage system
-        pass
+        raise NotImplementedError("Subclasses must implement get_metadata_for_probe method")
 
 # ===================================
 #  PROBE LEVEL EVENT DETECTOR
@@ -1421,6 +1439,7 @@ def process_session(session_id, config):
     probe_id = None
     probe_id_log = "Not Loaded Yet"
     probe_events_dict = {}  # Initialize dictionary to store probe events
+    all_probe_metadata = [] # Initialize list to store metadata from each processed probe
     loader = None  # Initialize loader to None
     
     try:
@@ -1493,13 +1512,13 @@ def process_session(session_id, config):
                 logger.warning(f"Session {session_id}: No results for probe {probe_id_log}, skipping...")
                 continue
                 
-            # Extract results
+            # Extract results using the standardized key names
             peakripple_chan_raw_lfp = results['peak_ripple_chan_raw_lfp']
             lfp_time_index = results['lfp_time_index']
-            ca1_chans = results['ca1_chans']
+            ca1_chans = results['ca1_channel_ids'] # Use standardized key
             outof_hp_chans_lfp = results['control_lfps']
-            take_two = results['control_channels']
-            peakrippleband = results['rippleband']
+            take_two = results['control_channel_ids'] # Use standardized key
+            peakrippleband = results['ripple_band_filtered'] # Use standardized key
             peak_ripple_chan_id = results['peak_ripple_chan_id']
             
             # Save channel selection metadata only if the flag is enabled
@@ -1691,7 +1710,25 @@ def process_session(session_id, config):
             Karlsson_ripple_times.to_csv(csv_path, index=True, compression="gzip")
             probe_events_dict[probe_id_log] = Karlsson_ripple_times
             logger.info(f"Session {session_id}: Saved {len(Karlsson_ripple_times)} filtered events for probe {probe_id_log}")
-        
+            
+            # Collect probe metadata for successfully processed probes
+            # Allow errors from get_metadata_for_probe to propagate
+            logger.info(f"Session {session_id}: Collecting metadata for probe {probe_id_log}")
+            probe_metadata = loader.get_metadata_for_probe(probe_id, config=config)
+            all_probe_metadata.append(probe_metadata)
+
+        # --- Save Probe Metadata CSV --- 
+        # Saves metadata for all probes that were *successfully* processed (didn't return None)
+        if all_probe_metadata:
+            logger.info(f"Session {session_id}: Saving probe metadata CSV ({len(all_probe_metadata)} entries).")
+            metadata_df = pd.DataFrame(all_probe_metadata)
+            metadata_filename = f"session_{session_id}_probe_metadata.csv.gz"
+            metadata_filepath = os.path.join(session_subfolder, metadata_filename)
+            metadata_df.to_csv(metadata_filepath, index=False, compression="gzip")
+            logger.info(f"Session {session_id}: Saved probe metadata to {metadata_filepath}")
+        else:
+            logger.warning(f"Session {session_id}: No probe metadata collected (likely all probes failed or were skipped), CSV not saved.")
+
         # Process global ripples if we have probe events
         if probe_events_dict:
             process_stage = "Detecting Global Ripples"

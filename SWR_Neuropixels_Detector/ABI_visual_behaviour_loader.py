@@ -10,6 +10,7 @@ from allensdk.brain_observatory.behavior.behavior_project_cache import (
     VisualBehaviorNeuropixelsProjectCache,
 )
 import pandas as pd
+import logging
 
 # Import the BaseLoader
 from swr_neuropixels_collection_core import BaseLoader
@@ -151,52 +152,44 @@ class abi_visual_behaviour_loader(BaseLoader):
         lfp_ca1_chans = lfp_ca1.columns
         lfp_ca1 = lfp_ca1.to_numpy()
         
-        # Check for NaNs
+        # Check for NaNs - Log and return None to skip probe
         if np.isnan(lfp_ca1).any():
-            print(f"NaN detected in LFP data for probe {probe_id}, skipping")
-            return None
-        
+            # Log error (ensure logger is accessible or use print as fallback)
+            # ADD PROBE HAS NaNs to metadata table and skip probe
+            logging.warning(f"Session {self.session_id} Probe {probe_id}: NaN detected in resampled CA1 LFP data. Skipping probe.")
+            return None # Signal to process_session to skip this probe
+
         # Resample to 1500 Hz
         lfp_ca1, lfp_time_index = super().resample_signal(
             lfp_ca1, og_lfp_obj_time_vals, 1500.0
         )
         
         # Find channel with highest ripple power if function provided
-        if filter_ripple_band_func is not None:
-            # --- Select Ripple Channel --- 
-            this_chan_id, peakrippleband, peakripchan_lfp_ca1 = self.select_ripple_channel(
-                ca1_lfp=lfp_ca1,
-                ca1_chan_ids=lfp_ca1_chans,
-                channel_positions=all_channel_positions, # Pass the extracted positions
-                ripple_filter_func=filter_ripple_band_func,
-                config=None # Pass config if needed
-            )
+        # --- Select Ripple Channel --- 
+        this_chan_id, peakrippleband, peakripchan_lfp_ca1 = self.select_ripple_channel(
+            ca1_lfp=lfp_ca1,
+            ca1_chan_ids=lfp_ca1_chans,
+            channel_positions=all_channel_positions, # Pass the extracted positions
+            ripple_filter_func=filter_ripple_band_func,
+            config=None # Pass config if needed
+        )
 
-            # --- Select Sharp Wave Channel --- 
-            best_sw_chan_id, best_sw_chan_lfp = super().select_sharpwave_channel(
-                ca1_lfp=lfp_ca1,
-                lfp_time_index=lfp_time_index,  
-                ca1_chan_ids=lfp_ca1_chans,
-                peak_ripple_chan_id=this_chan_id, # Pass selected ripple channel ID
-                channel_positions=all_channel_positions,
-                ripple_filtered=peakrippleband,
-                config=None, # Pass config if needed
-                filter_path=getattr(self, 'sw_component_filter_path', None) # Use attribute if exists
-            )
+        # --- Select Sharp Wave Channel --- 
+        best_sw_chan_id, best_sw_chan_lfp = super().select_sharpwave_channel(
+            ca1_lfp=lfp_ca1,
+            lfp_time_index=lfp_time_index,  
+            ca1_chan_ids=lfp_ca1_chans,
+            peak_ripple_chan_id=this_chan_id, # Pass selected ripple channel ID
+            channel_positions=all_channel_positions,
+            ripple_filtered=peakrippleband,
+            config=None, # Pass config if needed
+            filter_path=getattr(self, 'sw_component_filter_path', None) # Use attribute if exists
+        )
 
-            # Extract sharpwave channel information
-            if best_sw_chan_lfp is not None:
-                best_sw_chan_lfp = best_sw_chan_lfp.flatten()
-                best_sw_power_z = zscore(best_sw_chan_lfp)
-            else:
-                best_sw_power_z = None
-        else:
-            this_chan_id = None
-            peakrippleband = None
-            peakripchan_lfp_ca1 = None
-            best_sw_chan_id = None
-            best_sw_chan_lfp = None
-            best_sw_power_z = None
+        # Extract sharpwave channel information 
+        best_sw_chan_lfp = best_sw_chan_lfp.flatten()
+        best_sw_power_z = zscore(best_sw_chan_lfp)
+
         del lfp_ca1
 
         # Collect results using final, consistent key names
@@ -252,3 +245,69 @@ class abi_visual_behaviour_loader(BaseLoader):
     def cleanup(self):
         """Cleans up resources to free memory."""
         self.session = None
+
+    def get_metadata_for_probe(self, probe_id, config=None):
+        """
+        Generates metadata for a single specified probe (ABI Visual Behaviour).
+
+        Parameters
+        ----------
+        probe_id : int
+            The unique identifier for the probe being processed.
+        config : dict, optional
+            Configuration dictionary (not used in this implementation).
+
+        Returns
+        -------
+        dict
+            Standardized probe metadata.
+        """
+        # --- Basic Setup ---
+        # Assume session, channels, cache are loaded via set_up.
+        # Let access fail explicitly (AttributeError) if they aren't.
+        metadata = {
+            'probe_id': probe_id,
+            'has_ca1_channels': False,
+            'ca1_channel_count': 0,
+            'ca1_span_microns': 0.0,
+            'total_unit_count': 0,
+            'good_unit_count': 0,
+            'ca1_total_unit_count': 0,
+            'ca1_good_unit_count': 0
+        }
+
+        # --- Get Data for Probe ---
+        # Allow potential KeyErrors etc. to propagate
+        probe_channels = self.session.channels[self.session.channels.probe_id == probe_id]
+        session_units = self.cache.get_unit_table()
+        probe_units = session_units[session_units.ecephys_probe_id == probe_id]
+
+        # Subsequent operations will fail explicitly if probe_channels is unexpectedly empty
+
+        metadata['total_unit_count'] = len(probe_units)
+
+        # --- Identify Good Units (Uses 'quality' column) ---
+        # Allow potential KeyError to propagate if 'quality' column is missing
+        good_units = probe_units[probe_units.quality == 'good']
+        metadata['good_unit_count'] = len(good_units)
+
+        # --- CA1 Analysis ---
+        # Allow potential KeyErrors to propagate
+        ca1_channels = probe_channels[probe_channels.structure_acronym == "CA1"]
+        metadata['has_ca1_channels'] = True # Set directly, assumes this called only for probes with CA1
+        metadata['ca1_channel_count'] = len(ca1_channels)
+
+        # Calculate CA1 span (unconditionally, assuming >1 channel)
+        ca1_depths = ca1_channels['probe_vertical_position']
+        metadata['ca1_span_microns'] = float(ca1_depths.max() - ca1_depths.min())
+
+        # Calculate CA1 unit counts (unconditionally)
+        ca1_channel_ids = ca1_channels.index
+        units_in_ca1 = probe_units[probe_units['channel_id'].isin(ca1_channel_ids)]
+        metadata['ca1_total_unit_count'] = len(units_in_ca1)
+
+        # Good units in CA1 (using the pre-filtered good_units DataFrame)
+        good_units_in_ca1 = good_units[good_units['channel_id'].isin(ca1_channel_ids)]
+        metadata['ca1_good_unit_count'] = len(good_units_in_ca1)
+
+        return metadata

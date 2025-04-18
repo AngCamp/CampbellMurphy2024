@@ -76,12 +76,7 @@ import argparse
 MESSAGE = 25
 logging.addLevelName(MESSAGE, "MESSAGE")
 
-
-# Custom logging level
-MESSAGE = 25
-logging.addLevelName(MESSAGE, "MESSAGE")
-
-def listener_process(queue):
+def listener_process(queue, log_dir, dataset_name, run_name):
     """
     This function listens for messages from the logging module and writes them to a log file.
     It sets the logging level to MESSAGE so that only messages with level MESSAGE or higher are written to the log file.
@@ -89,9 +84,9 @@ def listener_process(queue):
     messages that are mostly irrelevant and make the log file too large and uninterpretable.
     """
     root = logging.getLogger()
-    h = logging.FileHandler(
-        f"ibl_detector_{swr_output_dir}_{run_name}_app.log", mode="w"
-    )
+    # Use passed arguments for dynamic log file path
+    log_file_path = os.path.join(log_dir, f"{dataset_name}_detector_{run_name}_app.log")
+    h = logging.FileHandler(log_file_path, mode="w")
     f = logging.Formatter("%(name)s - %(levelname)s - %(message)s")
     h.setFormatter(f)
     root.addHandler(h)
@@ -113,10 +108,10 @@ def init_pool(queue):
 
 def main():
     """Main function to handle configuration and orchestrate processing"""
-    global queue, swr_output_dir_path, lfp_output_dir_path, swr_output_dir
-    global gamma_filter, save_lfp, gamma_event_thresh, ripple_band_threshold
-    global movement_artifact_ripple_band_threshold, run_name, sharp_wave_component_path
-    global DATASET_TO_PROCESS, full_config
+    #global queue, swr_output_dir_path, lfp_output_dir_path, swr_output_dir
+    #global gamma_filter, save_lfp, gamma_event_thresh, ripple_band_threshold
+    #global movement_artifact_ripple_band_threshold, run_name, sharp_wave_component_path
+    #global DATASET_TO_PROCESS, full_config
 
     # Configure AWS timeout settings
     my_aws_config = Config(connect_timeout=1200, read_timeout=1200)
@@ -208,12 +203,11 @@ def main():
     print(f"SWR output directory: {swr_output_dir}")
 
     # Setup logging
-    # logging.basicConfig(level=MESSAGE)
     queue = Queue()
-    # Ensure log directory exists (moved earlier)
-    # os.makedirs(log_dir, exist_ok=True)
-    # log_file_path = os.path.join(log_dir, f"{DATASET_TO_PROCESS}_detector_{run_name}.log")
-    listener = Process(target=listener_process, args=(queue,)) # Reverted to original args
+    # Ensure log directory exists (must be done before listener starts)
+    os.makedirs(log_dir, exist_ok=True) 
+    # Pass necessary arguments to the listener process
+    listener = Process(target=listener_process, args=(queue, log_dir, DATASET_TO_PROCESS, run_name))
     listener.start()
 
     # loading filters
@@ -230,11 +224,6 @@ def main():
         os.makedirs(lfp_output_dir_path, exist_ok=True)
     else:
         lfp_output_dir_path = None # Ensure it's None if not saving LFP
-
-    # Set up multiprocessing queue for logging (This block seems redundant, listener already started)
-    # queue = Queue()
-    # listener = Process(target=listener_process, args=(queue,))
-    # listener.start()
 
     # Load session IDs based on dataset type
     if DATASET_TO_PROCESS == "abi_visual_coding":
