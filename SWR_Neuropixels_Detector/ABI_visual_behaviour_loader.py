@@ -174,6 +174,7 @@ class abi_visual_behaviour_loader(BaseLoader):
             config=None # Pass config if needed
         )
 
+
         # --- Select Sharp Wave Channel --- 
         best_sw_chan_id, best_sw_chan_lfp = super().select_sharpwave_channel(
             ca1_lfp=lfp_ca1,
@@ -214,34 +215,6 @@ class abi_visual_behaviour_loader(BaseLoader):
         # Return results directly, without standardization call
         return results
     
-    def global_events_probe_info(self):
-        """
-        Get probe-level information needed for global SWR detection.
-        
-        Returns
-        -------
-        dict
-            Dictionary mapping probe IDs to probe information dictionaries
-        """
-        probe_info = {}
-        units = self.cache.get_unit_table()
-        for probe_id in self.probe_id_list:
-            # Get units for this probe
-            # Get units directly with quality metrics for this probe
-            
-            # Filter for good units based on quality metrics
-            good_units = units[(units.quality=='good') & (units.ecephys_probe_id == probe_id)]
-            
-            # Count good units from CA1
-            ca1_good_units = sum(good_units.structure_acronym == 'CA1')
-            
-            probe_info[probe_id] = {
-                'good_unit_count': len(good_units),
-                'ca1_good_unit_count': ca1_good_units
-            }
-        
-        return probe_info
-
     def cleanup(self):
         """Cleans up resources to free memory."""
         self.session = None
@@ -267,7 +240,6 @@ class abi_visual_behaviour_loader(BaseLoader):
         # Let access fail explicitly (AttributeError) if they aren't.
         metadata = {
             'probe_id': probe_id,
-            'has_ca1_channels': False,
             'ca1_channel_count': 0,
             'ca1_span_microns': 0.0,
             'total_unit_count': 0,
@@ -294,7 +266,6 @@ class abi_visual_behaviour_loader(BaseLoader):
         # --- CA1 Analysis ---
         # Allow potential KeyErrors to propagate
         ca1_channels = probe_channels[probe_channels.structure_acronym == "CA1"]
-        metadata['has_ca1_channels'] = True # Set directly, assumes this called only for probes with CA1
         metadata['ca1_channel_count'] = len(ca1_channels)
 
         # Calculate CA1 span (unconditionally, assuming >1 channel)
@@ -303,11 +274,11 @@ class abi_visual_behaviour_loader(BaseLoader):
 
         # Calculate CA1 unit counts (unconditionally)
         ca1_channel_ids = ca1_channels.index
-        units_in_ca1 = probe_units[probe_units['channel_id'].isin(ca1_channel_ids)]
+        units_in_ca1 = probe_units[probe_units['ecephys_channel_id'].isin(ca1_channel_ids)]
         metadata['ca1_total_unit_count'] = len(units_in_ca1)
 
         # Good units in CA1 (using the pre-filtered good_units DataFrame)
-        good_units_in_ca1 = good_units[good_units['channel_id'].isin(ca1_channel_ids)]
+        good_units_in_ca1 = good_units[good_units['ecephys_channel_id'].isin(ca1_channel_ids)]
         metadata['ca1_good_unit_count'] = len(good_units_in_ca1)
 
         return metadata

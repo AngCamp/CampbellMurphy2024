@@ -1300,18 +1300,21 @@ def save_global_events(global_events, session_dir, session_id, label="global"):
     logging.info(f"Saved global events to {filepath}")
     return filepath
 
-def create_global_swr_events(probe_events_dict, swr_config, probe_info, session_subfolder, session_id):
+def create_global_swr_events(probe_events_dict, swr_config, probe_metadata_df, session_subfolder, session_id):
     """
-    Create global SWR events from probe-level events.
+    Create global SWR events from probe-level events, filtering probes based on metadata.
     
     Parameters
     ----------
     probe_events_dict : dict
-        Dictionary mapping probe IDs to event DataFrames
+        Dictionary mapping probe IDs (str) to event DataFrames
     swr_config : dict
-        Configuration parameters for global SWR detection
-    probe_info : dict
-        Dictionary mapping probe IDs to probe information dictionaries
+        Configuration parameters for global SWR detection (e.g., min_sw_power, 
+        min_filtered_events, min_ca1_units, merge_window, min_probe_count, 
+        global_rip_label)
+    probe_metadata_df : pd.DataFrame
+        DataFrame loaded from probe_metadata.csv.gz, containing columns like 
+        'probe_id' (str), 'ca1_good_unit_count'.
     session_subfolder : str
         Path to session directory
     session_id : str
@@ -1319,62 +1322,86 @@ def create_global_swr_events(probe_events_dict, swr_config, probe_info, session_
         
     Returns
     -------
-    pandas.DataFrame
-        Global events DataFrame
+    pd.DataFrame or None
+        Global events DataFrame, or None if no events pass filtering criteria.
     
     Raises
     ------
     ValueError
-        If no events pass filtering criteria
+        If no probe events are provided or if required columns are missing from metadata.
     """
     if not probe_events_dict:
-        raise ValueError("No probe events provided - probe_events_dict is empty")
+        logger.warning(f"Session {session_id}: No probe events provided to create_global_swr_events.")
+        return None # Changed from raise ValueError to return None, as this might be expected
     
+    if not all(col in probe_metadata_df.columns for col in ['probe_id', 'ca1_good_unit_count']):
+         raise ValueError("Probe metadata DataFrame is missing required columns ('probe_id', 'ca1_good_unit_count')")
+
     # Apply SW power filters to all collected events
     filtered_probe_events_dict = {}
-    for probe_id, events in probe_events_dict.items():
+    for probe_id_str, events in probe_events_dict.items():
         # Apply SW power threshold
         if 'sw_peak_power' in events.columns:
-            filtered_events = events[events['sw_peak_power'] >= swr_config['min_sw_power']]
-        elif 'SW_max_zscore' in events.columns:
-            filtered_events = events[events['SW_max_zscore'] >= swr_config['min_sw_power']]
+            filtered_events = events[events['sw_peak_power'] >= swr_config.get('min_sw_power', -np.inf)] # Use get with default
+        elif 'SW_max_zscore' in events.columns: # Check legacy name
+            filtered_events = events[events['SW_max_zscore'] >= swr_config.get('min_sw_power', -np.inf)]
         else:
-            filtered_events = events
+            # If no SW power column, maybe don't filter? Or require it?
+            logger.warning(f"Session {session_id} Probe {probe_id_str}: No SW power column found (sw_peak_power or SW_max_zscore). Skipping SW power filter.")
+            filtered_events = events # Keep all events if no power column
             
         # Store events if we have enough after filtering
-        if len(filtered_events) >= swr_config['min_filtered_events']:
-            filtered_probe_events_dict[probe_id] = filtered_events
+        if len(filtered_events) >= swr_config.get('min_filtered_events', 0): # Default min 1 event, 0 for debugging
+            filtered_probe_events_dict[probe_id_str] = filtered_events
     
     if not filtered_probe_events_dict:
-        raise ValueError(f"No probes have enough events after SW power filtering (min_filtered_events={swr_config['min_filtered_events']})")
+        logger.warning(f"Session {session_id}: No probes have enough events after SW power filtering (min_filtered_events={swr_config.get('min_filtered_events', 1)}).")
+        return None # Changed from raise ValueError
 
-    # Filter probes based on unit count
+    # Filter probes based on unit count using the metadata DataFrame
     unit_filtered_probe_events_dict = {}
-    for probe_id, events in filtered_probe_events_dict.items():
+    min_ca1_units_req = swr_config.get('min_ca1_units', 1) # Default min 1 unit
+    
+    for probe_id_str, events in filtered_probe_events_dict.items():
+        # Find the row for this probe in the metadata DataFrame
+        probe_row = probe_metadata_df[probe_metadata_df['probe_id'] == probe_id_str]
+        
+        if probe_row.empty:
+            logger.warning(f"Session {session_id}: Probe {probe_id_str} not found in metadata CSV. Skipping for unit filtering.")
+            continue
+        
+        # Get the unit count (handle potential multiple rows? Take first)
+        ca1_good_units = probe_row['ca1_good_unit_count'].iloc[0]
+            
         # Check if probe has enough CA1 units
-        if probe_id in probe_info and probe_info[probe_id].get('ca1_good_unit_count', 0) >= swr_config['min_ca1_units']:
-            unit_filtered_probe_events_dict[probe_id] = events
+        if ca1_good_units >= min_ca1_units_req:
+            unit_filtered_probe_events_dict[probe_id_str] = events
+        else:
+             logger.info(f"Session {session_id}: Probe {probe_id_str} excluded by unit count ({ca1_good_units} < {min_ca1_units_req}).")
 
     if not unit_filtered_probe_events_dict:
-        raise ValueError(f"No probes have enough CA1 units (min_ca1_units={swr_config['min_ca1_units']})")
+        logger.warning(f"Session {session_id}: No probes meet the minimum CA1 unit count criteria (min_ca1_units={min_ca1_units_req}).")
+        return None # Changed from raise ValueError
 
-    # Create global events
-    global_events = create_global_events(
-        unit_filtered_probe_events_dict,
-        merge_window=swr_config['merge_window'],
-        min_probe_count=swr_config['min_probe_count']
-    )
+    # Create global events using the unit-filtered probes
+    try:
+        global_events = create_global_events(
+            unit_filtered_probe_events_dict,
+            merge_window=swr_config.get('merge_window', 0.02),
+            min_probe_count=swr_config.get('min_probe_count', 1)
+        )
+    except ValueError as e_create:
+        # create_global_events raises ValueError if no intervals or merged events found
+        logger.warning(f"Session {session_id}: Error during global event creation: {e_create}")
+        return None
     
-    if global_events is None or len(global_events) == 0:
-        raise ValueError(f"No global events created after merging (min_probe_count={swr_config['min_probe_count']})")
-    
-    # Save global events
-    save_global_events(
-        global_events, 
-        session_subfolder, 
-        session_id, 
-        label=swr_config['global_rip_label']
-    )
+    # Note: Saving is handled back in process_session now
+    # save_global_events(
+    #     global_events, 
+    #     session_subfolder, 
+    #     session_id, 
+    #     label=swr_config.get('global_rip_label', 'global')
+    # )
     
     return global_events
 
@@ -1507,13 +1534,9 @@ def process_session(session_id, config):
             elif dataset_to_process == 'ibl':
                 results = loader.process_probe(this_probe, filter_ripple_band)
                 
-            # Skip if no results
-            if results is None:
-                logger.warning(f"Session {session_id}: No results for probe {probe_id_log}, skipping...")
-                continue
-                
+             
             # Extract results using the standardized key names
-            peakripple_chan_raw_lfp = results['peak_ripple_chan_raw_lfp']
+            peakripple_chan_raw_lfp = results['peak_ripple_raw_lfp']
             lfp_time_index = results['lfp_time_index']
             ca1_chans = results['ca1_channel_ids'] # Use standardized key
             outof_hp_chans_lfp = results['control_lfps']
@@ -1625,16 +1648,7 @@ def process_session(session_id, config):
                 sharp_wave_lfp=sharp_wave_lfp,
                 sharpwave_filter=sharpwave_filter
             )
-            
-            # Save SW component metadata if enabled
-            if save_lfp and hasattr(loader, 'sw_component_summary_stats_dict'):
-                channel_info_path = os.path.join(
-                    session_lfp_subfolder,
-                    f"probe_{probe_id_log}_sw_component_summary.json.gz"
-                )
-                with gzip.open(channel_info_path, 'wt', encoding='utf-8') as f:
-                    json.dump(loader.sw_component_summary_stats_dict, f)
-            
+                       
             # Detect gamma events
             process_stage = f"Detecting Gamma Events on probe with id {probe_id_log}"
             logger.info(f"Session {session_id}: Detecting gamma events on probe {probe_id_log}")
@@ -1719,44 +1733,54 @@ def process_session(session_id, config):
 
         # --- Save Probe Metadata CSV --- 
         # Saves metadata for all probes that were *successfully* processed (didn't return None)
-        if all_probe_metadata:
-            logger.info(f"Session {session_id}: Saving probe metadata CSV ({len(all_probe_metadata)} entries).")
-            metadata_df = pd.DataFrame(all_probe_metadata)
-            metadata_filename = f"session_{session_id}_probe_metadata.csv.gz"
-            metadata_filepath = os.path.join(session_subfolder, metadata_filename)
-            metadata_df.to_csv(metadata_filepath, index=False, compression="gzip")
-            logger.info(f"Session {session_id}: Saved probe metadata to {metadata_filepath}")
-        else:
-            logger.warning(f"Session {session_id}: No probe metadata collected (likely all probes failed or were skipped), CSV not saved.")
+        logger.info(f"Session {session_id}: Saving probe metadata CSV ({len(all_probe_metadata)} entries).")
+        metadata_df = pd.DataFrame(all_probe_metadata)
+        metadata_filename = f"session_{session_id}_probe_metadata.csv.gz"
+        metadata_filepath = os.path.join(session_subfolder, metadata_filename)
+        metadata_df.to_csv(metadata_filepath, index=False, compression="gzip")
+        logger.info(f"Session {session_id}: Saved probe metadata to {metadata_filepath}")
 
         # Process global ripples if we have probe events
         if probe_events_dict:
             process_stage = "Detecting Global Ripples"
             logger.info(f"Session {session_id}: Detecting global ripples")
             
-            # Get probe information for global event detection
-            probe_info = loader.global_events_probe_info()
-            
-            if probe_info is None:
-                logger.warning(f"Session {session_id}: Probe info for global filtering not available, skipping global detection.")
-            else:
-                # Create global events
+            # Load the probe metadata we just saved to use for filtering
+            try:
+                probe_metadata_df = pd.read_csv(metadata_filepath, compression='gzip')
+                # Convert probe_id column to string to ensure consistent type for matching keys
+                # (probe_events_dict keys are strings from probe_id_log)
+                if 'probe_id' in probe_metadata_df.columns:
+                     probe_metadata_df['probe_id'] = probe_metadata_df['probe_id'].astype(str)
+                else:
+                     raise ValueError("'probe_id' column missing from metadata CSV.")
+                     
+                # Create global events, passing the DataFrame instead of probe_info dict
                 global_events = create_global_swr_events(
                     probe_events_dict, 
                     global_swr_config, 
-                    probe_info, 
+                    probe_metadata_df, # Pass the loaded DataFrame
                     session_subfolder, 
                     session_id
                 )
                 
-                # Save global events if not None
-                if global_events is not None:
+                # Save global events if created successfully
+                # (create_global_swr_events now handles internal filtering logic)
+                if global_events is not None and not global_events.empty:
                     csv_filename = f"session_{session_id}_global_swr_events.csv.gz"
                     csv_path = os.path.join(session_subfolder, csv_filename)
-                    global_events.to_csv(csv_path, index=True, compression="gzip")
+                    global_events.to_csv(csv_path, index=True, compression="gzip") # Keep index=True?
                     logger.info(f"Session {session_id}: Created {len(global_events)} global events")
                 else:
-                    logger.info(f"Session {session_id}: No global events found that meet criteria")
+                    logger.info(f"Session {session_id}: No global events found that meet criteria after filtering.")
+            
+            except FileNotFoundError:
+                 logger.error(f"Session {session_id}: Probe metadata CSV file not found at {metadata_filepath}. Cannot proceed with global event detection.")
+            except Exception as e_global:
+                 logger.error(f"Session {session_id}: Error during global event processing: {e_global}")
+                 # Optionally re-raise if this should halt the session
+                 # raise e_global
+
         else:
             logger.warning(f"Session {session_id}: No probe events available for global detection")
         

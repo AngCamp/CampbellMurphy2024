@@ -341,42 +341,6 @@ class ibl_loader(BaseLoader):
         # Example: Use base class logic for now
         return super().select_ripple_channel(ca1_lfp, ca1_chan_ids, channel_positions, ripple_filter_func, config)
     
-    def global_events_probe_info(self):
-        """
-        Get probe-level information needed for global SWR detection.
-        
-        Returns
-        -------
-        dict
-            Dictionary mapping probe IDs to probe information dictionaries
-        """
-        probe_info = {}
-        
-        for i, probe_id in enumerate(self.probelist):
-            # Get the probe name at this index
-            probe_name = self.probenames[i]
-            
-            # Load spike sorting data
-            sl = SpikeSortingLoader(eid=self.session_id, pname=probe_name, one=self.one)
-            spikes, clusters, channels = sl.load_spike_sorting()
-            
-            # Merge clusters
-            clusters = sl.merge_clusters(spikes, clusters, channels)
-
-            # Filter for good units
-
-            good_units_acronym = clusters.acronym[clusters.label==1.0]
-            
-            # Count good units in CA1
-            ca1_good_units = sum( good_units_acronym == 'CA1')
-
-            probe_info[probe_id] = {
-                'good_unit_count': len(good_units_acronym),
-                'ca1_good_unit_count': ca1_good_units,
-            }
-        
-        return probe_info
-
     def cleanup(self):
         """Cleans up resources to free memory."""
         del self.one
@@ -412,16 +376,16 @@ class ibl_loader(BaseLoader):
         # --- Basic Setup ---
         # Assume ONE API and probe list/names are loaded via set_up / get_probe_ids_and_names
         # Let access fail explicitly if they aren't.
+        # Create dict to store results for this specific probe call
         metadata = {
-            'probe_id': probe_id,
-            'has_ca1_channels': False,
+            'probe_id': probe_id, # Included for clarity, though caller has it
+            # 'has_ca1_channels': True, # Excluded - Determined by caller context
             'ca1_channel_count': 0,
             'ca1_span_microns': 0.0,
             'total_unit_count': 0,
             'good_unit_count': 0,
             'ca1_total_unit_count': 0,
-            'ca1_good_unit_count': 0,
-            # 'has_nan_lfp': False # Placeholder if we add this later
+            'ca1_good_unit_count': 0
         }
 
         # --- Find probe name corresponding to probe_id (UUID) ---
@@ -449,7 +413,7 @@ class ibl_loader(BaseLoader):
         # CA1 channels
         # Assume 'acronym' column exists. Let access fail if missing.
         ca1_channels = channels[channels.acronym == 'CA1']
-        metadata['has_ca1_channels'] = True # Set directly, as this runs only for probes with CA1
+        # We know CA1 exists because this function is only called for such probes
         metadata['ca1_channel_count'] = len(ca1_channels)
 
         # Calculate CA1 span (unconditionally, assuming >1 channel)
@@ -466,5 +430,4 @@ class ibl_loader(BaseLoader):
 
         # Cleanup SpikeSortingLoader explicitly
         del sl, spikes, clusters, channels
-
         return metadata
