@@ -1,5 +1,5 @@
 #!/bin/bash
-
+export PYTHONDONTWRITEBYTECODE=1 # prevents pycache files from being created
 # Display help information
 show_help() {
   echo "SWR Neuropixels Detector Pipeline"

@@ -26,11 +26,44 @@ class abi_visual_coding_loader(BaseLoader):
         # Set up the cache
         config_path = os.environ.get('CONFIG_PATH', 'united_detector_config.yaml')
         with open(config_path, "r") as f:
-            config_content = f.read()
-            full_config = yaml.safe_load(config_content)
+            # Read the raw YAML content as a string
+            raw_yaml_content = f.read()
+            # Expand environment variables (handles $VAR or ${VAR})
+            expanded_yaml_content = os.path.expandvars(raw_yaml_content)
+            # Load the YAML from the expanded string
+            full_config = yaml.safe_load(expanded_yaml_content)
+            
         dataset_config = full_config["abi_visual_coding"]
-        sdk_cache_dir = dataset_config["sdk_cache_dir"]
+        # Prioritize environment variable for cache path, fallback to config
+        sdk_cache_dir = os.environ.get('ABI_VISUAL_CODING_SDK_CACHE', dataset_config["sdk_cache_dir"])
+        
+        # Ensure the cache directory exists before creating the manifest path
+        if not os.path.isdir(sdk_cache_dir):
+             raise FileNotFoundError(f"Specified SDK cache directory does not exist: {sdk_cache_dir}")
+             
         manifest_path = os.path.join(sdk_cache_dir, "manifest.json")
+        
+        # Check if manifest exists, create if not (as per AllenSDK example for first run)
+        # Although from_warehouse usually expects it, this handles first-time setup better.
+        if not os.path.exists(manifest_path):
+            print(f"Manifest file not found at {manifest_path}. Attempting to initialize cache...")
+            # Ensure parent directory exists before trying to initialize
+            os.makedirs(sdk_cache_dir, exist_ok=True) 
+            # Initialize cache to create manifest - may download small session/probe files
+            try:
+                print("Initializing EcephysProjectCache to potentially create manifest...")
+                temp_cache = EcephysProjectCache.from_warehouse(manifest=manifest_path)
+                # Attempt a basic operation to trigger manifest creation/download if needed
+                _ = temp_cache.get_session_table()
+                print("Cache initialized successfully.")
+                del temp_cache
+            except Exception as e_init:
+                print(f"Error initializing cache/creating manifest: {e_init}")
+                # Decide how to handle this - raise error or proceed cautiously?
+                # For now, let's raise to make the issue explicit
+                raise RuntimeError(f"Failed to initialize cache or create manifest at {manifest_path}") from e_init
+        
+        # Now, load the cache assuming the manifest exists
         self.cache = EcephysProjectCache.from_warehouse(manifest=manifest_path)
         
         # Set the sharp wave component filter path
