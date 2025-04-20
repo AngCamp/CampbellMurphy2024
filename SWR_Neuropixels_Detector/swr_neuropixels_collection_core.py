@@ -1516,11 +1516,9 @@ def process_session(session_id, config):
         
         # Process probes
         process_stage = "Running through the probes in the session"
-        icount = 0 # debugging
+        
         for this_probe in range(len(probelist)):
-            if icount > 0: # debugging
-                break # debugging
-            icount += 1 # debugging
+
             if dataset_to_process == 'ibl':
                 probe_name = probenames[this_probe]
             probe_id = probelist[this_probe]
@@ -1817,6 +1815,3 @@ def process_session(session_id, config):
         if 'session_subfolder' in locals() and os.path.exists(session_subfolder) and not os.listdir(session_subfolder):
             os.rmdir(session_subfolder)
             logger.warning(f"Session {session_id}: Removed empty session folder after error")
-        
-        # Re-raise the exception to ensure the failure is explicit
-        raise
