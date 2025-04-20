@@ -12,7 +12,7 @@ from ibldsp.voltage import destripe_lfp
 from iblatlas.atlas import AllenAtlas
 from iblatlas.regions import BrainRegions
 import logging
-
+from math import ceil
 
 # Import the BaseLoader
 from swr_neuropixels_collection_core import BaseLoader
@@ -136,19 +136,19 @@ class ibl_loader(BaseLoader):
         
         # Destripe data
         print(f"Destripping LFP data for probe {probe_id}...")
-        destriped = destripe_lfp(raw, fs=fs_from_sr)
-        print(f"Destriped shape: {destriped.shape}")
+        #destriped = destripe_lfp(raw, fs=fs_from_sr)
+        #print(f"Destriped shape: {destriped.shape}")
         
-        #fname = f"destriped_probe_{probe_id}.npz"
-        #path = os.path.join(os.getcwd(), fname)
+        fname = f"destriped_probe_{probe_id}.npz"
+        path = os.path.join(os.getcwd(), fname)
 
         # save compressed
         #np.savez_compressed(path, destriped=destriped)
 
         # later, to load
-        #destriped_data = np.load(path)
-        #destriped = destriped_data["destriped"]
-        #del destriped_data
+        destriped_data = np.load(path)
+        destriped = destriped_data["destriped"]
+        del destriped_data
         
         # normal code...
         del raw  # Free memory
@@ -178,8 +178,15 @@ class ibl_loader(BaseLoader):
         # _load_probe_data will now raise errors if essential data (like .cbin) is missing
         data = self._load_probe_data(probe_idx) 
         
-        # Extract channel positions into a Series (assuming keys 'id' and 'y')
-        all_channel_positions = pd.Series(data['channels']['y'], index=data['channels']['id'])
+        # Extract channel positions into a Series.
+        # Use 'rawInd' * 10 as a proxy for relative vertical position 
+        # This assumes an approximate 10µm spacing related to the raw index.
+        # Let potential KeyErrors propagate if 'rawInd' or 'id' are missing.
+        # all_channel_positions = pd.Series(data['channels']['axial_um'], index=data['channels']['rawInd'])
+        #all_channel_positions = pd.Series(data['channels']['rawInd'] * 10, index=data['channels']['rawInd'])
+        axial_um = [ceil(ind/2)*20 for ind in data['channels']['rawInd']]
+        all_channel_positions = pd.Series(axial_um, index=data['channels']['rawInd'])
+        
         
         #Resample control channels
         outof_hp_chans_lfp = []
@@ -272,7 +279,15 @@ class ibl_loader(BaseLoader):
         )
         print(f"Found {len(dsets)} datasets")
         
+        if not dsets:
+            raise FileNotFoundError(f"No datasets found for session {self.session_id}, probe {probe_name}")
+        
         self.data_files, _ = self.one.load_datasets(self.session_id, dsets, download_only=False)
+        
+        # Check if data_files is None or empty
+        if not self.data_files:
+            raise FileNotFoundError(f"Failed to load datasets for session {self.session_id}, probe {probe_name}")
+        
         bin_file = next((df for df in self.data_files if df.suffix == ".cbin"), None)
         
         if bin_file is None:
@@ -401,33 +416,37 @@ class ibl_loader(BaseLoader):
         sl = SpikeSortingLoader(eid=self.session_id, pname=probe_name, one=self.one, atlas=self.ba)
         spikes, clusters, channels = sl.load_spike_sorting(dataset_types=['clusters.metrics']) # Load metrics too
         clusters = sl.merge_clusters(spikes, clusters, channels) # Adds 'acronym' if missing? Check docs.
+        
+        clusters = clusters.to_df()
+        #channels = channels.to_df() # because they are easier to work with than AlfBunch objects
         print(f"Spike sorting data loaded for probe {probe_id}")
 
         # --- Calculate Metadata (Allow KeyErrors/AttributeErrors to propagate) ---
         metadata['total_unit_count'] = len(clusters)
 
-        # Good units (label == 1)
-        good_clusters = clusters[clusters.label == 1]
-        metadata['good_unit_count'] = len(good_clusters)
+        # Count good units in CA1 (using mask approach)
+        good_units_mask = (clusters.label == 1)
+        metadata['good_unit_count'] = np.sum(good_units_mask)
+        ca1_good_units = np.sum((clusters.acronym == 'CA1') & good_units_mask)
+        metadata['ca1_good_unit_count'] = ca1_good_units
 
-        # CA1 channels
-        # Assume 'acronym' column exists. Let access fail if missing.
-        ca1_channels = channels[channels.acronym == 'CA1']
-        # We know CA1 exists because this function is only called for such probes
-        metadata['ca1_channel_count'] = len(ca1_channels)
+        # Create CA1 mask
+        ca1_mask = (channels.acronym == 'CA1')
 
-        # Calculate CA1 span (unconditionally, assuming >1 channel)
-        ca1_depths = ca1_channels['y']
+        # Count CA1 channels
+        metadata['ca1_channel_count'] = np.sum(ca1_mask)
+
+        # Calculate CA1 span
+        ca1_depths = channels.axial_um[ca1_mask]
         metadata['ca1_span_microns'] = float(ca1_depths.max() - ca1_depths.min())
 
-        # Calculate CA1 unit counts (unconditionally)
-        ca1_channel_rawInds = ca1_channels['id']
-        units_in_ca1 = clusters[clusters['channels'].isin(ca1_channel_rawInds)]
-        metadata['ca1_total_unit_count'] = len(units_in_ca1)
+        # Get CA1 channel IDs for filtering units
+        ca1_channel_ids = channels.rawInd[ca1_mask]
 
-        good_units_in_ca1 = good_clusters[good_clusters['channels'].isin(ca1_channel_rawInds)]
-        metadata['ca1_good_unit_count'] = len(good_units_in_ca1)
-
+        # Count total units in CA1 region
+        in_ca1_mask = np.isin(clusters.channels, ca1_channel_ids)
+        metadata['ca1_total_unit_count'] = np.sum(in_ca1_mask)
+        
         # Cleanup SpikeSortingLoader explicitly
         del sl, spikes, clusters, channels
         return metadata
