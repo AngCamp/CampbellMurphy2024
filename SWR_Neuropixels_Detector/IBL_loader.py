@@ -136,21 +136,8 @@ class ibl_loader(BaseLoader):
         
         # Destripe data
         print(f"Destripping LFP data for probe {probe_id}...")
-        #destriped = destripe_lfp(raw, fs=fs_from_sr)
-        #print(f"Destriped shape: {destriped.shape}")
-        
-        fname = f"destriped_probe_{probe_id}.npz"
-        path = os.path.join(os.getcwd(), fname)
-
-        # save compressed
-        #np.savez_compressed(path, destriped=destriped)
-
-        # later, to load
-        destriped_data = np.load(path)
-        destriped = destriped_data["destriped"]
-        del destriped_data
-        
-        # normal code...
+        destriped = destripe_lfp(raw, fs=fs_from_sr)
+        print(f"Destriped shape: {destriped.shape}")
         del raw  # Free memory
         
         # Get CA1 channels

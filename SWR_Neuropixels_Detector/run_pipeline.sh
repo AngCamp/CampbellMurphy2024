@@ -1,5 +1,24 @@
 #!/bin/bash
-export PYTHONDONTWRITEBYTECODE=1 # prevents pycache files from being created
+
+# =====================================================================
+# IMPORTANT CONFIGURATION VARIABLES - EDIT THESE FOR YOUR ENVIRONMENT
+# =====================================================================
+
+# Output directory for all results
+export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_swr_data"}
+
+# Cache directories for datasets (where raw data is stored/downloaded)
+export ABI_VISUAL_CODING_SDK_CACHE=${ABI_VISUAL_CODING_SDK_CACHE:-"/space/scratch/allen_viscoding_data"}
+export ABI_VISUAL_BEHAVIOUR_SDK_CACHE=${ABI_VISUAL_BEHAVIOUR_SDK_CACHE:-"/space/scratch/allen_visbehave_data"}
+export IBL_ONEAPI_CACHE=${IBL_ONEAPI_CACHE:-"/space/scratch/IBL_data_cache"}
+
+# Run name used for organizing log files
+export RUN_NAME=${RUN_NAME:-"on_the_cluster"}
+
+# prevents pycache files from being created in working directory
+export PYTHONDONTWRITEBYTECODE=1 
+
+# =====================================================================
 # Display help information
 show_help() {
   echo "SWR Neuropixels Detector Pipeline"
@@ -207,15 +226,9 @@ if [[ "$OVERWRITE_EXISTING" == "true" ]]; then echo "- Overwriting existing data
 if [[ "$CLEANUP_AFTER" == "true" ]]; then echo "- Cleaning up after processing"; fi
 echo "========================================================"
 
-# Set run name
-export RUN_NAME=${RUN_NAME:-"on_the_cluster"}
-
 # Create a timestamp for this run
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 RUN_ID="${RUN_NAME}_${TIMESTAMP}"
-
-# Output directory (default is /space/scratch/SWR_final_pipeline/testing_dir)
-export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/muckingabout"}
 
 # Log directory goes under $OUTPUT_DIR/logs/$RUN_ID
 export LOG_DIR="${OUTPUT_DIR}/logs/${RUN_ID}"
@@ -234,11 +247,6 @@ if [[ "$OVERWRITE_EXISTING" == "true" ]]; then PYTHON_ARGS+=" --overwrite-existi
 if [[ "$CLEANUP_AFTER" == "true" ]]; then PYTHON_ARGS+=" --cleanup-after"; fi
 if [[ "$DEBUG_MODE" == "true" ]]; then PYTHON_ARGS+=" --debug"; fi
 PYTHON_ARGS+=" --config $CONFIG_PATH"
-
-# Where to find dataset caches
-export ABI_VISUAL_CODING_SDK_CACHE=${ABI_VISUAL_CODING_SDK_CACHE:-"/space/scratch/allen_viscoding_data"}
-export ABI_VISUAL_BEHAVIOUR_SDK_CACHE=${ABI_VISUAL_BEHAVIOUR_SDK_CACHE:-"/space/scratch/allen_visbehave_data"}
-export IBL_ONEAPI_CACHE=${IBL_ONEAPI_CACHE:-"/space/scratch/IBL_data_cache"}
 
 # Create output/log directories
 mkdir -p "$OUTPUT_DIR"

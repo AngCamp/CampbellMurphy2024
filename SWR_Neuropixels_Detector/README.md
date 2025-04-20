@@ -90,6 +90,22 @@ chmod +x run_pipeline.sh
 ./run_pipeline.sh 
 ```
 
+### Important Configuration Variables
+
+The most important configuration variables are now placed at the top of the `run_pipeline.sh` script for easy access:
+
+```bash
+# Output directory for all results
+export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/muckingabout"}
+
+# Cache directories for datasets (where raw data is stored/downloaded)
+export ABI_VISUAL_CODING_SDK_CACHE=${ABI_VISUAL_CODING_SDK_CACHE:-"/space/scratch/allen_viscoding_data"}
+export ABI_VISUAL_BEHAVIOUR_SDK_CACHE=${ABI_VISUAL_BEHAVIOUR_SDK_CACHE:-"/space/scratch/allen_visbehave_data"}
+export IBL_ONEAPI_CACHE=${IBL_ONEAPI_CACHE:-"/space/scratch/IBL_data_cache"}
+```
+
+You should edit these variables directly in the script to match your system's storage locations before running the pipeline.
+
 ### Dataset Selection
 
 There are two ways to specify which datasets to process:
@@ -201,6 +217,47 @@ Outputs are saved in the directory specified by `paths.swr_output_dir` in the co
 ## Logging
 
 Logs are saved to the directory specified by `paths.log_dir` (default: `./logs/`). A main `pipeline_run.log` file captures the overall process and errors.
+
+## Troubleshooting
+
+### Pipeline Hanging
+
+If the pipeline seems to hang when a session fails, this may be due to the multiprocessing error handling. When a worker process encounters an exception, the pipeline may not properly terminate or continue processing other sessions. To address this issue:
+
+1. **Check log files:** Look at the logs in the `LOG_DIR` to identify which session(s) may be causing the issue.
+
+2. **Run with fewer parallel sessions:** Reduce the `pool_size` value in your configuration file to process fewer sessions in parallel, which can help isolate problematic sessions.
+
+3. **Run specific problem sessions individually:** If you identify problematic sessions, you can run them individually with additional debugging:
+   ```bash
+   ./run_pipeline.sh subset ibl -d
+   ```
+
+4. **Memory issues:** Some sessions may fail due to memory constraints. If a worker process exceeds available memory, it may hang rather than crash properly. Consider increasing system memory or reducing the number of parallel workers.
+
+5. **One-by-one processing:** If you continue to experience hanging issues, you can modify the pipeline to process sessions one by one by setting `pool_size: 1` in your configuration.
+
+### Empty Session Directories
+
+The pipeline automatically cleans up empty session directories that might result from failed processing.
+
+### Memory Issues
+
+If you encounter memory issues, try adjusting the pool sizes in the configuration file:
+
+```yaml
+pool_sizes:
+  abi_visual_behaviour: 6  # Reduce this number if needed
+  abi_visual_coding: 6     # Reduce this number if needed
+  ibl: 2                   # Reduce this number if needed
+```
+
+### Missing Cache Directories
+
+If the pipeline fails to find data in the cache directories, ensure that:
+1. The paths at the top of `run_pipeline.sh` are correctly set to your local cache directories
+2. You have the necessary permissions to access these directories
+3. The cache directories contain the expected data structure for each dataset
 
 ## Debugging
 
@@ -426,27 +483,6 @@ OUTPUT_DIR/
 ├── logs/                              # Log files
 └── results/                           # Snakemake results and markers
 ```
-
-## Troubleshooting
-
-### Empty Session Directories
-
-The pipeline automatically cleans up empty session directories and logs them.
-
-### Memory Issues
-
-If you encounter memory issues, try adjusting the pool sizes in the configuration file:
-
-```yaml
-pool_sizes:
-  abi_visual_behaviour: 6  # Reduce this number if needed
-  abi_visual_coding: 6     # Reduce this number if needed
-  ibl: 2                   # Reduce this number if needed
-```
-
-### Log Files
-
-Check the log files in the `LOG_DIR` for detailed information about each dataset's processing.
 
 ## Citation
 
