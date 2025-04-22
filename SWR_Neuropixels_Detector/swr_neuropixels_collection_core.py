@@ -68,6 +68,7 @@ import gzip
 import string
 from botocore.config import Config
 import boto3
+import shutil
 
 
 # ===================================
@@ -1479,11 +1480,38 @@ def process_session(session_id, config):
                 logger.info(f"Session {session_id}: Output directory already exists and contains files. Skipping processing.")
                 return
             else:
-                logger.info(f"Session {session_id}: Output directory already exists but will be overwritten (--overwrite-existing flag).")
+                logger.info(f"Session {session_id}: Output directory exists and will be completely removed for clean overwrite.")
+                # Clean out the directory
+                for item in os.listdir(session_subfolder):
+                    item_path = os.path.join(session_subfolder, item)
+                    if os.path.isfile(item_path):
+                        os.unlink(item_path)
+                    elif os.path.isdir(item_path):
+                        shutil.rmtree(item_path)
+                # Recreate the empty directory
+                os.makedirs(session_subfolder, exist_ok=True)
         
         # Create LFP subfolder path
         if save_lfp:
             session_lfp_subfolder = os.path.join(lfp_output_dir_path, f"lfp_session_{str(session_id)}")
+        
+        # Add overwrite handling for LFP directory
+        if os.path.exists(session_lfp_subfolder) and os.listdir(session_lfp_subfolder):
+            if not overwrite_existing:
+                logger.info(f"Session {session_id}: LFP output directory already exists and contains files.")
+                # Continue processing, but don't save LFP data
+                save_lfp = False
+            else:
+                logger.info(f"Session {session_id}: LFP output directory exists and will be completely removed for clean overwrite.")
+                # Clean out the directory instead of removing it entirely
+                for item in os.listdir(session_lfp_subfolder):
+                    item_path = os.path.join(session_lfp_subfolder, item)
+                    if os.path.isfile(item_path):
+                        os.unlink(item_path)
+                    elif os.path.isdir(item_path):
+                        shutil.rmtree(item_path)
+                # Ensure directory still exists
+                os.makedirs(session_lfp_subfolder, exist_ok=True)
         
         # Set up logging
         process_stage = "Setting up"
@@ -1811,7 +1839,20 @@ def process_session(session_id, config):
             except Exception as e_cleanup:
                 logger.error(f"Session {session_id}: Error during loader cleanup after main exception: {e_cleanup}")
         
-        # Check if session subfolder exists and is empty
-        if 'session_subfolder' in locals() and os.path.exists(session_subfolder) and not os.listdir(session_subfolder):
-            os.rmdir(session_subfolder)
-            logger.warning(f"Session {session_id}: Removed empty session folder after error")
+        # Remove session directory if it exists (regardless of content)
+        if 'session_subfolder' in locals() and os.path.exists(session_subfolder):
+            try:
+                shutil.rmtree(session_subfolder)
+                logger.warning(f"Session {session_id}: Removed session folder after error")
+            except Exception as e_rm:
+                logger.error(f"Session {session_id}: Failed to remove session folder: {e_rm}")
+        
+        # Only try to remove the LFP directory if we were actually saving LFP data
+        if save_lfp and 'session_lfp_subfolder' in locals() and os.path.exists(session_lfp_subfolder):
+            try:
+                shutil.rmtree(session_lfp_subfolder)
+                logger.warning(f"Session {session_id}: Removed LFP folder after error")
+            except Exception as e_rm:
+                logger.error(f"Session {session_id}: Failed to remove LFP folder: {e_rm}")
+        
+

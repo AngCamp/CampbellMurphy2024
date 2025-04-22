@@ -36,17 +36,17 @@ show_help() {
   echo "                          Example: 'ibl' or 'ibl,abi_visual_behaviour'"
   echo ""
   echo "Options:"
-  echo "  -h, --help                 Show this help message and exit"
-  echo "  -c, --config FILE          Specify a custom configuration YAML file"
-  echo "                             (default: united_detector_config.yaml)"
-  echo "  -p, --run-putative         Run ONLY the Putative event detection stage"
-  echo "  -f, --run-filter           Run ONLY the event Filtering stage"
-  echo "  -g, --run-global           Run ONLY the Global event consolidation stage"
-  echo "  -s, --save-lfp             Enable saving of LFP data (overrides config)"
-  echo "  -m, --save-channel-metadata  Enable saving of channel selection metadata"
-  echo "  -o, --overwrite-existing   Overwrite existing session output folders"
-  echo "  -X, --cleanup-after        Clean up cache after processing each session"
-  echo "  -d, --debug                Enable debug mode (debugpy listening on port 5678)"
+  echo "  -h, --help                      Show this help message and exit"
+  echo "  -c, --config FILE               Specify a custom configuration YAML file"
+  echo "                                  (default: united_detector_config.yaml)"
+  echo "  -p, --run-putative              Run ONLY the Putative event detection stage"
+  echo "  -f, --run-filter                Run ONLY the event Filtering stage"
+  echo "  -g, --run-global                Run ONLY the Global event consolidation stage"
+  echo "  -s, --save-lfp, --save-lfp-data Enable saving of LFP data (overrides config)"
+  echo "  -m, --save-metadata             Enable saving of channel selection metadata"
+  echo "  -o, --overwrite, --overwrite-existing   Overwrite existing session output folders"
+  echo "  -X, --cleanup, --cleanup-after  Clean up cache after processing each session"
+  echo "  -d, --debug                     Enable debug mode (debugpy listening on port 5678)"
   echo ""
   echo "Examples:"
   echo "  ./run_pipeline.sh                          # Run all datasets with all stages"
@@ -54,6 +54,7 @@ show_help() {
   echo "  ./run_pipeline.sh subset ibl,abi_visual_behaviour   # Run IBL and ABI Visual Behaviour"
   echo "  ./run_pipeline.sh debug ibl               # Debug the IBL dataset"
   echo "  ./run_pipeline.sh subset ibl -p -s        # Run IBL with only putative stage and save LFP"
+  echo "  ./run_pipeline.sh subset ibl --save-lfp --run-putative  # Same as above with descriptive flags"
   echo ""
   echo "Environment Variables:"
   echo "  DATASET_TO_PROCESS         Alternative way to specify dataset to process"
@@ -152,16 +153,16 @@ while getopts "c:pfgsmoXdh-:" opt; do
         run-global)
           RUN_GLOBAL=true
           ;;
-        save-lfp)
+        save-lfp|save-lfp-data)
           SAVE_LFP=true
           ;;
-        save-channel-metadata)
+        save-metadata|save-channel-metadata)
           SAVE_CHANNEL_METADATA=true
           ;;
-        overwrite-existing)
+        overwrite|overwrite-existing)
           OVERWRITE_EXISTING=true
           ;;
-        cleanup-after)
+        cleanup|cleanup-after)
           CLEANUP_AFTER=true
           ;;
         debug)
@@ -221,7 +222,7 @@ if [[ "$RUN_PUTATIVE" == "true" ]]; then echo "- Running putative detection stag
 if [[ "$RUN_FILTER" == "true" ]]; then echo "- Running filtering stage"; fi
 if [[ "$RUN_GLOBAL" == "true" ]]; then echo "- Running global event stage"; fi
 if [[ "$SAVE_LFP" == "true" ]]; then echo "- Saving LFP data"; fi
-if [[ "$SAVE_CHANNEL_METADATA" == "true" ]]; then echo "- Saving channel metadata"; fi
+if [[ "$SAVE_CHANNEL_METADATA" == "true" ]]; then echo "- Saving channel selection metadata"; fi
 if [[ "$OVERWRITE_EXISTING" == "true" ]]; then echo "- Overwriting existing data"; fi
 if [[ "$CLEANUP_AFTER" == "true" ]]; then echo "- Cleaning up after processing"; fi
 echo "========================================================"
