@@ -23,6 +23,7 @@ from scipy import io, signal, stats, interpolate
 from scipy.signal import lfilter, hilbert, fftconvolve
 import scipy.ndimage
 from scipy.ndimage import gaussian_filter, gaussian_filter1d
+from scipy.stats import pearsonr
 
 # Multiprocessing
 from multiprocessing import Pool, Process, Queue, Manager, set_start_method
@@ -296,11 +297,22 @@ class BaseLoader:
         if ripple_amp.size < 10:
             return np.nan
 
-        weighted_cos = np.sum(ripple_amp * np.cos(sw_phase))
-        weighted_sin = np.sum(ripple_amp * np.sin(sw_phase))
-        R = np.sqrt(weighted_cos ** 2 + weighted_sin ** 2)
-        norm = np.sqrt(np.sum(ripple_amp ** 2))
-        return R / norm
+        sin_phi = np.sin(sw_phase)
+        cos_phi = np.cos(sw_phase)
+
+        r_s, _ = pearsonr(ripple_amp, sin_phi)
+        r_c, _ = pearsonr(ripple_amp, cos_phi)
+        r_sc, _ = pearsonr(sin_phi, cos_phi)
+
+        denominator = 1 - r_sc**2
+        if denominator <= 0:
+            return 0.0  # Safely assume no meaningful correlation
+
+        numerator = r_c**2 + r_s**2 - 2 * r_c * r_s * r_sc
+        r_cl = numerator / denominator
+        r_cl = max(0, r_cl)
+
+        return np.sqrt(r_cl)
 
     def select_sharpwave_channel(
             self,
@@ -966,15 +978,29 @@ def incorporate_sharp_wave_component_info(
         return (np.log(n_bins) - H) / np.log(n_bins)
 
     def _clcorr(mask: np.ndarray) -> float:
-        """Circular‑linear correlation (vector‑strength form)."""
+        """Circular‑linear correlation (Zar-style, bounded between 0 and 1)."""
         if mask.sum() < 10:
             return np.nan
+
         phi = sw_phase[mask]
         amp = ripple_amp[mask]
-        wc  = np.sum(amp * np.cos(phi))
-        ws  = np.sum(amp * np.sin(phi))
-        R   = np.sqrt(wc**2 + ws**2)
-        return R / np.sqrt(np.sum(amp**2))
+
+        sin_phi = np.sin(phi)
+        cos_phi = np.cos(phi)
+
+        r_s, _ = pearsonr(amp, sin_phi)
+        r_c, _ = pearsonr(amp, cos_phi)
+        r_sc, _ = pearsonr(sin_phi, cos_phi)
+
+        denominator = 1 - r_sc**2
+        if denominator <= 1e-8 or not np.isfinite(denominator):
+            return 0.0  # No meaningful circular variation
+
+        numerator = r_c**2 + r_s**2 - 2 * r_c * r_s * r_sc
+        r_cl = numerator / denominator
+        r_cl = max(0, r_cl)
+
+        return np.sqrt(r_cl)
 
     # ---------- iterate events ---------------------------------------------------
     out_df = events_df.copy()
