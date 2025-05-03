@@ -529,9 +529,7 @@ class SWRExplorer:
         events_df['max_speed_in_window'] = speeds
         filtered_events = events_df[events_df['max_speed_in_window'] <= max_speed]
         
-        # Preserve the multi-index structure
-        if isinstance(events_df.index, pd.MultiIndex):
-            filtered_events.index = events_df.index[filtered_events.index]
-        
+        # The filtered events will automatically maintain the same index structure
+        # as the original events_df, so we don't need to manually set it
         return filtered_events
 
