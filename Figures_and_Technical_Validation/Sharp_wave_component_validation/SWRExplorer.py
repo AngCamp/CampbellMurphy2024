@@ -10,6 +10,7 @@ from scipy.stats import zscore
 from pathlib import Path
 from tqdm import tqdm
 import re
+import glob
 
 class SWRExplorer:
     """
@@ -179,6 +180,14 @@ class SWRExplorer:
             raise ValueError("Invalid dataset, session_id, or probe_id")
             
         events = self.data[dataset][session_id][probe_id]['events'].copy()
+        print(f"[DEBUG] {dataset} {session_id} {probe_id} events columns: {list(events.columns)}, shape: {events.shape}")
+        if events.empty:
+            print(f"[INFO] No events for dataset={dataset}, session={session_id}, probe={probe_id}")
+        if 'overlaps_with_gamma' not in events.columns or 'overlaps_with_movement' not in events.columns:
+            print(f"[ERROR] Missing expected columns in events for dataset={dataset}, session={session_id}, probe={probe_id}")
+            print(f"Columns found: {list(events.columns)}")
+            print(f"File may be corrupted or from an old pipeline run.")
+            raise KeyError("Missing 'overlaps_with_gamma' or 'overlaps_with_movement' in event file!")
         
         # Apply filters
         mask = (
@@ -195,13 +204,15 @@ class SWRExplorer:
             
         filtered_events = events[mask].copy()
         
-        # Set the index to be a combination of dataset, session, and probe
-        filtered_events.index.name = f"{dataset}_{session_id}_{probe_id}"
+        # Add dataset, session, and probe information as columns
+        filtered_events['dataset'] = dataset
+        filtered_events['session_id'] = session_id
+        filtered_events['probe_id'] = probe_id
         
         # Ensure 'Unnamed: 0' is preserved as 'event_id'
         if 'Unnamed: 0' in filtered_events.columns:
             filtered_events = filtered_events.rename(columns={'Unnamed: 0': 'event_id'})
-            filtered_events = filtered_events.set_index('event_id', append=True)
+            filtered_events = filtered_events.set_index('event_id')
         
         return filtered_events.sort_values('sw_ripple_clcorr', ascending=False)
     
@@ -314,63 +325,71 @@ class SWRExplorer:
             
         return filtered_events.sort_values('sw_ripple_clcorr', ascending=False)
     
-    def plot_swr_event(self, events_df, event_idx, channel_pyramidal=None, channel_radiatum=None):
+    def plot_swr_event(self, events_df, event_idx, filter_path=None):
         """
-        Plot a single SWR event with detailed visualization.
+        Plot a detailed visualization of a specific SWR event, matching the reference plotting code.
+        Now automatically finds the correct LFP files for the probe in the session directory.
         
         Parameters:
         -----------
         events_df : pd.DataFrame
-            DataFrame containing filtered events with metadata
-        event_idx : int or str
-            Index of the event to plot in the DataFrame (can be either position or event_id)
-        channel_pyramidal : str, optional
-            Channel ID for pyramidal layer
-        channel_radiatum : str, optional
-            Channel ID for radiatum layer
+            DataFrame containing the events
+        event_idx : int
+            Index of the event to plot
+        filter_path : str
+            Path to the sharp wave filter npz file (must be provided)
         """
-        # Get the event data
-        if isinstance(event_idx, int):
-            event_data = events_df.iloc[event_idx]
-        else:
-            event_data = events_df.loc[event_idx]
+        if filter_path is None:
+            raise ValueError("You must provide filter_path to plot_swr_event. Pass it from your workflow file.")
         
-        # Extract dataset and session info from the index
-        if isinstance(events_df.index, pd.MultiIndex):
-            dataset, session_id, probe_id = events_df.index.names[0].split('_')
-        else:
-            dataset, session_id, probe_id = events_df.index.name.split('_')
+        # Get the event data
+        event = events_df.loc[event_idx]
+        dataset = event['dataset']
+        session_id = event['session_id']
+        probe_id = event['probe_id']
         
         # Set up paths
-        swr_dir = self.base_path / dataset / f"swrs_session_{session_id}"
-        lfp_dir = self.base_path / self.lfp_sources[dataset] / f"lfp_session_{session_id}"
-        filter_path = "/home/acampbell/NeuropixelsLFPOnRamp/SWR_Neuropixels_Detector/Filters/sharpwave_componenet_8to40band_1500hz_band.npz"
+        base_dir = str(self.base_path)
+        lfp_dir = os.path.join(base_dir, self.lfp_sources[dataset], f"lfp_session_{session_id}")
         
-        # Load LFP data
-        ripple_file = lfp_dir / f"probe_{probe_id}_channel_{channel_pyramidal}_lfp_ca1_peakripplepower.npz"
-        sharp_wave_file = lfp_dir / f"probe_{probe_id}_channel_{channel_radiatum}_lfp_ca1_sharpwave.npz"
-        time_file = lfp_dir / f"probe_{probe_id}_channel_{channel_pyramidal}_lfp_time_index_1500hz.npz"
+        # Find the correct LFP files for this probe
+        ripple_pattern = os.path.join(lfp_dir, f"probe_{probe_id}_channel*_lfp_ca1_peakripplepower.npz")
+        sharp_wave_pattern = os.path.join(lfp_dir, f"probe_{probe_id}_channel*_lfp_ca1_sharpwave.npz")
+        time_pattern = os.path.join(lfp_dir, f"probe_{probe_id}_channel*_lfp_time_index_1500hz.npz")
+        
+        ripple_files = glob.glob(ripple_pattern)
+        sharp_wave_files = glob.glob(sharp_wave_pattern)
+        time_files = glob.glob(time_pattern)
+        
+        if not ripple_files or not sharp_wave_files or not time_files:
+            raise FileNotFoundError(f"Could not find required LFP files for probe {probe_id} in session {session_id}")
+        
+        ripple_file = ripple_files[0]
+        sharp_wave_file = sharp_wave_files[0]
+        time_file = time_files[0]
         
         ripple_data = np.load(ripple_file)
         sharp_wave_data = np.load(sharp_wave_file)
         time_data = np.load(time_file)
         
-        # Extract data arrays
         ripple_signal = ripple_data['array'] if 'array' in ripple_data else ripple_data[ripple_data.files[0]]
         sharp_wave_signal = sharp_wave_data['array'] if 'array' in sharp_wave_data else sharp_wave_data[sharp_wave_data.files[0]]
         time_stamps = time_data['array'] if 'array' in time_data else time_data[time_data.files[0]]
         
-        # Load and apply sharp wave filter
+        # Load the sharp wave filter
         sw_filter_data = np.load(filter_path)
         sw_filter = sw_filter_data['sharpwave_componenet_8to40band_1500hz_band']
-        sharp_wave_filtered = fftconvolve(sharp_wave_signal, sw_filter, mode='same')
         
-        # Calculate time window
-        window_padding = max(0.05, (event_data['end_time'] - event_data['start_time']) * 3)
-        start_time = max(time_stamps[0], event_data['start_time'] - window_padding)
-        end_time = min(time_stamps[-1], event_data['end_time'] + window_padding)
+        # Filter the sharp wave signal
+        sharp_wave_filtered_full = fftconvolve(sharp_wave_signal, sw_filter, mode='same')
+        ripple_filtered_full = ripple_signal  # No additional filtering for ripple
         
-        # Find sample indices
+        # Calculate time window - tight focus on the ripple
+        window_padding = max(0.02, event['duration'] * 2)  # Padding is 2x the event duration or 20ms minimum
+        start_time = max(time_stamps[0], event['start_time'] - window_padding)
+        end_time = min(time_stamps[-1], event['end_time'] + window_padding)
+        
+        # Find sample indices using np.searchsorted for accurate indexing
         start_idx = np.searchsorted(time_stamps, start_time)
         end_idx = np.searchsorted(time_stamps, end_time)
         
@@ -378,57 +397,48 @@ class SWRExplorer:
         time_window = time_stamps[start_idx:end_idx]
         ripple_window = ripple_signal[start_idx:end_idx]
         sharp_wave_window = sharp_wave_signal[start_idx:end_idx]
-        sharp_wave_filtered_window = sharp_wave_filtered[start_idx:end_idx]
+        ripple_filtered_window = ripple_filtered_full[start_idx:end_idx]
+        sharp_wave_filtered_window = sharp_wave_filtered_full[start_idx:end_idx]
+        
+        # Z-score the filtered signals for this window
+        ripple_filtered_zscore = zscore(ripple_filtered_window)
+        sharp_wave_filtered_zscore = zscore(sharp_wave_filtered_window)
         
         # Create plot
-        fig, axes = plt.subplots(3, 1, figsize=(14, 10), sharex=True)
+        fig, axes = plt.subplots(3, 1, figsize=(12, 10))
         
-        # Plot pyramidal layer LFP
-        axes[0].plot(time_window, ripple_window, color='grey', linewidth=0.8)
-        axes[0].axvspan(event_data['start_time'], event_data['end_time'], alpha=0.2, color='red')
-        axes[0].set_ylabel('Putative Pyramidal Layer LFP', fontsize=12)
+        # Plot ripple power (raw)
+        axes[0].plot(time_window, ripple_window, color='blue', linewidth=0.75)
+        axes[0].axvspan(event['start_time'], event['end_time'], alpha=0.3, color='red')
+        axes[0].set_ylabel('Ripple Power (Raw)', fontsize=12)
+        axes[0].set_title(f'SWR Event {event_idx} - SW Peak Power: {event["sw_peak_power"]:.2f}, SW-Ripple MI: {event.get("sw_ripple_mi", np.nan):.3f}', fontsize=14)
+        # Add vertical line for ripple peak
+        if 'Peak_time' in event and not pd.isna(event['Peak_time']):
+            axes[0].axvline(event['Peak_time'], color='orange', linestyle='--', label='Ripple Peak')
+            axes[0].legend()
         
-        # Add title and event info
-        title = (f"SWR Event {event_idx} - Session: {session_id}, Probe: {probe_id}\n"
-                f"SW Peak Power: {event_data['sw_peak_power']:.2f}, "
-                f"SW-Ripple CLCORR: {event_data['sw_ripple_clcorr']:.3f}, "
-                f"Speed: {event_data['max_speed_in_window']:.2f} cm/s")
-        axes[0].set_title(title, fontsize=14)
+        # Plot sharp wave (raw)
+        axes[1].plot(time_window, sharp_wave_window, color='green', linewidth=0.75)
+        axes[1].axvspan(event['start_time'], event['end_time'], alpha=0.3, color='red')
+        axes[1].set_ylabel('Sharp Wave (Raw)', fontsize=12)
         
-        if 'Peak_time' in event_data and not pd.isna(event_data['Peak_time']):
-            axes[0].axvline(event_data['Peak_time'], color='orange', linestyle='--', label='Ripple Peak')
-            axes[0].legend(loc='upper right')
-        
-        # Plot radiatum layer LFP
-        axes[1].plot(time_window, sharp_wave_window, color='grey', linewidth=0.8)
-        axes[1].axvspan(event_data['start_time'], event_data['end_time'], alpha=0.2, color='red')
-        axes[1].set_ylabel('Putative S. Radiatum Layer LFP', fontsize=12)
-        
-        # Plot filtered signals
-        axes[2].plot(time_window, ripple_window, color='black', linewidth=1.2, 
-                    label='Pyramidal Layer')
-        axes[2].plot(time_window, sharp_wave_filtered_window, color='blue', linewidth=1.2, 
-                    label='Bandpassed S. Radiatum')
-        axes[2].axvspan(event_data['start_time'], event_data['end_time'], alpha=0.2, color='red')
-        axes[2].set_ylabel('Filtered Signals', fontsize=12)
+        # Plot filtered and z-scored signals
+        axes[2].plot(time_window, ripple_filtered_zscore, color='blue', linewidth=0.75, label='Ripple (Z-scored)')
+        axes[2].plot(time_window, sharp_wave_filtered_zscore, color='green', linewidth=0.75, label='Sharp Wave Band (Z-scored)')
+        axes[2].axvspan(event['start_time'], event['end_time'], alpha=0.3, color='red')
+        axes[2].set_ylabel('Z-scored Signals', fontsize=12)
         axes[2].set_xlabel('Time (s)', fontsize=12)
-        axes[2].legend(loc='upper right')
-        
-        # Add horizontal zero lines
-        for ax in axes:
-            ax.axhline(y=0, color='lightgrey', linestyle='-', alpha=0.5)
-            ax.set_xlim(time_window[0], time_window[-1])
+        axes[2].legend()
         
         # Add info text
-        info_text = (f"Duration: {event_data['duration']*1000:.1f} ms, "
-                    f"Max Z-score: {event_data['max_zscore']:.2f}, "
-                    f"SW-Ripple PLV: {event_data['sw_ripple_plv']:.3f}, "
-                    f"SW exceeds threshold: {event_data['sw_exceeds_threshold']}")
-        fig.suptitle(info_text, fontsize=12, y=0.95)
+        info_text = (f"Duration: {event['duration']*1000:.1f} ms, "
+                    f"Max Z-score: {event.get('max_zscore', np.nan):.2f}, "
+                    f"SW-Ripple PLV: {event.get('sw_ripple_plv', np.nan):.3f}, "
+                    f"SW exceeds threshold: {event.get('sw_exceeds_threshold', np.nan)}")
+        fig.suptitle(info_text, fontsize=12)
         
         plt.tight_layout()
-        plt.subplots_adjust(top=0.9)
-        plt.show()
+        return fig
     
     def get_allensdk_speed(self, running_speed_df, events_df, event_index='all', window=0.5, agg='mean'):
         """
