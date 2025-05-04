@@ -5,12 +5,13 @@ import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.signal import fftconvolve
+from scipy.signal import fftconvolve, butter, filtfilt, hilbert
 from scipy.stats import zscore
 from pathlib import Path
 from tqdm import tqdm
 import re
 import glob
+from ripple_detection import filter_ripple_band
 
 class SWRExplorer:
     """
@@ -328,16 +329,8 @@ class SWRExplorer:
     def plot_swr_event(self, events_df, event_idx, filter_path=None):
         """
         Plot a detailed visualization of a specific SWR event, matching the reference plotting code.
-        Now automatically finds the correct LFP files for the probe in the session directory.
-        
-        Parameters:
-        -----------
-        events_df : pd.DataFrame
-            DataFrame containing the events
-        event_idx : int
-            Index of the event to plot
-        filter_path : str
-            Path to the sharp wave filter npz file (must be provided)
+        Now uses the Allen/EdNeo ripple filter via ripple_detection.filter_ripple_band, and uses the array from the peakripplepower file as the raw LFP.
+        Adds a fourth panel for z-scored power (envelope) for both bands, and updates colors/line thicknesses.
         """
         if filter_path is None:
             raise ValueError("You must provide filter_path to plot_swr_event. Pass it from your workflow file.")
@@ -372,9 +365,13 @@ class SWRExplorer:
         sharp_wave_data = np.load(sharp_wave_file)
         time_data = np.load(time_file)
         
-        ripple_signal = ripple_data['array'] if 'array' in ripple_data else ripple_data[ripple_data.files[0]]
+        # Use the array from the peakripplepower file as the raw LFP
+        raw_lfp_signal = ripple_data['array'] if 'array' in ripple_data else ripple_data[ripple_data.files[0]]
         sharp_wave_signal = sharp_wave_data['array'] if 'array' in sharp_wave_data else sharp_wave_data[sharp_wave_data.files[0]]
         time_stamps = time_data['array'] if 'array' in time_data else time_data[time_data.files[0]]
+        
+        # Use the ripple filter
+        ripple_band_signal = filter_ripple_band(raw_lfp_signal[:, None])
         
         # Load the sharp wave filter
         sw_filter_data = np.load(filter_path)
@@ -382,7 +379,6 @@ class SWRExplorer:
         
         # Filter the sharp wave signal
         sharp_wave_filtered_full = fftconvolve(sharp_wave_signal, sw_filter, mode='same')
-        ripple_filtered_full = ripple_signal  # No additional filtering for ripple
         
         # Calculate time window - tight focus on the ripple
         window_padding = max(0.02, event['duration'] * 2)  # Padding is 2x the event duration or 20ms minimum
@@ -395,40 +391,55 @@ class SWRExplorer:
         
         # Extract window data
         time_window = time_stamps[start_idx:end_idx]
-        ripple_window = ripple_signal[start_idx:end_idx]
+        ripple_band_window = ripple_band_signal[start_idx:end_idx]
         sharp_wave_window = sharp_wave_signal[start_idx:end_idx]
-        ripple_filtered_window = ripple_filtered_full[start_idx:end_idx]
         sharp_wave_filtered_window = sharp_wave_filtered_full[start_idx:end_idx]
+        raw_lfp_window = raw_lfp_signal[start_idx:end_idx]
         
         # Z-score the filtered signals for this window
-        ripple_filtered_zscore = zscore(ripple_filtered_window)
+        ripple_band_zscore = zscore(ripple_band_window)
         sharp_wave_filtered_zscore = zscore(sharp_wave_filtered_window)
         
-        # Create plot
-        fig, axes = plt.subplots(3, 1, figsize=(12, 10))
+        # Compute analytic signal (envelope/power) and z-score for both bands
+        ripple_power = np.abs(hilbert(ripple_band_window))**2
+        sharp_wave_power = np.abs(hilbert(sharp_wave_filtered_window))**2
+        ripple_power_z = zscore(ripple_power)
+        sharp_wave_power_z = zscore(sharp_wave_power)
         
-        # Plot ripple power (raw)
-        axes[0].plot(time_window, ripple_window, color='blue', linewidth=0.75)
-        axes[0].axvspan(event['start_time'], event['end_time'], alpha=0.3, color='red')
+        # Create plot with 4 panels
+        fig, axes = plt.subplots(4, 1, figsize=(12, 13), sharex=True)
+        
+        # Panel 1: Raw LFP (thin, black)
+        axes[0].plot(time_window, raw_lfp_window, color='black', linewidth=0.5, label='Raw LFP (Pyramidal)')
+        axes[0].axvspan(event['start_time'], event['end_time'], alpha=0.3, color='green')
         axes[0].set_ylabel('Ripple Power (Raw)', fontsize=12)
-        axes[0].set_title(f'SWR Event {event_idx} - SW Peak Power: {event["sw_peak_power"]:.2f}, SW-Ripple MI: {event.get("sw_ripple_mi", np.nan):.3f}', fontsize=14)
-        # Add vertical line for ripple peak
-        if 'Peak_time' in event and not pd.isna(event['Peak_time']):
-            axes[0].axvline(event['Peak_time'], color='orange', linestyle='--', label='Ripple Peak')
-            axes[0].legend()
+        axes[0].set_title(
+            f'SWR Event {event_idx} - SW Peak Power: {event["sw_peak_power"]:.2f}, SW-Ripple MI: {event.get("sw_ripple_mi", np.nan):.3f}\n'
+            f'Start: {event["start_time"]:.3f}s, End: {event["end_time"]:.3f}s',
+            fontsize=14
+        )
+        axes[0].legend(loc='upper right')
         
-        # Plot sharp wave (raw)
-        axes[1].plot(time_window, sharp_wave_window, color='green', linewidth=0.75)
-        axes[1].axvspan(event['start_time'], event['end_time'], alpha=0.3, color='red')
+        # Panel 2: Raw sharp wave (thin, blue)
+        axes[1].plot(time_window, sharp_wave_window, color='blue', linewidth=0.5, label='Raw LFP (Sharp Wave)')
+        axes[1].axvspan(event['start_time'], event['end_time'], alpha=0.3, color='green')
         axes[1].set_ylabel('Sharp Wave (Raw)', fontsize=12)
+        axes[1].legend(loc='upper right')
         
-        # Plot filtered and z-scored signals
-        axes[2].plot(time_window, ripple_filtered_zscore, color='blue', linewidth=0.75, label='Ripple (Z-scored)')
-        axes[2].plot(time_window, sharp_wave_filtered_zscore, color='green', linewidth=0.75, label='Sharp Wave Band (Z-scored)')
-        axes[2].axvspan(event['start_time'], event['end_time'], alpha=0.3, color='red')
+        # Panel 3: Z-scored oscillatory signals (thick)
+        axes[2].plot(time_window, ripple_band_zscore, color='black', linewidth=1.5, label='Ripple Band (Z-scored)')
+        axes[2].plot(time_window, sharp_wave_filtered_zscore, color='blue', linewidth=1.5, label='Sharp Wave Band (Z-scored)')
+        axes[2].axvspan(event['start_time'], event['end_time'], alpha=0.3, color='green')
         axes[2].set_ylabel('Z-scored Signals', fontsize=12)
-        axes[2].set_xlabel('Time (s)', fontsize=12)
-        axes[2].legend()
+        axes[2].legend(loc='upper right')
+        
+        # Panel 4: Z-scored power (envelope) for both bands (thick)
+        axes[3].plot(time_window, ripple_power_z, color='black', linewidth=1.5, label='Ripple Power (Z-scored)')
+        axes[3].plot(time_window, sharp_wave_power_z, color='blue', linewidth=1.5, label='Sharp Wave Power (Z-scored)')
+        axes[3].axvspan(event['start_time'], event['end_time'], alpha=0.3, color='green')
+        axes[3].set_ylabel('Z-scored Power', fontsize=12)
+        axes[3].set_xlabel('Time (s)', fontsize=12)
+        axes[3].legend(loc='upper right')
         
         # Add info text
         info_text = (f"Duration: {event['duration']*1000:.1f} ms, "
