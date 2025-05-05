@@ -5,13 +5,15 @@ import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.signal import fftconvolve, butter, filtfilt, hilbert
+from scipy.signal import fftconvolve, butter, filtfilt, hilbert, gaussian, convolve
 from scipy.stats import zscore
 from pathlib import Path
 from tqdm import tqdm
 import re
 import glob
 from ripple_detection import filter_ripple_band
+from ripple_detection.core import gaussian_smooth
+import matplotlib as mpl
 
 class SWRExplorer:
     """
@@ -326,12 +328,25 @@ class SWRExplorer:
             
         return filtered_events.sort_values('sw_ripple_clcorr', ascending=False)
     
-    def plot_swr_event(self, events_df, event_idx, filter_path=None):
+    def plot_swr_event(self, events_df, event_idx, filter_path=None, show_ripple_peak=True, show_sharp_wave_peak=True, figsize_mm=(200, 150), ripple_power_thresh=None, sw_power_thresh=None, save_path=None):
         """
-        Plot a detailed visualization of a specific SWR event, matching the reference plotting code.
-        Now uses the Allen/EdNeo ripple filter via ripple_detection.filter_ripple_band, and uses the array from the peakripplepower file as the raw LFP.
-        Adds a fourth panel for z-scored power (envelope) for both bands, and updates colors/line thicknesses.
+        Plot a detailed visualization of a specific SWR event with publication-quality formatting.
+        - 3 panels: (1) Pyramidal LFP + ripple bandpass, (2) Sharp Wave LFP + sharp wave bandpass, (3) Z-scored power for both bands.
+        - All signals in microvolts (μV).
+        - Power is smoothed with a forward-facing half-Gaussian before z-scoring.
+        - Time axis is centered on the ripple peak.
+        - Optionally plot peak markers and threshold lines.
+        - All fonts bold, SVG output, customizable figure size.
         """
+        # Set SVG and font rcParams
+        mpl.rcParams["svg.fonttype"] = "none"
+        mpl.rcParams["text.usetex"] = False
+        mpl.rcParams["font.weight"] = "bold"
+        mpl.rcParams["axes.titleweight"] = "bold"
+        mpl.rcParams["axes.labelweight"] = "bold"
+        mpl.rcParams["font.size"] = 8
+        mpl.rcParams["pdf.use14corefonts"] = False
+        
         if filter_path is None:
             raise ValueError("You must provide filter_path to plot_swr_event. Pass it from your workflow file.")
         
@@ -371,7 +386,7 @@ class SWRExplorer:
         time_stamps = time_data['array'] if 'array' in time_data else time_data[time_data.files[0]]
         
         # Use the ripple filter
-        ripple_band_signal = filter_ripple_band(raw_lfp_signal[:, None])
+        ripple_band_signal = filter_ripple_band(raw_lfp_signal[:,None])
         
         # Load the sharp wave filter
         sw_filter_data = np.load(filter_path)
@@ -396,59 +411,114 @@ class SWRExplorer:
         sharp_wave_filtered_window = sharp_wave_filtered_full[start_idx:end_idx]
         raw_lfp_window = raw_lfp_signal[start_idx:end_idx]
         
+        # Convert to microvolts
+        raw_lfp_window_uv = raw_lfp_window * 1e6
+        sharp_wave_window_uv = sharp_wave_window * 1e6
+        ripple_band_window_uv = ripple_band_window * 1e6
+        sharp_wave_filtered_window_uv = sharp_wave_filtered_window * 1e6
+        
         # Z-score the filtered signals for this window
-        ripple_band_zscore = zscore(ripple_band_window)
-        sharp_wave_filtered_zscore = zscore(sharp_wave_filtered_window)
+        ripple_band_zscore = zscore(ripple_band_window_uv)
+        sharp_wave_filtered_zscore = zscore(sharp_wave_filtered_window_uv)
         
         # Compute analytic signal (envelope/power) and z-score for both bands
-        ripple_power = np.abs(hilbert(ripple_band_window))**2
-        sharp_wave_power = np.abs(hilbert(sharp_wave_filtered_window))**2
-        ripple_power_z = zscore(ripple_power)
-        sharp_wave_power_z = zscore(sharp_wave_power)
+        ripple_power = np.abs(hilbert(ripple_band_window_uv))**2
+        sharp_wave_power = np.abs(hilbert(sharp_wave_filtered_window_uv))**2
+        # Use ripple_detection's gaussian_smooth for smoothing
+        smoothing_sigma = 0.004
+        sampling_frequency = 1500
+        ripple_power_smooth = gaussian_smooth(ripple_power, sigma=smoothing_sigma, sampling_frequency=sampling_frequency)
+        #sharp_wave_power_smooth = gaussian_smooth(sharp_wave_power, sigma=smoothing_sigma, sampling_frequency=sampling_frequency)
+        sharp_wave_power_smooth = sharp_wave_power
+        ripple_power_z = zscore(ripple_power_smooth)
+        sharp_wave_power_z = zscore(sharp_wave_power_smooth)
         
-        # Create plot with 4 panels
-        fig, axes = plt.subplots(4, 1, figsize=(12, 13), sharex=True)
+        # Center time axis on ripple peak
+        peak_time = event['Peak_time'] if 'Peak_time' in event else event['start_time'] + event['duration']/2
+        time_rel = time_window - peak_time
         
-        # Panel 1: Raw LFP (thin, black)
-        axes[0].plot(time_window, raw_lfp_window, color='black', linewidth=0.5, label='Raw LFP (Pyramidal)')
-        axes[0].axvspan(event['start_time'], event['end_time'], alpha=0.3, color='green')
-        axes[0].set_ylabel('Ripple Power (Raw)', fontsize=12)
-        axes[0].set_title(
+        # Set up figure size in mm
+        width_mm, height_mm = figsize_mm
+        fig, axes = plt.subplots(3, 1, figsize=(width_mm / 25.4, height_mm / 25.4), sharex=True)
+        
+        # Panel 1: Pyramidal LFP (dark blue, thin, left y-axis, μV) + ripple bandpass (black, thick, right y-axis, μV)
+        ax1 = axes[0]
+        ax1.plot(time_rel, raw_lfp_window_uv, color='grey', linewidth=0.7, label='Putative Pyramidal Layer LFP (μV)')
+        ax1.axvspan(event['start_time']-peak_time, event['end_time']-peak_time, alpha=0.3, color='green')
+        ax1.axhline(0, color='grey', linewidth=0.7, linestyle='--')
+        ax1.set_ylabel('Pyramidal LFP (μV)', fontsize=10, fontweight='bold')
+        ax1.tick_params(axis='both', which='major', labelsize=8, width=1.2)
+        for label in ax1.get_xticklabels() + ax1.get_yticklabels():
+            label.set_fontweight('bold')
+        ax1.set_title(
             f'SWR Event {event_idx} - SW Peak Power: {event["sw_peak_power"]:.2f}, SW-Ripple MI: {event.get("sw_ripple_mi", np.nan):.3f}\n'
             f'Start: {event["start_time"]:.3f}s, End: {event["end_time"]:.3f}s',
-            fontsize=14
+            fontsize=12, fontweight='bold'
         )
-        axes[0].legend(loc='upper right')
+        # Right y-axis for bandpass
+        ax1b = ax1.twinx()
+        ax1b.plot(time_rel, ripple_band_window_uv, color='black', linewidth=1.5, label='Ripple Envelope')
+        ax1b.set_ylabel('Ripple Band (μV)', fontsize=10, fontweight='bold')
+        ax1b.tick_params(axis='y', labelsize=8, width=1.2)
+        for label in ax1b.get_yticklabels():
+            label.set_fontweight('bold')
+        # No legend for first panel
         
-        # Panel 2: Raw sharp wave (thin, blue)
-        axes[1].plot(time_window, sharp_wave_window, color='blue', linewidth=0.5, label='Raw LFP (Sharp Wave)')
-        axes[1].axvspan(event['start_time'], event['end_time'], alpha=0.3, color='green')
-        axes[1].set_ylabel('Sharp Wave (Raw)', fontsize=12)
-        axes[1].legend(loc='upper right')
+        # Panel 2: Sharp Wave LFP (blue, thin, left y-axis, μV) + sharp wave bandpass (blue, thick, right y-axis, μV)
+        ax2 = axes[1]
+        ax2.plot(time_rel, sharp_wave_window_uv, color='#003366', linewidth=0.7, label='S. Raiatum LFP (μV)')
+        ax2.axvspan(event['start_time']-peak_time, event['end_time']-peak_time, alpha=0.3, color='green')
+        ax2.axhline(0, color='grey', linewidth=0.7, linestyle='--')
+        ax2.set_ylabel('S. Raiatum LFP (μV)', fontsize=10, fontweight='bold')
+        ax2.tick_params(axis='both', which='major', labelsize=8, width=1.2)
+        for label in ax2.get_xticklabels() + ax2.get_yticklabels():
+            label.set_fontweight('bold')
+        # Right y-axis for bandpass
+        ax2b = ax2.twinx()
+        ax2b.plot(time_rel, sharp_wave_filtered_window_uv, color='blue', alpha=0.5, linewidth=1.5, label='Sharp Wave Band (a.u.)')
+        ax2b.set_ylabel('SW Band (μV)', fontsize=10, fontweight='bold')
+        ax2b.tick_params(axis='y', labelsize=8, width=1.2)
+        for label in ax2b.get_yticklabels():
+            label.set_fontweight('bold')
+        # No legend for second panel
         
-        # Panel 3: Z-scored oscillatory signals (thick)
-        axes[2].plot(time_window, ripple_band_zscore, color='black', linewidth=1.5, label='Ripple Band (Z-scored)')
-        axes[2].plot(time_window, sharp_wave_filtered_zscore, color='blue', linewidth=1.5, label='Sharp Wave Band (Z-scored)')
-        axes[2].axvspan(event['start_time'], event['end_time'], alpha=0.3, color='green')
-        axes[2].set_ylabel('Z-scored Signals', fontsize=12)
-        axes[2].legend(loc='upper right')
-        
-        # Panel 4: Z-scored power (envelope) for both bands (thick)
-        axes[3].plot(time_window, ripple_power_z, color='black', linewidth=1.5, label='Ripple Power (Z-scored)')
-        axes[3].plot(time_window, sharp_wave_power_z, color='blue', linewidth=1.5, label='Sharp Wave Power (Z-scored)')
-        axes[3].axvspan(event['start_time'], event['end_time'], alpha=0.3, color='green')
-        axes[3].set_ylabel('Z-scored Power', fontsize=12)
-        axes[3].set_xlabel('Time (s)', fontsize=12)
-        axes[3].legend(loc='upper right')
+        # Panel 3: Z-scored power (envelope) for both bands (thick)
+        ax3 = axes[2]
+        ax3.plot(time_rel, ripple_power_z, color='black', linewidth=1.5, label='Ripple Power (Z-scored)')
+        ax3.plot(time_rel, sharp_wave_power_z, color='blue', linewidth=1.5, label='Sharp Wave Power (Z-scored)')
+        ax3.axvspan(event['start_time']-peak_time, event['end_time']-peak_time, alpha=0.3, color='green')
+        ax3.axhline(0, color='grey', linewidth=0.7, linestyle='--')
+        ax3.set_ylabel('Z-scored Power', fontsize=10, fontweight='bold')
+        ax3.set_xlabel('Time from Ripple Peak (s)', fontsize=10, fontweight='bold')
+        ax3.tick_params(axis='both', which='major', labelsize=8, width=1.2)
+        for label in ax3.get_xticklabels() + ax3.get_yticklabels():
+            label.set_fontweight('bold')
+        # Plot peak markers if requested
+        if show_ripple_peak and 'Peak_time' in event and not pd.isna(event['Peak_time']):
+            peak_idx = np.argmin(np.abs(time_window - event['Peak_time']))
+            ax3.plot(time_rel[peak_idx], ripple_power_z[peak_idx], 'o', color='black', markersize=6, markeredgecolor='white', label='Ripple Peak')
+        if show_sharp_wave_peak and 'sw_peak_time' in event and not pd.isna(event['sw_peak_time']):
+            sw_peak_idx = np.argmin(np.abs(time_window - event['sw_peak_time']))
+            ax3.plot(time_rel[sw_peak_idx], sharp_wave_power_z[sw_peak_idx], 'o', color='blue', markersize=6, markeredgecolor='white', label='SW Peak')
+        # Plot vertical line at ripple peak (x=0)
+        ax3.axvline(0, color='grey', linestyle=':', linewidth=1.2)
+        # Plot threshold lines if provided
+        if ripple_power_thresh is not None:
+            ax3.axhline(ripple_power_thresh, color='black', linestyle=':', linewidth=1.2, label='Ripple Threshold')
+        if sw_power_thresh is not None:
+            ax3.axhline(sw_power_thresh, color='blue', linestyle=':', linewidth=1.2, label='SW Threshold')
+        ax3.legend(loc='upper right', fontsize=8, frameon=False)
         
         # Add info text
         info_text = (f"Duration: {event['duration']*1000:.1f} ms, "
                     f"Max Z-score: {event.get('max_zscore', np.nan):.2f}, "
                     f"SW-Ripple PLV: {event.get('sw_ripple_plv', np.nan):.3f}, "
                     f"SW exceeds threshold: {event.get('sw_exceeds_threshold', np.nan)}")
-        fig.suptitle(info_text, fontsize=12)
+        fig.suptitle(info_text, fontsize=10, fontweight='bold')
         
         plt.tight_layout()
+        if save_path:
+            fig.savefig(save_path, format='svg')
         return fig
     
     def get_allensdk_speed(self, running_speed_df, events_df, event_index='all', window=0.5, agg='mean'):
