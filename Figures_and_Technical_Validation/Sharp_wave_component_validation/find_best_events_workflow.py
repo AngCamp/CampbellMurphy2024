@@ -11,9 +11,6 @@ os.environ["PYTHONDONTWRITEBYTECODE"] = "1" # prevent pychace from being written
 # Path to sharp wave filter(s)
 # Main filter used for Allen/IBL Neuropixels LFP (1500 Hz):
 filter_path = "/home/acampbell/NeuropixelsLFPOnRamp/SWR_Neuropixels_Detector/Filters/sharpwave_componenet_8to40band_1500hz_band.npz"
-# Other available filters (uncomment and use as needed):
-# filter_path_30000hz = "/home/acampbell/NeuropixelsLFPOnRamp/SWR_Neuropixels_Detector/Filters/sharpwave_componenet_8to40band_30000hz_band.npz"
-# filter_path_2500hz = "/home/acampbell/NeuropixelsLFPOnRamp/SWR_NeuropixelsLFPOnRamp/SWR_Neuropixels_Detector/Filters/sharpwave_componenet_8to40band_2500hz_band.npz"
 
 def find_top_events(explorer, min_sw_power=1.5, min_duration=0.08, max_duration=0.1,
                    min_clcorr=0.8, max_speed=5.0, window=0.5, target_count=10):
