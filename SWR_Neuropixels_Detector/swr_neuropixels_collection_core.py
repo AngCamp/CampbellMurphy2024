@@ -502,116 +502,6 @@ class BaseLoader:
         """
         raise NotImplementedError("Each loader must implement global_events_probe_info")
 
-    def cleanup(self):
-        """Clean up resources."""
-        raise NotImplementedError("Subclasses must implement cleanup method")
-
-    def get_probe_unit_info(self, probe_id=None):
-        """
-        Returns information about units (neurons) for a specified probe.
-        Should return a DataFrame or similar structure with columns like:
-        'unit_id', 'quality_metric' (e.g., label, pass), 'structure_acronym'
-        
-        Parameters
-        ----------
-        probe_id : int or str, optional
-            The ID of the probe to get units for. If None, returns units for all probes.
-            
-        Returns
-        -------
-        pd.DataFrame
-            DataFrame containing unit information
-        """
-        raise NotImplementedError("Subclasses must implement get_probe_unit_info")
-
-    def select_ripple_channel(self, 
-                              ca1_lfp, 
-                              ca1_chan_ids, 
-                              channel_positions, 
-                              ripple_filter_func, 
-                              config=None):
-        """
-        Selects the CA1 channel with the highest ripple power and populates metadata.
-
-        Parameters:
-        ----------
-        ca1_lfp : np.ndarray
-            LFP data array (time, channels) for CA1 channels.
-        ca1_chan_ids : list of int
-            List of channel IDs corresponding to columns in ca1_lfp.
-        channel_positions : pd.Series
-            Series mapping channel IDs to vertical positions.
-        ripple_filter_func : callable
-            Function (e.g., ripple_detection.filter_ripple_band) to apply ripple filter.
-        config : dict, optional
-            Configuration dictionary.
-
-        Returns:
-        -------
-        tuple
-            - peak_chan_id (int): ID of the selected channel.
-            - peak_ripple_band_lfp (np.ndarray): Ripple-filtered LFP of the selected channel.
-            - peak_ripple_chan_lfp (np.ndarray): Raw LFP of the selected channel.
-            Returns (None, None, None) if no suitable channel found.
-        """
-        # --- Input Validation --- 
-
-        # --- Calculate Metrics for All CA1 Channels --- 
-        all_ripple_filtered = ripple_filter_func(ca1_lfp) # Apply filter to all CA1 channels
-        all_ripple_power = np.abs(signal.hilbert(all_ripple_filtered, axis=0)) ** 2
-        
-        ripple_metrics = {
-            'channel_ids': [],
-            'depths': [],
-            'skewness': [],
-            'net_power': [],
-            'max_power': [] # Store max power for selection
-        }
-        
-        for i, chan_id in enumerate(ca1_chan_ids):
-            power_trace = all_ripple_power[:, i]
-            skew = stats.skew(power_trace)
-            net_power = np.sum(power_trace)
-            max_power = np.max(power_trace)
-            
-            ripple_metrics['channel_ids'].append(int(chan_id))
-            # Directly access position - will raise KeyError if chan_id not found in channel_positions
-            ripple_metrics['depths'].append(float(channel_positions.loc[chan_id]))
-            # Removed try/except KeyError block
-
-            ripple_metrics['skewness'].append(float(skew) if pd.notna(skew) else None)
-            ripple_metrics['net_power'].append(float(net_power))
-            ripple_metrics['max_power'].append(float(max_power))
-
-        # --- Select Channel (Highest Max Power) --- 
-        # First, check for corrupted data (NaN or Inf in power metrics)
-        power_array = np.array(ripple_metrics['max_power'])
-        if np.isnan(power_array).any() or np.isinf(power_array).any():
-            raise ValueError(f"Corrupted LFP/power data (NaN or Inf detected) for channels {ripple_metrics['channel_ids']}. Cannot select ripple channel.")
-
-        # If data is clean, proceed with simple argmax
-        if power_array.size == 0:
-             # This case should ideally be caught earlier by input validation, but as a safeguard:
-             raise ValueError("No ripple power metrics calculated (empty array). Cannot select channel.")
-
-        peak_chan_idx = np.argmax(power_array)
-        peak_chan_id = ca1_chan_ids[peak_chan_idx]
-        peak_ripple_band_lfp = all_ripple_filtered[:, peak_chan_idx]
-        peak_ripple_chan_lfp = ca1_lfp[:, peak_chan_idx]
-        selection_method = "highest_max_power"
-
-        # --- Populate Metadata Dictionary --- 
-        self.channel_selection_metadata_dict['ripple_band']['channel_ids'] = ripple_metrics['channel_ids']
-        self.channel_selection_metadata_dict['ripple_band']['depths'] = ripple_metrics['depths']
-        self.channel_selection_metadata_dict['ripple_band']['skewness'] = ripple_metrics['skewness']
-        self.channel_selection_metadata_dict['ripple_band']['net_power'] = ripple_metrics['net_power']
-        self.channel_selection_metadata_dict['ripple_band']['selected_channel_id'] = int(peak_chan_id)
-        self.channel_selection_metadata_dict['ripple_band']['selection_method'] = selection_method
-
-        print(f"Selected ripple channel {peak_chan_id} based on {selection_method}.")
-
-        return peak_chan_id, peak_ripple_band_lfp, peak_ripple_chan_lfp
-
     def get_metadata_for_probe(self, probe_id, config=None):
         """
         Generates metadata for a single specified probe, focusing on unit counts
@@ -643,6 +533,218 @@ class BaseLoader:
             This base method must be implemented by each dataset-specific loader subclass.
         """
         raise NotImplementedError("Subclasses must implement get_metadata_for_probe method")
+
+    def extending_edeno_event_stats(self, events_df, time_values, ripple_filtered):
+        """
+        Extend event statistics with power-based metrics and envelope 90th percentile.
+        Primarily computes power metrics from the ripple band LFP data, but also includes
+        the 90th percentile of the smoothed envelope.
+        
+        Parameters
+        ----------
+        events_df : pd.DataFrame
+            Must contain 'start_time' and 'end_time' columns (seconds).
+        time_values : np.ndarray
+            Time vector (seconds) aligned to the LFP traces.
+        ripple_filtered : np.ndarray
+            Ripple-band filtered signal (same length as time_values).
+            
+        Returns
+        -------
+        pd.DataFrame
+            Copy of events_df with new power-based metrics and envelope percentile columns.
+        """
+        # Compute envelope and smooth it
+        envelope = np.abs(signal.hilbert(ripple_filtered))
+        smoothing_sigma = 0.004  # 4ms smoothing
+        envelope_smoothed = gaussian_filter1d(envelope, sigma=smoothing_sigma * 1500.0)  # 1500 Hz sampling rate
+        
+        # Compute power from smoothed envelope
+        ripple_power = envelope_smoothed ** 2
+        
+        # Z-score the power using global statistics
+        power_z = (ripple_power - np.mean(ripple_power)) / np.std(ripple_power)
+        
+        # Initialize lists for metrics
+        power_metrics = []
+        
+        # Process each event
+        for _, event in events_df.iterrows():
+            # Get event window
+            mask = (time_values >= event['start_time']) & (time_values <= event['end_time'])
+            event_power_z = power_z[mask]
+            event_envelope = envelope_smoothed[mask]
+            event_times = time_values[mask]
+            
+            # Compute metrics
+            metrics = {
+                'power_peak_time': event_times[np.argmax(event_power_z)],
+                'power_max_zscore': np.max(event_power_z),
+                'power_median_zscore': np.median(event_power_z),
+                'power_mean_zscore': np.mean(event_power_z),
+                'power_min_zscore': np.min(event_power_z),
+                'power_area': np.trapz(event_power_z, event_times),
+                'power_total_energy': np.sum(event_power_z),
+                'power_90th_percentile': np.percentile(event_power_z, 90),
+                'envelope_90th_percentile': np.percentile(event_envelope, 90)
+            }
+            power_metrics.append(metrics)
+        
+        # Convert to DataFrame and merge with events
+        power_df = pd.DataFrame(power_metrics)
+        
+        # Drop any existing power columns before merging
+        existing_power_cols = [col for col in events_df.columns if col.startswith('power_') or col == 'envelope_90th_percentile']
+        if existing_power_cols:
+            events_df = events_df.drop(columns=existing_power_cols)
+        
+        # Merge the power metrics with the original events DataFrame
+        events_df = pd.concat([events_df, power_df], axis=1)
+        
+        return events_df
+
+    def incorporate_sharp_wave_component_info(
+            self,
+            events_df: pd.DataFrame,
+            time_values: np.ndarray,
+            ripple_filtered: np.ndarray,
+            sharp_wave_lfp: np.ndarray,
+            sharpwave_filter: np.ndarray,
+            n_bins: int = 18
+    ) -> pd.DataFrame:
+        """
+        Add sharp‑wave metrics to each ripple event.
+
+        For every ripple (row) in *events_df* the function computes:
+        1. sw_exceeds_threshold      – True if sharp‑wave power (z‑score) > +1 SD at any point.
+        2. sw_peak_power             – Median sharp‑wave z‑score of samples ≥ 90th percentile
+                                       (robust peak estimate).
+        3. sw_peak_time              – Time (s) of the absolute peak sharp‑wave power.
+        4. sw_ripple_plv             – Phase‑locking value (PLV) between ripple and SW phase.
+        5. sw_ripple_mi              – Modulation index (Tort MI) between SW phase and ripple amp.
+        6. sw_ripple_clcorr          – Circular‑linear correlation between SW phase and ripple amp.
+
+        Parameters
+        ----------
+        events_df : pd.DataFrame
+            Must contain 'start_time' and 'end_time' columns (seconds).
+        time_values : np.ndarray
+            Time vector (seconds) aligned to the LFP traces.
+        ripple_filtered : np.ndarray
+            Ripple‑band filtered signal (same length as time_values).
+        sharp_wave_lfp : np.ndarray
+            Raw LFP from the selected sharp‑wave channel.
+        sharpwave_filter : np.ndarray
+            FIR/IIR kernel to isolate the 8–40 Hz sharp‑wave component.
+        n_bins : int, optional
+            Number of phase bins for MI calculation (default 18).
+
+        Returns
+        -------
+        pd.DataFrame
+            Copy of *events_df* with the six new columns listed above.
+        """
+        # ---------- analytic signals -------------------------------------------------
+        sw_filtered = signal.fftconvolve(sharp_wave_lfp, sharpwave_filter, mode="same")
+        sw_an       = signal.hilbert(sw_filtered)
+        sw_phase    = np.angle(sw_an)
+        sw_power    = np.abs(sw_an) ** 2
+        sw_power_z  = stats.zscore(sw_power)
+
+        ripple_an   = signal.hilbert(ripple_filtered)
+        ripple_phase = np.angle(ripple_an)
+        ripple_amp   = np.abs(ripple_an)
+
+        # ---------- helpers ----------------------------------------------------------
+        def _plv(mask: np.ndarray) -> float:
+            """Phase‑locking value."""
+            if mask.sum() < 10:
+                return np.nan
+            dphi = ripple_phase[mask] - sw_phase[mask]
+            return np.abs(np.mean(np.exp(1j * dphi)))
+
+        def _mi(mask: np.ndarray) -> float:
+            """Tort modulation index."""
+            if mask.sum() < 10:
+                return np.nan
+            phi = sw_phase[mask]
+            amp = ripple_amp[mask]
+            bins = np.linspace(-np.pi, np.pi, n_bins + 1)
+            digitized = np.digitize(phi, bins) - 1
+            amp_by_bin = np.array([
+                amp[digitized == j].mean() if np.any(digitized == j) else 0
+                for j in range(n_bins)
+            ])
+            if amp_by_bin.sum() == 0:
+                return np.nan
+            P = amp_by_bin / amp_by_bin.sum()
+            H = -np.sum(P * np.log(P + 1e-10))
+            return (np.log(n_bins) - H) / np.log(n_bins)
+
+        def _clcorr(mask: np.ndarray) -> float:
+            """Circular‑linear correlation (Zar-style, bounded between 0 and 1)."""
+            if mask.sum() < 10:
+                return np.nan
+
+            phi = sw_phase[mask]
+            amp = ripple_amp[mask]
+
+            sin_phi = np.sin(phi)
+            cos_phi = np.cos(phi)
+
+            r_s, _ = pearsonr(amp, sin_phi)
+            r_c, _ = pearsonr(amp, cos_phi)
+            r_sc, _ = pearsonr(sin_phi, cos_phi)
+
+            denominator = 1 - r_sc**2
+            if denominator <= 1e-8 or not np.isfinite(denominator):
+                return 0.0  # No meaningful circular variation
+
+            numerator = r_c**2 + r_s**2 - 2 * r_c * r_s * r_sc
+            r_cl = numerator / denominator
+            r_cl = max(0, r_cl)
+
+            return np.sqrt(r_cl)
+
+        # ---------- iterate events ---------------------------------------------------
+        out_df = events_df.copy()
+        exceeds, peak_pwr, peak_time, plv, mi, clcorr = ([] for _ in range(6))
+
+        for _, ev in events_df.iterrows():
+            mask = (time_values >= ev['start_time']) & (time_values <= ev['end_time'])
+            sw_z = sw_power_z[mask]
+
+            # 1. threshold flag
+            exceeds.append(bool(np.any(sw_z > 1)))
+
+            # 2‑3. robust peak power & its time
+            if sw_z.size:
+                q90 = np.quantile(sw_z, 0.9)
+                peak_pwr.append(np.median(sw_z[sw_z >= q90]))
+                peak_idx = np.argmax(sw_z)
+                peak_time.append(time_values[mask][peak_idx])
+            else:
+                peak_pwr.append(np.nan)
+                peak_time.append(np.nan)
+
+            # 4‑6. coupling metrics
+            plv.append(_plv(mask))
+            mi.append(_mi(mask))
+            clcorr.append(_clcorr(mask))
+
+        # ---------- add to dataframe -------------------------------------------------
+        out_df['sw_exceeds_threshold'] = exceeds
+        out_df['sw_peak_power']        = peak_pwr
+        out_df['sw_peak_time']         = peak_time
+        out_df['sw_ripple_plv']        = plv
+        out_df['sw_ripple_mi']         = mi
+        out_df['sw_ripple_clcorr']     = clcorr
+
+        return out_df
+
+    def cleanup(self):
+        """Clean up resources."""
+        raise NotImplementedError("Subclasses must implement cleanup method")
 
 # ===================================
 #  PROBE LEVEL EVENT DETECTOR
@@ -898,154 +1000,6 @@ def resample_signal(signal, times, new_rate):
 
     return new_signal, new_times
 
-
-def incorporate_sharp_wave_component_info(
-        events_df: pd.DataFrame,
-        time_values: np.ndarray,
-        ripple_filtered: np.ndarray,
-        sharp_wave_lfp: np.ndarray,
-        sharpwave_filter: np.ndarray,
-        n_bins: int = 18
-) -> pd.DataFrame:
-    """
-    Add sharp‑wave metrics to each ripple event.
-
-    For every ripple (row) in *events_df* the function computes:
-    1. sw_exceeds_threshold      – True if sharp‑wave power (z‑score) > +1 SD at any point.
-    2. sw_peak_power             – Median sharp‑wave z‑score of samples ≥ 90th percentile
-                                   (robust peak estimate).
-    3. sw_peak_time              – Time (s) of the absolute peak sharp‑wave power.
-    4. sw_ripple_plv             – Phase‑locking value (PLV) between ripple and SW phase.
-    5. sw_ripple_mi              – Modulation index (Tort MI) between SW phase and ripple amp.
-    6. sw_ripple_clcorr          – Circular‑linear correlation between SW phase and ripple amp.
-
-    Parameters
-    ----------
-    events_df : pd.DataFrame
-        Must contain 'start_time' and 'end_time' columns (seconds).
-    time_values : np.ndarray
-        Time vector (seconds) aligned to the LFP traces.
-    ripple_filtered : np.ndarray
-        Ripple‑band filtered signal (same length as time_values).
-    sharp_wave_lfp : np.ndarray
-        Raw LFP from the selected sharp‑wave channel.
-    sharpwave_filter : np.ndarray
-        FIR/IIR kernel to isolate the 8–40 Hz sharp‑wave component.
-    n_bins : int, optional
-        Number of phase bins for MI calculation (default 18).
-
-    Returns
-    -------
-    pd.DataFrame
-        Copy of *events_df* with the six new columns listed above.
-    """
-
-    # ---------- analytic signals -------------------------------------------------
-    sw_filtered = signal.fftconvolve(sharp_wave_lfp, sharpwave_filter, mode="same")
-    sw_an       = signal.hilbert(sw_filtered)
-    sw_phase    = np.angle(sw_an)
-    sw_power    = np.abs(sw_an) ** 2
-    sw_power_z  = stats.zscore(sw_power)
-
-    ripple_an   = signal.hilbert(ripple_filtered)
-    ripple_phase = np.angle(ripple_an)
-    ripple_amp   = np.abs(ripple_an)
-
-    # ---------- helpers ----------------------------------------------------------
-    def _plv(mask: np.ndarray) -> float:
-        """Phase‑locking value."""
-        if mask.sum() < 10:
-            return np.nan
-        dphi = ripple_phase[mask] - sw_phase[mask]
-        return np.abs(np.mean(np.exp(1j * dphi)))
-
-    def _mi(mask: np.ndarray) -> float:
-        """Tort modulation index."""
-        if mask.sum() < 10:
-            return np.nan
-        phi = sw_phase[mask]
-        amp = ripple_amp[mask]
-        bins = np.linspace(-np.pi, np.pi, n_bins + 1)
-        digitized = np.digitize(phi, bins) - 1
-        amp_by_bin = np.array([
-            amp[digitized == j].mean() if np.any(digitized == j) else 0
-            for j in range(n_bins)
-        ])
-        if amp_by_bin.sum() == 0:
-            return np.nan
-        P = amp_by_bin / amp_by_bin.sum()
-        H = -np.sum(P * np.log(P + 1e-10))
-        return (np.log(n_bins) - H) / np.log(n_bins)
-
-    def _clcorr(mask: np.ndarray) -> float:
-        """Circular‑linear correlation (Zar-style, bounded between 0 and 1)."""
-        if mask.sum() < 10:
-            return np.nan
-
-        phi = sw_phase[mask]
-        amp = ripple_amp[mask]
-
-        sin_phi = np.sin(phi)
-        cos_phi = np.cos(phi)
-
-        r_s, _ = pearsonr(amp, sin_phi)
-        r_c, _ = pearsonr(amp, cos_phi)
-        r_sc, _ = pearsonr(sin_phi, cos_phi)
-
-        denominator = 1 - r_sc**2
-        if denominator <= 1e-8 or not np.isfinite(denominator):
-            return 0.0  # No meaningful circular variation
-
-        numerator = r_c**2 + r_s**2 - 2 * r_c * r_s * r_sc
-        r_cl = numerator / denominator
-        r_cl = max(0, r_cl)
-
-        return np.sqrt(r_cl)
-
-    # ---------- iterate events ---------------------------------------------------
-    out_df = events_df.copy()
-    exceeds, peak_pwr, peak_time, plv, mi, clcorr = ([] for _ in range(6))
-
-    for _, ev in events_df.iterrows():
-        mask = (time_values >= ev['start_time']) & (time_values <= ev['end_time'])
-        sw_z = sw_power_z[mask]
-
-        # 1. threshold flag
-        exceeds.append(bool(np.any(sw_z > 1)))
-
-        # 2‑3. robust peak power & its time
-        if sw_z.size:
-            q90 = np.quantile(sw_z, 0.9)
-            peak_pwr.append(np.median(sw_z[sw_z >= q90]))
-            peak_idx = np.argmax(sw_z)
-            peak_time.append(time_values[mask][peak_idx])
-        else:
-            peak_pwr.append(np.nan)
-            peak_time.append(np.nan)
-
-        # 4‑6. coupling metrics
-        plv.append(_plv(mask))
-        mi.append(_mi(mask))
-        clcorr.append(_clcorr(mask))
-
-    # ---------- add to dataframe -------------------------------------------------
-    out_df['sw_exceeds_threshold'] = exceeds
-    out_df['sw_peak_power']        = peak_pwr
-    out_df['sw_peak_time']         = peak_time
-    out_df['sw_ripple_plv']        = plv
-    out_df['sw_ripple_mi']         = mi
-    out_df['sw_ripple_clcorr']     = clcorr
-
-    return out_df
-
-
-# ===================================
-#  PROBE LEVEL EVENT FILTERING
-#  -Thresholds applied here to probe level events
-# ===================================
-
-import pandas as pd
-import numpy as np
 
 def check_gamma_overlap(events_df, gamma_df):
     """
@@ -1616,7 +1570,7 @@ def process_session(session_id, config):
                 np.savez(
                     os.path.join(
                         session_lfp_subfolder,
-                        f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_lfp_ca1_peakripplepower.npz",
+                        f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_lfp_ca1_putative_pyramidal_layer.npz",
                     ),
                     lfp_ca1=peakripple_chan_raw_lfp,
                 )
@@ -1631,11 +1585,10 @@ def process_session(session_id, config):
                 # Save control channel data
                 for i in range(2):
                     channel_outside_hp = take_two[i]
-                    channel_outside_hp_str = f"channelsrawInd_{str(channel_outside_hp)}"
                     np.savez(
                         os.path.join(
                             session_lfp_subfolder,
-                            f"probe_{probe_id_log}_channel_{channel_outside_hp_str}_lfp_control_channel.npz",
+                            f"probe_{probe_id_log}_channel_{channel_outside_hp}_lfp_control_channel.npz",
                         ),
                         lfp_control_channel=outof_hp_chans_lfp[i],
                     )
@@ -1683,17 +1636,25 @@ def process_session(session_id, config):
                 np.savez(
                     os.path.join(
                         session_lfp_subfolder,
-                        f"probe_{probe_id_log}_channel_{sw_chan_id}_lfp_ca1_sharpwave.npz",
+                        f"probe_{probe_id_log}_channel_{sw_chan_id}_lfp_ca1_putative_str_radiatum.npz",
                     ),
                     lfp_ca1=sharp_wave_lfp,
                 )
             
-            # Incorporate sharp wave component info
+            # Incorporate power metrics 
+            logger.info(f"Session {session_id}: Incorporating power metrics for probe {probe_id_log}")
+            Karlsson_ripple_times = loader.extending_edeno_event_stats(
+                events_df=Karlsson_ripple_times,
+                time_values=lfp_time_index,
+                ripple_filtered=peakrippleband
+            )
+            
+            # Then incorporate sharp wave component info
             logger.info(f"Session {session_id}: Incorporating sharp wave component information for probe {probe_id_log}")
             sw_filter_data = np.load(sharp_wave_component_path)
             sharpwave_filter = sw_filter_data['sharpwave_componenet_8to40band_1500hz_band']
             
-            Karlsson_ripple_times = incorporate_sharp_wave_component_info(
+            Karlsson_ripple_times = loader.incorporate_sharp_wave_component_info(
                 events_df=Karlsson_ripple_times,
                 time_values=lfp_time_index,
                 ripple_filtered=peakrippleband,
