@@ -4,6 +4,8 @@
 import multiprocessing as mp
 import os
 import traceback
+import shutil
+import re
 
 if os.getenv("DEBUG_MODE") == "true" and mp.current_process().name == "MainProcess":
     import debugpy
@@ -62,7 +64,6 @@ from swr_neuropixels_collection_core import (
     event_boundary_detector,
     event_boundary_times,
     peaks_time_of_events,
-    incorporate_sharp_wave_component_info,
     check_gamma_overlap,
     check_movement_overlap,
     create_global_swr_events,
@@ -80,9 +81,7 @@ logging.addLevelName(MESSAGE, "MESSAGE")
 def listener_process(queue, log_dir, dataset_name, run_name):
     """
     This function listens for messages from the logging module and writes them to a log file.
-    It sets the logging level to MESSAGE so that only messages with level MESSAGE or higher are written to the log file.
-    This is a level we created to be between INFO and WARNING, so to see messages from this code and errors but not other
-    messages that are mostly irrelevant and make the log file too large and uninterpretable.
+    It sets the logging level to INFO so that we can see all session processing logs.
     """
     root = logging.getLogger()
     # Use passed arguments for dynamic log file path
@@ -91,7 +90,7 @@ def listener_process(queue, log_dir, dataset_name, run_name):
     f = logging.Formatter("%(name)s - %(levelname)s - %(message)s")
     h.setFormatter(f)
     root.addHandler(h)
-    root.setLevel(MESSAGE)
+    root.setLevel(logging.INFO)  # Changed from MESSAGE to INFO
 
     while True:
         message = queue.get()
@@ -131,7 +130,7 @@ def main():
     parser.add_argument("-g", "--run-global", action="store_true", help="Run Global event consolidation stage.")
     parser.add_argument("-C", "--cleanup-cache", action="store_true", help="Run cache cleanup after processing each session.")
     parser.add_argument("-s", "--save-lfp", action="store_true", help="Enable saving of LFP data.")
-    parser.add_argument("-m", "--save-channel-metadata", action="store_true", help="Enable saving of channel selection metadata.")
+    parser.add_argument("-m", "--save-channel-metadata", action="store_true", default=True, help="Enable saving of channel selection metadata.")
     parser.add_argument("-o", "--overwrite-existing", action="store_true", help="Overwrite existing session output.")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable debug mode (for internal script use).")
     # Add argument for config path if needed, overriding env var
@@ -297,7 +296,7 @@ def main():
     }
 
     # Start multiprocessing
-    # ==============================================================================
+    # ===============================================================================
     # Create a partially applied function with the consolidated configuration
     process_func_partial = partial(process_session, config=config)
     
@@ -308,7 +307,7 @@ def main():
         list(tqdm(p.imap(process_func_partial, all_sesh_with_ca1_eid), total=len(all_sesh_with_ca1_eid)))
 
     # Clean up
-    # ==============================================================================
+    # ===============================================================================
     # Signal listener to terminate and wait for it to complete
     queue.put("kill")
     listener.join()
@@ -328,8 +327,74 @@ def main():
                 logging.log(MESSAGE, f"Empty session folder found and removed: {session_id}")
                 print(f"Removing empty session folder: {folder_path}")
                 
+                # Create session subfolder paths
+                session_subfolder = os.path.join(swr_output_dir_path, f"swrs_session_{str(session_id)}")
+                
+                # Check if the session directory already exists and contains probe metadata
+                if os.path.exists(session_subfolder):
+                    metadata_file = os.path.join(session_subfolder, f"session_{session_id}_probe_metadata.csv.gz")
+                    if os.path.exists(metadata_file):
+                        logger.info(f"Session {session_id}: Output directory exists and contains probe metadata. Skipping processing.")
+                        return
+                    elif os.listdir(session_subfolder):
+                        if not args.overwrite_existing:
+                            logger.info(f"Session {session_id}: Output directory exists and contains files. Skipping processing.")
+                            return
+                        else:
+                            logger.info(f"Session {session_id}: Output directory exists and will be completely removed for clean overwrite.")
+                            # Clean out the directory
+                            files_to_remove = []
+                            for f in os.listdir(session_subfolder):
+                                # Putative/filter stage files
+                                if (args.run_putative or args.run_filter) and (
+                                    re.match(r"probe_.*_channel_.*_karlsson_detector_events\\.csv\\.gz", f) or
+                                    re.match(r"probe_.*_channel_.*_gamma_band_events\\.csv\\.gz", f) or
+                                    re.match(r"probe_.*_channel_.*_movement_artifacts\\.csv\\.gz", f) or
+                                    re.match(r"probe_.*_channel_selection_metadata\\.json\\.gz", f) or
+                                    re.match(r"session_.*_probe_metadata\\.csv\\.gz", f)
+                                ):
+                                    files_to_remove.append(f)
+                                # Global stage files
+                                if args.run_global and re.match(r"session_.*_global_swr_events\\.csv\\.gz", f):
+                                    files_to_remove.append(f)
+                            for f in set(files_to_remove):
+                                try:
+                                    os.remove(os.path.join(session_subfolder, f))
+                                except Exception as e:
+                                    print(f"Warning: Could not remove file {f}: {e}")
+                            # Recreate the empty directory
+                            os.makedirs(session_subfolder, exist_ok=True)
+                
+                # Create LFP subfolder path
+                if save_lfp:
+                    session_lfp_subfolder = os.path.join(lfp_output_dir_path, f"lfp_session_{str(session_id)}")
+                
+                # Add overwrite handling for LFP directory
+                if os.path.exists(session_lfp_subfolder) and os.listdir(session_lfp_subfolder):
+                    if not args.overwrite_existing:
+                        logger.info(f"Session {session_id}: LFP output directory already exists and contains files.")
+                        # Continue processing, but don't save LFP data
+                        save_lfp = False
+                    else:
+                        logger.info(f"Session {session_id}: LFP output directory exists and will be completely removed for clean overwrite.")
+                        # Clean out the directory instead of removing it entirely
+                        for item in os.listdir(session_lfp_subfolder):
+                            item_path = os.path.join(session_lfp_subfolder, item)
+                            if os.path.isfile(item_path):
+                                os.unlink(item_path)
+                            elif os.path.isdir(item_path):
+                                shutil.rmtree(item_path)
+                        # Ensure directory still exists
+                        os.makedirs(session_lfp_subfolder, exist_ok=True)
+                
                 # Remove the empty directory
                 os.rmdir(folder_path)
+                # Also remove the corresponding LFP session folder if save_lfp is enabled
+                if 'save_lfp' in locals() and save_lfp and lfp_output_dir_path is not None:
+                    lfp_session_dir = os.path.join(lfp_output_dir_path, f"lfp_session_{session_id}")
+                    if os.path.exists(lfp_session_dir):
+                        shutil.rmtree(lfp_session_dir)
+                        print(f"Removed LFP session folder: {lfp_session_dir}")
                 empty_folder_count += 1
 
     print(f"Removed {empty_folder_count} empty session folders")
