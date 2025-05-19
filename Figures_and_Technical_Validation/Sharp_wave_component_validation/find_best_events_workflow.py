@@ -11,6 +11,10 @@ os.environ["PYTHONDONTWRITEBYTECODE"] = "1" # prevent pychace from being written
 # Path to sharp wave filter(s)
 # Main filter used for Allen/IBL Neuropixels LFP (1500 Hz):
 filter_path = "/home/acampbell/NeuropixelsLFPOnRamp/SWR_Neuropixels_Detector/Filters/sharpwave_componenet_8to40band_1500hz_band.npz"
+envelope_mode = 'zscore'  # Options: 'zscore' or 'raw'
+info_on = False
+file_type = 'svg'
+output_dir = "top_swr_events/v2_version"
 
 def find_top_events(explorer, min_sw_power=1.5, min_duration=0.08, max_duration=0.1,
                    min_clcorr=0.8, max_speed=5.0, window=0.5, target_count=10):
@@ -47,6 +51,10 @@ def find_top_events(explorer, min_sw_power=1.5, min_duration=0.08, max_duration=
                         print(f"File may be corrupted or from an old pipeline run.")
                         raise KeyError("Missing 'overlaps_with_gamma' or 'overlaps_with_movement' in event file!")
                     print(f"[DEBUG] Loaded events for dataset={dataset}, session={session_id}, probe={probe_id}, columns={list(best_events.columns)}, shape={best_events.shape}")
+                    # Exclude events with power_max_zscore > 6
+                    #if 'power_max_zscore' in best_events.columns:
+                    #    powerfilt = (best_events['power_max_zscore'] <= 10) & (best_events['power_max_zscore'] >= 5)
+                    #    best_events = best_events[powerfilt]
                     all_candidates.append(best_events)
     if len(all_candidates) == 0:
         print("No events found matching criteria.")
@@ -107,9 +115,19 @@ def plot_and_save_events(explorer, events_df, output_dir):
         explorer.plot_swr_event(
             events_df=session_events,
             event_idx=event_id,
-            filter_path=filter_path
+            filter_path=filter_path,
+            envelope_mode=envelope_mode,
+            panels_to_plot=[
+                'raw_pyramidal_lfp',
+                'raw_s_radiatum_lfp',
+                'bandpass_signals',
+                'envelope',
+                'power',
+            ],
+            show_info_title=info_on,
+            show_peak_dots=True
         )
-        plt.savefig(f"{output_dir}/event_{idx+1}_session_{event['session_id']}_probe_{event['probe_id']}.png")
+        plt.savefig(f"{output_dir}/event_{idx+1}_{event.index+1}_session_{event['session_id']}_probe_{event['probe_id']}.{file_type}")
         plt.close()
 
 def main():
@@ -145,7 +163,7 @@ def main():
     plot_and_save_events(
         explorer=explorer,
         events_df=top_events,
-        output_dir="top_swr_events"
+        output_dir=output_dir
     )
 
 if __name__ == "__main__":

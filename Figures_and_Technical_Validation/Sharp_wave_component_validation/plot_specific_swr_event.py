@@ -17,6 +17,7 @@ image_type = 'svg'
 filter_path = os.path.join(
     os.sep, "home", "acampbell", "NeuropixelsLFPOnRamp", "SWR_Neuropixels_Detector", "Filters", "sharpwave_componenet_8to40band_1500hz_band.npz"
 )
+envelope_mode = 'zscore'  # Options: 'zscore' or 'raw'
 
 # Optional modular plotting options:
 window_padding = 0.02  # seconds - controls how much time we see around the event
@@ -81,10 +82,12 @@ for i, panel in enumerate(panels_to_plot):
         figsize_mm=figsize_mm,
         panels_to_plot=panel,  # Pass as a list containing just this panel
         time_per_mm=time_per_mm,
-        dpi=300  # Add high resolution
+        dpi=300,  # Add high resolution
+        envelope_mode=envelope_mode
     )
     # save the figure
     fig.savefig(output_filename, format=image_type, dpi=600, bbox_inches='tight')
     plt.close(fig)  # Close the figure to free memory
     if make_one_plot:
         break
+ 

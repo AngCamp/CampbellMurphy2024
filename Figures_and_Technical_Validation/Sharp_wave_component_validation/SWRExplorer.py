@@ -354,7 +354,7 @@ class SWRExplorer:
             raise ValueError(f"Event ID {event_id} not found in events for probe {probe_id}.")
         return events.loc[event_id]
 
-    def plot_swr_event(self, events_df, event_idx, filter_path=None, show_info_title=False, window_padding=None, figsize_mm=None, panels_to_plot=None, time_per_mm=None, **kwargs):
+    def plot_swr_event(self, events_df, event_idx, filter_path=None, show_info_title=False, window_padding=None, figsize_mm=None, panels_to_plot=None, time_per_mm=None, envelope_mode='zscore', show_peak_dots=False, **kwargs):
         """
         Plot a detailed visualization of a specific SWR event, with modular options.
         Parameters:
@@ -372,10 +372,15 @@ class SWRExplorer:
         figsize_mm : tuple, optional
             Figure size in mm (width, height). Default: (200, 200)
         panels_to_plot : list of str, optional
-            List of panels to plot. Options: ['raw_pyramidal_lfp','raw_s_radiatum_lfp','bandpassed_signals','power'].
-            Default: all four panels.
+            List of panels to plot. Options: ['ripple_band_zscore', 'sharp_wave_band_zscore', 'ripple_envelope_zscore', 'sharp_wave_envelope_zscore', 'power_zscore'].
+            Default: all five panels.
         time_per_mm : float, optional
             Seconds per mm for time axis scaling. If set, overrides figsize_mm width to match time window.
+        envelope_mode : str, optional
+            How to plot the envelope. Options: 'zscore' (default) or 'raw'.
+            'zscore' plots the z-scored envelope, 'raw' plots the smoothed envelope.
+        show_peak_dots : bool, optional
+            Whether to plot a dot at the peak (max z-score) for each envelope and power trace (default: False)
         kwargs : dict
             Additional arguments (e.g., save_path)
         Returns:
@@ -391,8 +396,8 @@ class SWRExplorer:
         probe_id = event['probe_id']
         base_dir = str(self.base_path)
         lfp_dir = os.path.join(base_dir, self.lfp_sources[dataset], f"lfp_session_{session_id}")
-        ripple_pattern = os.path.join(lfp_dir, f"probe_{probe_id}_channel*_lfp_ca1_peakripplepower.npz")
-        sharp_wave_pattern = os.path.join(lfp_dir, f"probe_{probe_id}_channel*_lfp_ca1_sharpwave.npz")
+        ripple_pattern = os.path.join(lfp_dir, f"probe_{probe_id}_channel*_lfp_ca1_putative_pyramidal_layer.npz")
+        sharp_wave_pattern = os.path.join(lfp_dir, f"probe_{probe_id}_channel*_lfp_ca1_putative_str_radiatum.npz")
         time_pattern = os.path.join(lfp_dir, f"probe_{probe_id}_channel*_lfp_time_index_1500hz.npz")
         ripple_files = glob.glob(ripple_pattern)
         sharp_wave_files = glob.glob(sharp_wave_pattern)
@@ -435,130 +440,184 @@ class SWRExplorer:
         # Calculate y_margin for LFP plots early
         y_margin = (lfp_max - lfp_min) * 0.05
 
-        ripple_band_zscore = zscore(ripple_band_window_uv)
-        sharp_wave_filtered_zscore = zscore(sharp_wave_filtered_window_uv)
-        ripple_power = np.abs(hilbert(ripple_band_window_uv))**2
-        sharp_wave_power = np.abs(hilbert(sharp_wave_filtered_window_uv))**2
-        smoothing_sigma = 0.004
+        ripple_envelope = np.abs(hilbert(ripple_band_window_uv))
+        sharp_wave_envelope = np.abs(hilbert(sharp_wave_filtered_window_uv))
+        
+        # Smooth envelopes using gaussian_smooth from ripple_detection
+        smoothing_sigma = 0.004  # 4ms smoothing
         sampling_frequency = 1500
-        ripple_power_smooth = gaussian_smooth(ripple_power, sigma=smoothing_sigma, sampling_frequency=sampling_frequency)
-        sharp_wave_power_smooth = gaussian_smooth(sharp_wave_power, sigma=smoothing_sigma, sampling_frequency=sampling_frequency)
-        ripple_power_z = zscore(ripple_power_smooth)
-        sharp_wave_power_z = zscore(sharp_wave_power_smooth)
-        power_min = min(ripple_power_z.min(), sharp_wave_power_z.min())
-        power_max = max(ripple_power_z.max(), sharp_wave_power_z.max())
-        marginfudge = 1.10
-        ytop = max(0.25, math.ceil(power_max * marginfudge / 0.25) * 0.25)
-        peak_time = event['Peak_time'] if 'Peak_time' in event else event['start_time'] + event['duration']/2
-        time_rel = time_window - peak_time
+        ripple_envelope_smooth = gaussian_smooth(ripple_envelope, sigma=smoothing_sigma, sampling_frequency=sampling_frequency)
+        sharp_wave_envelope_smooth = gaussian_smooth(sharp_wave_envelope, sigma=smoothing_sigma, sampling_frequency=sampling_frequency)
+        
+        # --- Compute full-session signals and z-score them ---
+        # Ripple band
+        full_ripple_file = os.path.join(lfp_dir, f"probe_{probe_id}_channel*_lfp_ca1_putative_pyramidal_layer.npz")
+        full_ripple_files = glob.glob(full_ripple_file)
+        full_ripple_data = np.load(full_ripple_files[0])
+        full_ripple_signal = full_ripple_data['array'] if 'array' in full_ripple_data else full_ripple_data[full_ripple_data.files[0]]
+        full_ripple_band = filter_ripple_band(full_ripple_signal[:, None])
+        full_ripple_band_z = zscore(full_ripple_band, axis=0)
+        full_ripple_envelope = np.abs(hilbert(full_ripple_band))
+        full_ripple_envelope_smooth = gaussian_smooth(full_ripple_envelope, sigma=smoothing_sigma, sampling_frequency=sampling_frequency)
+        full_ripple_envelope_z = zscore(full_ripple_envelope_smooth, axis=0)
+        full_ripple_power = full_ripple_envelope_smooth ** 2
+        full_ripple_power_z = zscore(full_ripple_power, axis=0)
+
+        # Sharp wave band
+        full_sharp_wave_file = os.path.join(lfp_dir, f"probe_{probe_id}_channel*_lfp_ca1_putative_str_radiatum.npz")
+        full_sharp_wave_files = glob.glob(full_sharp_wave_file)
+        full_sharp_wave_data = np.load(full_sharp_wave_files[0])
+        full_sharp_wave_signal = full_sharp_wave_data['array'] if 'array' in full_sharp_wave_data else full_sharp_wave_data[full_sharp_wave_data.files[0]]
+        sw_filter_data = np.load(filter_path)
+        sw_filter = sw_filter_data['sharpwave_componenet_8to40band_1500hz_band']
+        full_sharp_wave_filtered = fftconvolve(full_sharp_wave_signal, sw_filter, mode='same')
+        full_sharp_wave_band_z = zscore(full_sharp_wave_filtered, axis=0)
+        full_sharp_wave_envelope = np.abs(hilbert(full_sharp_wave_filtered))
+        full_sharp_wave_envelope_smooth = gaussian_smooth(full_sharp_wave_envelope, sigma=smoothing_sigma, sampling_frequency=sampling_frequency)
+        full_sharp_wave_envelope_z = zscore(full_sharp_wave_envelope_smooth, axis=0)
+        full_sharp_wave_power = full_sharp_wave_envelope_smooth ** 2
+        full_sharp_wave_power_z = zscore(full_sharp_wave_power, axis=0)
+
+        # --- Extract event window from z-scored full-session arrays ---
+        start_idx = np.searchsorted(time_stamps, start_time)
+        end_idx = np.searchsorted(time_stamps, end_time)
+        time_window = time_stamps[start_idx:end_idx]
+        time_rel = time_window - (event['start_time'] + event['duration']/2)
+        ripple_band_window_z = full_ripple_band_z[start_idx:end_idx].squeeze()
+        sharp_wave_band_window_z = full_sharp_wave_band_z[start_idx:end_idx].squeeze()
+        ripple_envelope_window_z = full_ripple_envelope_z[start_idx:end_idx].squeeze()
+        sharp_wave_envelope_window_z = full_sharp_wave_envelope_z[start_idx:end_idx].squeeze()
+        ripple_power_window_z = full_ripple_power_z[start_idx:end_idx].squeeze()
+        sharp_wave_power_window_z = full_sharp_wave_power_z[start_idx:end_idx].squeeze()
+
         # Modular panel selection
-        all_panels = ['raw_pyramidal_lfp','raw_s_radiatum_lfp','bandpassed_signals','power']
+        all_panels = [
+            'raw_pyramidal_lfp',
+            'raw_s_radiatum_lfp',
+            'bandpass_signals',
+            'envelope',
+            'power',
+        ]
         if panels_to_plot is None:
             panels_to_plot = all_panels
         n_panels = len(panels_to_plot)
         # Modular time-to-mm scaling
         time_window_size = end_time - start_time
-        # Use 500mm/second as the standard ratio (like the original plot showing 0.4s in 200mm)
-        width_mm = time_window_size * 500  # This gives us the proportional width
-        height_mm = 200  # Keep height constant
+        if show_info_title:
+            height_mm = 450
+        else:
+            height_mm = 200
+        width_mm = time_window_size * 500  # Proportional width
         figsize = (width_mm / 25.4, height_mm / 25.4)  # Convert to inches for matplotlib
 
-        fig, axes = plt.subplots(n_panels, 1, figsize=figsize, sharex=True)
+        fig, axes = plt.subplots(n_panels, 1, figsize=figsize, sharex=True, constrained_layout=show_info_title)
         if n_panels == 1:
             axes = [axes]
         panel_map = {name: i for i, name in enumerate(panels_to_plot)}
 
-        # Panel plotting with fixed y-axis limits
+        # Use event['peak_time'] if available, else midpoint
+        event_peak = event['peak_time'] if 'peak_time' in event else event['start_time'] + event['duration']/2
+        # 1. Raw LFP (Pyramidal)
         if 'raw_pyramidal_lfp' in panels_to_plot:
             ax = axes[panel_map['raw_pyramidal_lfp']]
             ax.plot(time_rel, raw_lfp_window_uv, color='black', linewidth=0.5, label='Raw LFP (Pyramidal)')
-            ax.axvspan(event['start_time']-peak_time, event['end_time']-peak_time, alpha=0.3, color='green')
+            ax.axvspan(event['start_time']-event_peak, event['end_time']-event_peak, alpha=0.3, color='green')
             ax.set_ylabel('Pyramidal Layer LFP (μV)', fontsize=12, fontweight='bold')
-            if show_info_title:
-                ax.set_title(
-                    f'SWR Event {event_idx} - SW Peak Power: {event["sw_peak_power"]:.2f}, SW-Ripple MI: {event.get("sw_ripple_mi", np.nan):.3f}\n'
-                    f'Start: {event["start_time"]:.3f}s, End: {event["end_time"]:.3f}s',
-                    fontsize=14, fontweight='bold'
-                )
             ax.legend(loc='upper right', frameon=True, fancybox=False)
-            # Ensure y-axis limits include the full signal range plus a small margin
-            ax.set_ylim(lfp_min - y_margin, lfp_max + y_margin)
-            ax.tick_params(axis='both', which='major', labelsize=8, width=1.2)
+            ax.margins(x=0)
             for label in ax.get_xticklabels() + ax.get_yticklabels():
                 label.set_fontweight('bold')
 
+        # 2. Raw LFP (Sharp Wave)
         if 'raw_s_radiatum_lfp' in panels_to_plot:
             ax = axes[panel_map['raw_s_radiatum_lfp']]
             ax.plot(time_rel, sharp_wave_window_uv, color='blue', linewidth=0.5, label='Raw LFP (Sharp Wave)')
-            ax.axvspan(event['start_time']-peak_time, event['end_time']-peak_time, alpha=0.3, color='green')
+            ax.axvspan(event['start_time']-event_peak, event['end_time']-event_peak, alpha=0.3, color='green')
             ax.set_ylabel('S. Radiatum LFP (μV)', fontsize=12, fontweight='bold')
             ax.legend(loc='upper right', frameon=True, fancybox=False)
-            # Use same y-axis limits as pyramidal LFP
-            ax.set_ylim(lfp_min - y_margin, lfp_max + y_margin)
-            ax.tick_params(axis='both', which='major', labelsize=8, width=1.2)
+            ax.margins(x=0)
             for label in ax.get_xticklabels() + ax.get_yticklabels():
                 label.set_fontweight('bold')
 
-        if 'bandpassed_signals' in panels_to_plot:
-            ax = axes[panel_map['bandpassed_signals']]
-            ax.plot(time_rel, ripple_band_zscore, color='black', linewidth=1.5, label='Ripple Band (Z-scored)')
-            ax.plot(time_rel, sharp_wave_filtered_zscore, color='blue', linewidth=1.5, label='Sharp Wave Band (Z-scored)')
-            ax.axvspan(event['start_time']-peak_time, event['end_time']-peak_time, alpha=0.3, color='green')
+        # 3. Bandpass signals (z-scored)
+        if 'bandpass_signals' in panels_to_plot:
+            ax = axes[panel_map['bandpass_signals']]
+            ax.plot(time_rel, ripple_band_window_z, color='black', linewidth=1.0, label='Ripple Band (Z-scored)')
+            ax.plot(time_rel, sharp_wave_band_window_z, color='blue', linewidth=1.0, label='Sharp Wave Band (Z-scored)')
+            ax.axvspan(event['start_time']-event_peak, event['end_time']-event_peak, alpha=0.3, color='green')
             ax.set_ylabel('Bandpass (Z-scored)', fontsize=12, fontweight='bold')
-            ax.legend(loc='upper right', frameon=True, fancybox=False)
-            # Set y-axis limits for z-scored signals
-            zscore_max = max(abs(ripple_band_zscore.max()), abs(ripple_band_zscore.min()),
-                           abs(sharp_wave_filtered_zscore.max()), abs(sharp_wave_filtered_zscore.min()))
-            zscore_margin = zscore_max * 0.05
-            ax.set_ylim(-zscore_max - zscore_margin, zscore_max + zscore_margin)
-            ax.tick_params(axis='both', which='major', labelsize=8, width=1.2)
+            ax.margins(x=0)
             for label in ax.get_xticklabels() + ax.get_yticklabels():
                 label.set_fontweight('bold')
 
+        # 4. Envelope (z-scored)
+        if 'envelope' in panels_to_plot:
+            ax = axes[panel_map['envelope']]
+            ax.plot(time_rel, ripple_envelope_window_z, color='black', linewidth=1.0, label='Ripple Envelope (Z-scored)')
+            ax.plot(time_rel, sharp_wave_envelope_window_z, color='blue', linewidth=1.0, label='Sharp Wave Envelope (Z-scored)')
+            # Compute local envelope peak in the event window
+            local_env_peak_idx = np.argmax(ripple_envelope_window_z)
+            local_env_peak_time = time_rel[local_env_peak_idx]
+            local_env_peak_value = ripple_envelope_window_z[local_env_peak_idx]
+            ax.plot(local_env_peak_time, local_env_peak_value, 'o', color='black', markersize=7, markeredgecolor='white', label='Envelope Max Z-score')
+            # Add 2 SD threshold line
+            ax.axhline(2, color='black', linestyle='--', label='Envelope Threshold (2 SD)')
+            ax.axvspan(event['start_time']-event_peak, event['end_time']-event_peak, alpha=0.3, color='green')
+            ax.set_ylabel('Envelope (Z-scored)', fontsize=12, fontweight='bold')
+            ax.margins(x=0)  # Remove x margin only
+            for label in ax.get_xticklabels() + ax.get_yticklabels():
+                label.set_fontweight('bold')
+
+        # 5. Power (z-scored)
         if 'power' in panels_to_plot:
             ax = axes[panel_map['power']]
-            line1, = ax.plot(time_rel, ripple_power_z, color='black', linewidth=1.5, label='Ripple Power (Z-scored)')
-            line2, = ax.plot(time_rel, sharp_wave_power_z, color='blue', linewidth=1.5, label='Sharp Wave Power (Z-scored)')
-            ax.axvspan(event['start_time']-peak_time, event['end_time']-peak_time, alpha=0.3, color='green')
-            ax.set_ylabel('Smoothed Power (Z-scored)', fontsize=12, fontweight='bold')
+            ax.plot(time_rel, ripple_power_window_z, color='black', linewidth=1.0, label='Ripple Power (Z-scored)')
+            ax.plot(time_rel, sharp_wave_power_window_z, color='blue', linewidth=1.0, label='Sharp Wave Power (Z-scored)')
+            if show_peak_dots:
+                # Ripple power peak: use power_peak_time and power_max_zscore
+                ripple_power_peak_time = event.get('power_peak_time', None)
+                ripple_power_peak_z = event.get('power_max_zscore', None)
+                if ripple_power_peak_time is not None and ripple_power_peak_z is not None:
+                    ax.plot(ripple_power_peak_time - (event['peak_time'] if 'peak_time' in event else event['start_time'] + event['duration']/2), ripple_power_peak_z, 'o', color='black', markersize=7, markeredgecolor='white', label='Ripple Power Peak')
+                # Sharp wave power peak: use sw_peak_time and sw_peak_power (these should be referenced to event_peak)
+                sharp_wave_power_peak_time = event.get('sw_peak_time', None)
+                sharp_wave_power_peak_z = event.get('sw_peak_power', None)
+                if sharp_wave_power_peak_time is not None and sharp_wave_power_peak_z is not None:
+                    ax.plot(sharp_wave_power_peak_time - event_peak, sharp_wave_power_peak_z, 'o', color='blue', markersize=7, markeredgecolor='white', label='Sharp Wave Power Peak')
+            ax.axhline(2.5, color='grey', linestyle='--', label='Ripple Threshold')
+            ax.axhline(1, color='blue', linestyle='--', label='Sharp Wave Threshold')
+            ax.axvspan(event['start_time']-event_peak, event['end_time']-event_peak, alpha=0.3, color='green')
+            ax.set_ylabel('Power (Z-scored)', fontsize=12, fontweight='bold')
             ax.set_xlabel('Time from Ripple Peak (s)', fontsize=12, fontweight='bold')
-            # Set y-axis limits for power plot
-            power_margin = (power_max - power_min) * 0.05
-            ax.set_ylim(power_min - power_margin, ytop + power_margin)
-
-            # Add peak time markers
-            dot_handles = []
-            dot_labels = []
-            if 'Peak_time' in event and not pd.isna(event['Peak_time']):
-                peak_idx = np.argmin(np.abs(time_window - event['Peak_time']))
-                dot1 = ax.plot(time_rel[peak_idx], ripple_power_z[peak_idx], 'o', color='black', markersize=7, markeredgecolor='white', label='Ripple Peak Power')[0]
-                dot_handles.append(dot1)
-                dot_labels.append('Ripple Peak Power')
-            if 'sw_peak_time' in event and not pd.isna(event['sw_peak_time']):
-                sw_peak_idx = np.argmin(np.abs(time_window - event['sw_peak_time']))
-                dot2 = ax.plot(time_rel[sw_peak_idx], sharp_wave_power_z[sw_peak_idx], 'o', color='blue', markersize=7, markeredgecolor='white', label='SW Peak Power')[0]
-                dot_handles.append(dot2)
-                dot_labels.append('SW Peak Power')
-
-            # Create unified legend with unique entries
-            handles, labels = ax.get_legend_handles_labels()
-            unique = {}
-            for h, l in zip(handles, labels):
-                if l not in unique:
-                    unique[l] = h
-            ax.legend(list(unique.values()), list(unique.keys()), loc='upper right', frameon=True, fancybox=False)
-            ax.tick_params(axis='both', which='major', labelsize=8, width=1.2)
+            ax.margins(x=0)  # Remove x margin only
             for label in ax.get_xticklabels() + ax.get_yticklabels():
                 label.set_fontweight('bold')
-
-            # Add detailed info title if requested
+            # Only add legend to the bottom panel, below the plot
             if show_info_title:
-                info_text = (f"Duration: {event['duration']*1000:.1f} ms, "
-                           f"Max Z-score: {event.get('max_zscore', np.nan):.2f}, "
-                           f"SW-Ripple PLV: {event.get('sw_ripple_plv', np.nan):.3f}, "
-                           f"SW exceeds threshold: {event.get('sw_exceeds_threshold', np.nan)}")
-                fig.suptitle(info_text, fontsize=12, fontweight='bold')
-        plt.tight_layout()
+                ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.32), ncol=2, fontsize=8, frameon=True)
+            else:
+                ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.18), ncol=2, fontsize=9, frameon=True)
+
+        # Display key values at the bottom of the figure
+        # Use event DataFrame columns for info block values
+        envelope_max_zscore = event.get('envelope_max_zscore', np.nan)
+        power_max_zscore = event.get('power_max_zscore', np.nan)
+        sw_peak_power = event.get('sw_peak_power', np.nan)
+        fig.text(0.5, 0.01, f"envelope_max_zscore: {envelope_max_zscore:.2f}   power_max_zscore: {power_max_zscore:.2f}   sw_peak_power: {sw_peak_power:.2f}",
+                 ha='center', va='bottom', fontsize=10, fontweight='bold')
+
+        # Add detailed info title if requested
+        if show_info_title:
+            info_text = (
+                f"Duration: {event['duration']*1000:.1f} ms\n"
+                f"Max {'Z-score' if envelope_mode=='zscore' else 'Envelope'}: {event.get('envelope_max_zscore', np.nan):.2f}\n"
+                f"SW-Ripple PLV: {event.get('sw_ripple_plv', np.nan):.3f}, SW-Ripple MI: {event.get('sw_ripple_mi', np.nan):.3f}, SW-Ripple CLCorr: {event.get('sw_ripple_clcorr', np.nan):.3f}"
+            )
+            fig.suptitle(info_text, fontsize=12, fontweight='bold')
+            plt.subplots_adjust(top=0.72)
+            plt.tight_layout(rect=[0, 0.03, 1, 0.93])
+        else:
+            plt.tight_layout(rect=[0, 0.03, 1, 1])
         if 'save_path' in kwargs and kwargs['save_path']:
             dpi = kwargs.get('dpi', 300)  # Default to 300 DPI for high resolution
             fig.savefig(kwargs['save_path'], format='svg', dpi=dpi, bbox_inches='tight')
