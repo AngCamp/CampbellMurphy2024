@@ -13,6 +13,8 @@ from iblatlas.atlas import AllenAtlas
 from iblatlas.regions import BrainRegions
 import logging
 from math import ceil
+from scipy.signal import hilbert
+from scipy.stats import skew as stats_skew
 
 # Import the BaseLoader
 from swr_neuropixels_collection_core import BaseLoader
@@ -335,14 +337,80 @@ class ibl_loader(BaseLoader):
         return control_data, control_channels
     
     def select_ripple_channel(self, ca1_lfp, ca1_chan_ids, channel_positions, ripple_filter_func, config=None):
-        """IBL-specific ripple channel selection (if needed)."""
-        # --- IBL specific logic here --- 
-        # Filter, calculate power/skew, populate metadata dict, select channel
-        # ... 
-        # return peak_chan_id, peak_ripple_band_lfp, peak_ripple_chan_lfp
-        # Example: Use base class logic for now
-        return super().select_ripple_channel(ca1_lfp, ca1_chan_ids, channel_positions, ripple_filter_func, config)
-    
+        """Select the putative pyramidal layer (ripple band) channel for a given probe.
+        
+        Parameters
+        ----------
+        ca1_lfp : np.ndarray
+            LFP data array containing signals from channels located in the CA1 region.
+            Expected shape: (time, channels).
+        ca1_chan_ids : list of int
+            List of unique channel identifiers corresponding to the columns in `ca1_lfp`.
+        channel_positions : pd.Series
+            A pandas Series where the index contains channel IDs (including those in 
+            `ca1_chan_ids` and potentially others) and the values are the vertical
+            positions (depths) of those channels on the probe.
+        ripple_filter_func : callable
+            Function to filter the LFP data into the ripple band.
+        config : dict, optional
+            Configuration dictionary (not used in this implementation).
+        
+        Returns
+        -------
+        tuple
+            - peak_chan_id (int): The channel ID selected as the best ripple channel.
+            - peak_ripple_band_lfp (np.ndarray): The ripple-band filtered signal from the selected channel.
+            - peak_ripple_chan_lfp (np.ndarray): The raw LFP signal from the selected channel.
+        """
+        # Initialize lists to store metrics for each channel
+        channel_metrics = []
+        
+        # Process each CA1 channel
+        for chan_idx, chan_id in enumerate(ca1_chan_ids):
+            # Get raw LFP for this channel
+            chan_lfp = ca1_lfp[:, chan_idx]
+            
+            # Filter to ripple band
+            ripple_band = ripple_filter_func(chan_lfp[:, None])
+            ripple_band = ripple_band.flatten()  # Remove extra dimension
+            
+            # Calculate power and skewness
+            ripple_power = np.abs(hilbert(ripple_band)) ** 2
+            net_power = np.sum(ripple_power)
+            skewness = stats_skew(ripple_power)
+            
+            # Store metrics
+            channel_metrics.append({
+                'channel_id': chan_id,
+                'depth': channel_positions.loc[chan_id],
+                'net_power': net_power,
+                'skewness': skewness,
+                'raw_lfp': chan_lfp,
+                'ripple_band': ripple_band
+            })
+            
+            # Update metadata dictionary
+            self.channel_selection_metadata_dict['ripple_band']['channel_ids'].append(int(chan_id))
+            self.channel_selection_metadata_dict['ripple_band']['depths'].append(float(channel_positions.loc[chan_id]))
+            self.channel_selection_metadata_dict['ripple_band']['skewness'].append(float(skewness))
+            self.channel_selection_metadata_dict['ripple_band']['net_power'].append(float(net_power))
+            
+        # Convert to DataFrame for easier selection
+        metrics_df = pd.DataFrame(channel_metrics)
+        
+        # Select channel with highest net power
+        best_channel = metrics_df.loc[metrics_df['net_power'].idxmax()]
+            
+        # Update metadata with selection info
+        self.channel_selection_metadata_dict['ripple_band']['selected_channel_id'] = int(best_channel['channel_id'])
+        self.channel_selection_metadata_dict['ripple_band']['selection_method'] = 'max_power'
+        
+        return (
+            best_channel['channel_id'],
+            best_channel['ripple_band'],
+            best_channel['raw_lfp']
+        )
+
     def cleanup(self):
         """Cleans up resources to free memory."""
         del self.one
