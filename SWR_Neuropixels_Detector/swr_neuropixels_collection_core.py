@@ -36,6 +36,7 @@ from botocore.config import Config
 import ripple_detection
 from ripple_detection import filter_ripple_band
 import ripple_detection.simulate as ripsim
+from ripple_detection.core import gaussian_smooth
 
 # Logging
 import logging
@@ -489,6 +490,10 @@ class BaseLoader:
         """Process a single probe."""
         raise NotImplementedError("Subclasses must implement process_probe method")
     # Add to BaseLoader class in swr_neuropixels_collection_core.py
+    
+    def select_ripple_channel(self, ca1_lfp, ca1_chan_ids, channel_positions, ripple_filter_func, config=None):
+        """Select the putative pyramidal layer (ripple band) channel for a given probe."""
+        raise NotImplementedError("Subclasses must implement select_ripple_channel")
 
     def global_events_probe_info(self):
         """
@@ -554,10 +559,22 @@ class BaseLoader:
         pd.DataFrame
             Copy of events_df with new power-based metrics and envelope percentile columns.
         """
+        # Rename envelope-based metrics from Karlsson detector
+        envelope_columns = {
+            'max_thresh': 'envelope_max_thresh',
+            'mean_zscore': 'envelope_mean_zscore',
+            'median_zscore': 'envelope_median_zscore',
+            'max_zscore': 'envelope_max_zscore',
+            'min_zscore': 'envelope_min_zscore',
+            'area': 'envelope_area',
+            'total_energy': 'envelope_total_energy'
+        }
+        events_df = events_df.rename(columns=envelope_columns)
+        
         # Compute envelope and smooth it
         envelope = np.abs(signal.hilbert(ripple_filtered))
         smoothing_sigma = 0.004  # 4ms smoothing
-        envelope_smoothed = gaussian_filter1d(envelope, sigma=smoothing_sigma * 1500.0)  # 1500 Hz sampling rate
+        envelope_smoothed = gaussian_smooth(envelope, sigma=smoothing_sigma, sampling_frequency=1500.0)  # 1500 Hz sampling rate
         
         # Compute power from smoothed envelope
         ripple_power = envelope_smoothed ** 2
@@ -583,8 +600,6 @@ class BaseLoader:
                 'power_median_zscore': np.median(event_power_z),
                 'power_mean_zscore': np.mean(event_power_z),
                 'power_min_zscore': np.min(event_power_z),
-                'power_area': np.trapz(event_power_z, event_times),
-                'power_total_energy': np.sum(event_power_z),
                 'power_90th_percentile': np.percentile(event_power_z, 90),
                 'envelope_90th_percentile': np.percentile(event_envelope, 90)
             }
@@ -592,11 +607,6 @@ class BaseLoader:
         
         # Convert to DataFrame and merge with events
         power_df = pd.DataFrame(power_metrics)
-        
-        # Drop any existing power columns before merging
-        existing_power_cols = [col for col in events_df.columns if col.startswith('power_') or col == 'envelope_90th_percentile']
-        if existing_power_cols:
-            events_df = events_df.drop(columns=existing_power_cols)
         
         # Merge the power metrics with the original events DataFrame
         events_df = pd.concat([events_df, power_df], axis=1)
@@ -1155,18 +1165,13 @@ def add_participating_probes(global_events, probe_events_dict, offset=0.02):
                 
                 # Get peak time and power from the strongest overlapping event
                 overlapping_events = probe_df[overlap]
-                if 'Peak_time' in overlapping_events.columns and 'max_zscore' in overlapping_events.columns:
-                    max_idx = overlapping_events['max_zscore'].idxmax()
-                    global_events.at[i, 'peak_times'].append(overlapping_events.loc[max_idx, 'Peak_time'])
-                    global_events.at[i, 'peak_powers'].append(overlapping_events.loc[max_idx, 'max_zscore'])
-                elif 'Peak_time' in overlapping_events.columns:
-                    max_idx = overlapping_events.index[0]
-                    global_events.at[i, 'peak_times'].append(overlapping_events.loc[max_idx, 'Peak_time'])
-                    global_events.at[i, 'peak_powers'].append(3.0)  # Default value
-    
+                max_idx = overlapping_events['power_max_zscore'].idxmax()
+                global_events.at[i, 'peak_times'].append(overlapping_events.loc[max_idx, 'power_peak_time'])
+                global_events.at[i, 'peak_powers'].append(overlapping_events.loc[max_idx, 'power_max_zscore'])
+
     # Add count of participating probes
     global_events['probe_count'] = global_events['participating_probes'].apply(len)
-    
+
     # Add global peak information
     global_events['global_peak_time'] = global_events.apply(
         lambda row: row['peak_times'][row['peak_powers'].index(max(row['peak_powers']))] 
@@ -1412,6 +1417,9 @@ def process_session(session_id, config):
     logger = logging.getLogger(f"session_{session_id}")
     logger.setLevel(logging.INFO)
     
+    # Log the session ID and dataset being processed
+    logger.info(f"Processing session {session_id} for dataset {config['run_details']['dataset_to_process']}")
+    
     # Extract necessary paths and settings from config
     swr_output_dir_path = config['paths']['swr_output_dir']
     lfp_output_dir_path = config['paths']['lfp_output_dir']
@@ -1508,7 +1516,8 @@ def process_session(session_id, config):
             probenames = None
             probelist = loader.get_probes_with_ca1()
         elif dataset_to_process == 'ibl':
-            probelist, probenames = loader.get_probe_ids_and_names()
+            # Get probes with CA1 directly - this will handle both getting all probes and filtering
+            probelist, probenames = loader.get_probes_with_ca1()
         
         # If no probes with CA1, log and return
         if not probelist:
@@ -1539,7 +1548,7 @@ def process_session(session_id, config):
                 results = loader.process_probe(probe_id, filter_ripple_band)
             elif dataset_to_process == 'ibl':
                 results = loader.process_probe(this_probe, filter_ripple_band)
-                
+            
              
             # Extract results using the standardized key names
             peakripple_chan_raw_lfp = results['peak_ripple_raw_lfp']
@@ -1730,6 +1739,23 @@ def process_session(session_id, config):
             logger.info(f"Session {session_id}: Filtering events for probe {probe_id_log}")
             Karlsson_ripple_times = check_gamma_overlap(Karlsson_ripple_times, gamma_times)
             Karlsson_ripple_times = check_movement_overlap(Karlsson_ripple_times, movement_control_list[0], movement_control_list[1])
+            
+            # Define the desired column order
+            column_order = [
+                'start_time', 'end_time', 'duration', 
+                'power_peak_time', 'power_max_zscore', 'power_median_zscore',
+                'power_mean_zscore', 'power_min_zscore', 'power_90th_percentile',
+                'sw_exceeds_threshold', 'sw_peak_power', 'sw_peak_time',
+                'sw_ripple_plv', 'sw_ripple_mi', 'sw_ripple_clcorr',
+                'envelope_max_thresh', 'envelope_mean_zscore', 'envelope_median_zscore',
+                'envelope_max_zscore', 'envelope_min_zscore',
+                'envelope_area', 'envelope_total_energy', 'envelope_90th_percentile',
+                'overlaps_with_gamma', 'gamma_overlap_percent',
+                'overlaps_with_movement', 'movement_overlap_percent'
+            ]
+            
+            # Reorder the DataFrame
+            Karlsson_ripple_times = Karlsson_ripple_times[column_order]
             
             # Save filtered ripple events
             csv_filename = f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_karlsson_detector_events.csv.gz"

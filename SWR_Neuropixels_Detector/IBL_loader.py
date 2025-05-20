@@ -68,32 +68,36 @@ class ibl_loader(BaseLoader):
         return self.probelist, self.probenames
     
     def get_probes_with_ca1(self):
-        """Get list of probes with CA1 channels."""
+        """Get list of probes with CA1 channels. After filtering, set self.probenames and self.probelist to the filtered lists."""
         self.get_probe_ids_and_names()
-        self.probes_of_interest = []
+        filtered_probe_indices = []
+        filtered_probe_ids = []
+        filtered_probe_names = []
 
         for i, probe_id in enumerate(self.probelist):
-            channels, _,_ = self.load_channels(i)
-            
+            channels, _, _ = self.load_channels(i)
             if self.has_ca1_channels(channels):
-                self.probes_of_interest.append(i)  # Store probe index
-        
-        print(f"Found {len(self.probes_of_interest)} probes with CA1 channels")
-        return self.probes_of_interest
+                filtered_probe_indices.append(i)
+                filtered_probe_ids.append(self.probelist[i])
+                filtered_probe_names.append(self.probenames[i])
+
+        print(f"Found {len(filtered_probe_ids)} probes with CA1 channels")
+        # Overwrite self.probenames and self.probelist with filtered lists
+        self.probenames = filtered_probe_names
+        self.probelist = filtered_probe_ids
+        return self.probelist, self.probenames
     
     def load_channels(self, probe_idx):
-        """Loads channel data for a specific probe."""
+        """Loads channel data for a specific probe. Now expects probe_idx to be an index into the filtered lists."""
         if self.probelist is None:
             self.get_probe_ids_and_names()
         print(f"Loading channel data for probe index: {probe_idx}")
+        if probe_idx >= len(self.probenames):
+            raise ValueError(f"Invalid probe index {probe_idx}. Only {len(self.probenames)} probes available.")
         probe_name = self.probenames[probe_idx]
         probe_id = self.probelist[probe_idx]
-        
-        # Get channels data
         collectionname = f"alf/{probe_name}/pykilosort"
-        
         channels = self.one.load_object(self.session_id, "channels", collection=collectionname)
-        
         return channels, probe_name, probe_id
     
     def has_ca1_channels(self, channels):
@@ -365,19 +369,31 @@ class ibl_loader(BaseLoader):
         # Initialize lists to store metrics for each channel
         channel_metrics = []
         
+        print(f"Processing {len(ca1_chan_ids)} CA1 channels for ripple channel selection") #debugging
+        print(f"CA1 channel IDs: {ca1_chan_ids}") #debugging
+        print(f"Channel positions shape: {channel_positions.shape}") #debugging
+        
         # Process each CA1 channel
         for chan_idx, chan_id in enumerate(ca1_chan_ids):
+            print(f"\nProcessing channel {chan_id} (index {chan_idx})") #debugging
+            
             # Get raw LFP for this channel
             chan_lfp = ca1_lfp[:, chan_idx]
+            print(f"Channel LFP shape: {chan_lfp.shape}") #debugging
             
             # Filter to ripple band
             ripple_band = ripple_filter_func(chan_lfp[:, None])
             ripple_band = ripple_band.flatten()  # Remove extra dimension
+            print(f"Ripple band shape after filtering: {ripple_band.shape}") #debugging
             
             # Calculate power and skewness
             ripple_power = np.abs(hilbert(ripple_band)) ** 2
             net_power = np.sum(ripple_power)
             skewness = stats_skew(ripple_power)
+            
+            print(f"Channel {chan_id} metrics:") #debugging
+            print(f"  Net power: {net_power}") #debugging
+            print(f"  Skewness: {skewness}")  #debugging
             
             # Store metrics
             channel_metrics.append({
@@ -397,9 +413,14 @@ class ibl_loader(BaseLoader):
             
         # Convert to DataFrame for easier selection
         metrics_df = pd.DataFrame(channel_metrics)
+        print("\nMetrics DataFrame:") #debugging
+        print(metrics_df) #debugging
+        print("\nMetrics DataFrame columns:", metrics_df.columns.tolist()) #debugging
         
         # Select channel with highest net power
         best_channel = metrics_df.loc[metrics_df['net_power'].idxmax()]
+        print(f"\nSelected best channel:") #debugging
+        print(best_channel) #debugging
             
         # Update metadata with selection info
         self.channel_selection_metadata_dict['ripple_band']['selected_channel_id'] = int(best_channel['channel_id'])
@@ -449,7 +470,6 @@ class ibl_loader(BaseLoader):
         # Create dict to store results for this specific probe call
         metadata = {
             'probe_id': probe_id, # Included for clarity, though caller has it
-            # 'has_ca1_channels': True, # Excluded - Determined by caller context
             'ca1_channel_count': 0,
             'ca1_span_microns': 0.0,
             'total_unit_count': 0,
@@ -457,51 +477,31 @@ class ibl_loader(BaseLoader):
             'ca1_total_unit_count': 0,
             'ca1_good_unit_count': 0
         }
-
         # --- Find probe name corresponding to probe_id (UUID) ---
-        # Allow ValueError/IndexError to propagate if probe_id not found
+        # Use filtered lists
+        if probe_id not in self.probelist:
+            raise ValueError(f"Probe ID {probe_id} not found in filtered CA1 probe list.")
         probe_idx = self.probelist.index(probe_id)
         probe_name = self.probenames[probe_idx]
-
         # --- Load Spike Sorting Data ---
-        # Allow exceptions during loading to propagate
         print(f"Loading spike sorting data for probe {probe_name} ({probe_id})...")
-        # Assume atlas (self.ba) is loaded if needed by SpikeSortingLoader/merge_clusters implicitly
-        # Let access fail if self.ba is None
         sl = SpikeSortingLoader(eid=self.session_id, pname=probe_name, one=self.one, atlas=self.ba)
-        spikes, clusters, channels = sl.load_spike_sorting(dataset_types=['clusters.metrics']) # Load metrics too
-        clusters = sl.merge_clusters(spikes, clusters, channels) # Adds 'acronym' if missing? Check docs.
-        
+        spikes, clusters, channels = sl.load_spike_sorting(dataset_types=['clusters.metrics'])
+        clusters = sl.merge_clusters(spikes, clusters, channels)
         clusters = clusters.to_df()
-        #channels = channels.to_df() # because they are easier to work with than AlfBunch objects
         print(f"Spike sorting data loaded for probe {probe_id}")
-
         # --- Calculate Metadata (Allow KeyErrors/AttributeErrors to propagate) ---
         metadata['total_unit_count'] = len(clusters)
-
-        # Count good units in CA1 (using mask approach)
         good_units_mask = (clusters.label == 1)
         metadata['good_unit_count'] = np.sum(good_units_mask)
         ca1_good_units = np.sum((clusters.acronym == 'CA1') & good_units_mask)
         metadata['ca1_good_unit_count'] = ca1_good_units
-
-        # Create CA1 mask
         ca1_mask = (channels.acronym == 'CA1')
-
-        # Count CA1 channels
         metadata['ca1_channel_count'] = np.sum(ca1_mask)
-
-        # Calculate CA1 span
         ca1_depths = channels.axial_um[ca1_mask]
         metadata['ca1_span_microns'] = float(ca1_depths.max() - ca1_depths.min())
-
-        # Get CA1 channel IDs for filtering units
         ca1_channel_ids = channels.rawInd[ca1_mask]
-
-        # Count total units in CA1 region
         in_ca1_mask = np.isin(clusters.channels, ca1_channel_ids)
         metadata['ca1_total_unit_count'] = np.sum(in_ca1_mask)
-        
-        # Cleanup SpikeSortingLoader explicitly
         del sl, spikes, clusters, channels
         return metadata

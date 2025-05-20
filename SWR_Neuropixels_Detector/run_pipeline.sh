@@ -7,6 +7,7 @@
 # Output directory for all results
 export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_swr_data"}
 
+
 # Cache directories for datasets (where raw data is stored/downloaded)
 export ABI_VISUAL_CODING_SDK_CACHE=${ABI_VISUAL_CODING_SDK_CACHE:-"/space/scratch/allen_viscoding_data"}
 export ABI_VISUAL_BEHAVIOUR_SDK_CACHE=${ABI_VISUAL_BEHAVIOUR_SDK_CACHE:-"/space/scratch/allen_visbehave_data"}
@@ -78,7 +79,7 @@ RUN_FILTER=false
 RUN_GLOBAL=false
 CLEANUP_AFTER=false
 SAVE_LFP=false
-SAVE_CHANNEL_METADATA=false
+SAVE_CHANNEL_METADATA=true
 OVERWRITE_EXISTING=false
 DEBUG_MODE=false
 

@@ -299,7 +299,7 @@ def main():
     # ===============================================================================
     # Create a partially applied function with the consolidated configuration
     process_func_partial = partial(process_session, config=config)
-    
+        
     # Run the processing with the specified number of cores
     print(f"Starting processing pool with {config['pool_size']} workers...")
     with Pool(processes=config['pool_size'], initializer=init_pool, initargs=(queue,)) as p:
