@@ -331,7 +331,7 @@ for dataset in "${DATASET_ARRAY[@]}"; do
     echo "Check log file: $LOG_FILE"
     tail -n 30 "$LOG_FILE"
     PIPELINE_STATUS=1
-    break
+    echo "Continuing with next dataset despite failure..."
   fi
   
   # Deactivate
