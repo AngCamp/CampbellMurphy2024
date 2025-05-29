@@ -299,7 +299,7 @@ def main():
     # ===============================================================================
     # Create a partially applied function with the consolidated configuration
     process_func_partial = partial(process_session, config=config)
-        
+    
     # Run the processing with the specified number of cores
     print(f"Starting processing pool with {config['pool_size']} workers...")
     with Pool(processes=config['pool_size'], initializer=init_pool, initargs=(queue,)) as p:
@@ -318,7 +318,7 @@ def main():
 
     for folder_name in os.listdir(swr_output_dir_path):
         folder_path = os.path.join(swr_output_dir_path, folder_name)
-        
+    
         # Check if it's a directory and starts with the session prefix
         if os.path.isdir(folder_path) and folder_name.startswith("swrs_session_"):
             # Check if the directory is empty
