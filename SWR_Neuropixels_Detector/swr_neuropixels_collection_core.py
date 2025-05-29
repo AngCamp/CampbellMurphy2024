@@ -23,7 +23,8 @@ from scipy import io, signal, stats, interpolate
 from scipy.signal import lfilter, hilbert, fftconvolve
 import scipy.ndimage
 from scipy.ndimage import gaussian_filter, gaussian_filter1d
-from scipy.stats import pearsonr
+from scipy.stats import pearsonr, skew
+
 
 # Multiprocessing
 from multiprocessing import Pool, Process, Queue, Manager, set_start_method
@@ -469,31 +470,97 @@ class BaseLoader:
         # Return the best channel ID and its raw LFP
         return best_cid, best_lfp
 
-    # Abstract method stubs that must be implemented by subclasses
-    # Due to dependency conflicts in the apis, differences in metadata labels or conventions
-    # the code is sufficiently different to implement all of these steps
-    # that they have implmented in their own seperate classes, see the _loader.py files
-    # for the code there
-    def set_up(self):
-        """Setup the loader and initialize connections."""
-        raise NotImplementedError("Subclasses must implement set_up method")
-        
-    def has_ca1_channels(self):
-        """Check if the session has CA1 channels."""
-        raise NotImplementedError("Subclasses must implement has_ca1_channels method")
-        
-    def get_probes_with_ca1(self):
-        """Get list of probes with CA1 channels."""
-        raise NotImplementedError("Subclasses must implement get_probes_with_ca1 method")
-        
-    def process_probe(self, probe_id, filter_ripple_band_func=None):
-        """Process a single probe."""
-        raise NotImplementedError("Subclasses must implement process_probe method")
-    # Add to BaseLoader class in swr_neuropixels_collection_core.py
-    
     def select_ripple_channel(self, ca1_lfp, ca1_chan_ids, channel_positions, ripple_filter_func, config=None):
-        """Select the putative pyramidal layer (ripple band) channel for a given probe."""
-        raise NotImplementedError("Subclasses must implement select_ripple_channel")
+        """Select the putative pyramidal layer (ripple band) channel for a given probe.
+        
+        Parameters
+        ----------
+        ca1_lfp : np.ndarray
+            LFP data array containing signals from channels located in the CA1 region.
+            Expected shape: (time, channels).
+        ca1_chan_ids : list of int
+            List of unique channel identifiers corresponding to the columns in `ca1_lfp`.
+        channel_positions : pd.Series
+            A pandas Series where the index contains channel IDs (including those in 
+            `ca1_chan_ids` and potentially others) and the values are the vertical
+            positions (depths) of those channels on the probe.
+        ripple_filter_func : callable
+            Function to filter the LFP data into the ripple band.
+        config : dict, optional
+            Configuration dictionary (not used in this implementation).
+        
+        Returns
+        -------
+        tuple
+            - peak_chan_id (int): The channel ID selected as the best ripple channel.
+            - peak_ripple_band_lfp (np.ndarray): The ripple-band filtered signal from the selected channel.
+            - peak_ripple_chan_lfp (np.ndarray): The raw LFP signal from the selected channel.
+        """
+        # Initialize lists to store metrics for each channel
+        channel_metrics = []
+        
+        print(f"Processing {len(ca1_chan_ids)} CA1 channels for ripple channel selection") #debugging
+        print(f"CA1 channel IDs: {ca1_chan_ids}") #debugging
+        print(f"Channel positions shape: {channel_positions.shape}") #debugging
+        
+        # Process each CA1 channel
+        for chan_idx, chan_id in enumerate(ca1_chan_ids):
+            print(f"\nProcessing channel {chan_id} (index {chan_idx})") #debugging
+            
+            # Get raw LFP for this channel
+            chan_lfp = ca1_lfp[:, chan_idx]
+            print(f"Channel LFP shape: {chan_lfp.shape}") #debugging
+            
+            # Filter to ripple band
+            ripple_band = ripple_filter_func(chan_lfp[:, None])
+            ripple_band = ripple_band.flatten()  # Remove extra dimension
+            print(f"Ripple band shape after filtering: {ripple_band.shape}") #debugging
+            
+            # Calculate power and skewness
+            ripple_power = np.abs(hilbert(ripple_band)) ** 2
+            net_power = np.sum(ripple_power)
+            skewness = skew(ripple_power)
+            
+            print(f"Channel {chan_id} metrics:") #debugging
+            print(f"  Net power: {net_power}") #debugging
+            print(f"  Skewness: {skewness}")  #debugging
+            
+            # Store metrics
+            channel_metrics.append({
+                'channel_id': chan_id,
+                'depth': channel_positions.loc[chan_id],
+                'net_power': net_power,
+                'skewness': skewness,
+                'raw_lfp': chan_lfp,
+                'ripple_band': ripple_band
+            })
+            
+            # Update metadata dictionary
+            self.channel_selection_metadata_dict['ripple_band']['channel_ids'].append(int(chan_id))
+            self.channel_selection_metadata_dict['ripple_band']['depths'].append(float(channel_positions.loc[chan_id]))
+            self.channel_selection_metadata_dict['ripple_band']['skewness'].append(float(skewness))
+            self.channel_selection_metadata_dict['ripple_band']['net_power'].append(float(net_power))
+            
+        # Convert to DataFrame for easier selection
+        metrics_df = pd.DataFrame(channel_metrics)
+        print("\nMetrics DataFrame:") #debugging
+        print(metrics_df) #debugging
+        print("\nMetrics DataFrame columns:", metrics_df.columns.tolist()) #debugging
+        
+        # Select channel with highest net power
+        best_channel = metrics_df.loc[metrics_df['net_power'].idxmax()]
+        print(f"\nSelected best channel:") #debugging
+        print(best_channel) #debugging
+            
+        # Update metadata with selection info
+        self.channel_selection_metadata_dict['ripple_band']['selected_channel_id'] = int(best_channel['channel_id'])
+        self.channel_selection_metadata_dict['ripple_band']['selection_method'] = 'max_power'
+        
+        return (
+            best_channel['channel_id'],
+            best_channel['ripple_band'],
+            best_channel['raw_lfp']
+        )
 
     def global_events_probe_info(self):
         """
@@ -575,7 +642,7 @@ class BaseLoader:
         envelope = np.abs(signal.hilbert(ripple_filtered))
         smoothing_sigma = 0.004  # 4ms smoothing
         envelope_smoothed = gaussian_smooth(envelope, sigma=smoothing_sigma, sampling_frequency=1500.0)  # 1500 Hz sampling rate
-        
+        envelope_smoothed_z = stats.zscore(envelope_smoothed)
         # Compute power from smoothed envelope
         ripple_power = envelope_smoothed ** 2
         
@@ -592,7 +659,7 @@ class BaseLoader:
             event_power_z = power_z[mask]
             event_envelope = envelope_smoothed[mask]
             event_times = time_values[mask]
-            
+            event_envelope_smoothed_z = envelope_smoothed_z[mask]
             # Compute metrics
             metrics = {
                 'power_peak_time': event_times[np.argmax(event_power_z)],
@@ -601,7 +668,8 @@ class BaseLoader:
                 'power_mean_zscore': np.mean(event_power_z),
                 'power_min_zscore': np.min(event_power_z),
                 'power_90th_percentile': np.percentile(event_power_z, 90),
-                'envelope_90th_percentile': np.percentile(event_envelope, 90)
+                'envelope_90th_percentile': np.percentile(event_envelope, 90),
+                'envelope_peak_time': event_times[np.argmax(event_envelope_smoothed_z)]
             }
             power_metrics.append(metrics)
         
@@ -755,6 +823,26 @@ class BaseLoader:
     def cleanup(self):
         """Clean up resources."""
         raise NotImplementedError("Subclasses must implement cleanup method")
+    # Abstract method stubs that must be implemented by subclasses
+    # Due to dependency conflicts in the apis, differences in metadata labels or conventions
+    # the code is sufficiently different to implement all of these steps
+    # that they have implmented in their own seperate classes, see the _loader.py files
+    # for the code there
+    def set_up(self):
+        """Setup the loader and initialize connections."""
+        raise NotImplementedError("Subclasses must implement set_up method")
+        
+    def has_ca1_channels(self):
+        """Check if the session has CA1 channels."""
+        raise NotImplementedError("Subclasses must implement has_ca1_channels method")
+        
+    def get_probes_with_ca1(self):
+        """Get list of probes with CA1 channels."""
+        raise NotImplementedError("Subclasses must implement get_probes_with_ca1 method")
+        
+    def process_probe(self, probe_id, filter_ripple_band_func=None):
+        """Process a single probe."""
+        raise NotImplementedError("Subclasses must implement process_probe method")  
 
 # ===================================
 #  PROBE LEVEL EVENT DETECTOR
@@ -1622,14 +1710,6 @@ def process_session(session_id, config):
                 Karlsson_ripple_times.duration < 0.25
             ]
             
-            # Calculate ripple band power and peak times
-            peakrippleband_power = np.abs(signal.hilbert(peakrippleband)) ** 2
-            Karlsson_ripple_times["Peak_time"] = peaks_time_of_events(
-                events=Karlsson_ripple_times,
-                time_values=lfp_time_index,
-                signal_values=peakrippleband_power,
-            )
-            
             # Remove speed columns
             speed_cols = [
                 col for col in Karlsson_ripple_times.columns if "speed" in col
@@ -1747,8 +1827,8 @@ def process_session(session_id, config):
                 'power_mean_zscore', 'power_min_zscore', 'power_90th_percentile',
                 'sw_exceeds_threshold', 'sw_peak_power', 'sw_peak_time',
                 'sw_ripple_plv', 'sw_ripple_mi', 'sw_ripple_clcorr',
-                'envelope_max_thresh', 'envelope_mean_zscore', 'envelope_median_zscore',
-                'envelope_max_zscore', 'envelope_min_zscore',
+                'envelope_peak_time','envelope_max_thresh', 'envelope_mean_zscore', 
+                'envelope_median_zscore', 'envelope_max_zscore', 'envelope_min_zscore',
                 'envelope_area', 'envelope_total_energy', 'envelope_90th_percentile',
                 'overlaps_with_gamma', 'gamma_overlap_percent',
                 'overlaps_with_movement', 'movement_overlap_percent'
