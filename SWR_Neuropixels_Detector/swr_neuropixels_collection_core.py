@@ -1657,10 +1657,6 @@ def process_session(session_id, config):
                     json.dump(loader.channel_selection_metadata_dict, f)
                 logger.info(f"Session {session_id}: Saved channel selection metadata for probe {probe_id_log}")
             
-            # Filter to gamma band
-            gamma_band_ca1 = np.convolve(
-                peakripple_chan_raw_lfp.reshape(-1), gamma_filter, mode="same"
-            )
             
             # Save LFP data if enabled
             if save_lfp:
@@ -1754,6 +1750,11 @@ def process_session(session_id, config):
             # Detect gamma events
             process_stage = f"Detecting Gamma Events on probe with id {probe_id_log}"
             logger.info(f"Session {session_id}: Detecting gamma events on probe {probe_id_log}")
+            
+            # Filter raw lfp to get gamma band
+            gamma_band_ca1 = np.convolve(
+                peakripple_chan_raw_lfp.reshape(-1), gamma_filter, mode="same"
+            )
             
             gamma_power = np.abs(signal.hilbert(gamma_band_ca1)) ** 2
             gamma_times = event_boundary_detector(
