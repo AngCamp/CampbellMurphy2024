@@ -1519,6 +1519,9 @@ def process_session(session_id, config):
     save_channel_metadata = config['flags'].get('save_channel_metadata', False)
     overwrite_existing = config['flags'].get('overwrite_existing', False)
     cleanup_after = config['flags'].get('cleanup_cache', False)
+    run_putative = config['flags'].get('run_putative', False)
+    run_filter = config['flags'].get('run_filter', False)
+    run_global = config['flags'].get('run_global', False)
     
     # Extract ripple detection settings
     ripple_band_threshold = config['ripple_detection']['ripple_band_threshold']
@@ -1550,13 +1553,32 @@ def process_session(session_id, config):
         # Create session subfolder paths
         session_subfolder = os.path.join(swr_output_dir_path, f"swrs_session_{str(session_id)}")
         
-        # Check if the session directory already exists and contains files
-        if os.path.exists(session_subfolder) and os.listdir(session_subfolder):
-            if not overwrite_existing:
-                logger.info(f"Session {session_id}: Output directory already exists and contains files. Skipping processing.")
+        # Create LFP subfolder path
+        if save_lfp:
+            session_lfp_subfolder = os.path.join(lfp_output_dir_path, f"lfp_session_{str(session_id)}")
+        
+        # Handle overwrite based on which stages we're running
+        if os.path.exists(session_subfolder):
+            # Check if the session directory contains probe metadata
+            metadata_file = os.path.join(session_subfolder, f"session_{session_id}_probe_metadata.csv.gz")
+            if os.path.exists(metadata_file) and not overwrite_existing:
+                logger.info(f"Session {session_id}: Output directory exists and contains probe metadata. Skipping processing.")
                 return
-            else:
-                logger.info(f"Session {session_id}: Output directory exists and will be completely removed for clean overwrite.")
+            elif os.path.exists(metadata_file) and overwrite_existing:
+                logger.info(f"Session {session_id}: Output directory exists and contains probe metadata. Overwriting enabled.")
+            elif not os.path.exists(metadata_file) and os.listdir(session_subfolder) and not overwrite_existing:
+                # Check if we need to skip based on what we're trying to do
+                if run_putative and any(f.startswith('probe_') for f in os.listdir(session_subfolder)):
+                    logger.info(f"Session {session_id}: Probe-level files exist and overwrite not enabled. Skipping putative detection.")
+                    return
+                if run_filter and any(f.endswith('_karlsson_detector_events.csv.gz') for f in os.listdir(session_subfolder)):
+                    logger.info(f"Session {session_id}: Filtered event files exist and overwrite not enabled. Skipping filtering.")
+                    return
+                if run_global and any(f.startswith('session_') and 'global_swr' in f for f in os.listdir(session_subfolder)):
+                    logger.info(f"Session {session_id}: Global event files exist and overwrite not enabled. Skipping global detection.")
+                    return
+            elif not os.path.exists(metadata_file) and os.listdir(session_subfolder) and overwrite_existing:
+                logger.info(f"Session {session_id}: Output directory exists and contains files. Overwriting enabled.")
                 # Clean out the directory
                 for item in os.listdir(session_subfolder):
                     item_path = os.path.join(session_subfolder, item)
@@ -1567,27 +1589,10 @@ def process_session(session_id, config):
                 # Recreate the empty directory
                 os.makedirs(session_subfolder, exist_ok=True)
         
-        # Create LFP subfolder path
+        # Create directories
+        os.makedirs(session_subfolder, exist_ok=True)
         if save_lfp:
-            session_lfp_subfolder = os.path.join(lfp_output_dir_path, f"lfp_session_{str(session_id)}")
-        
-        # Add overwrite handling for LFP directory
-        if os.path.exists(session_lfp_subfolder) and os.listdir(session_lfp_subfolder):
-            if not overwrite_existing:
-                logger.info(f"Session {session_id}: LFP output directory already exists and contains files.")
-                # Continue processing, but don't save LFP data
-                save_lfp = False
-            else:
-                logger.info(f"Session {session_id}: LFP output directory exists and will be completely removed for clean overwrite.")
-                # Clean out the directory instead of removing it entirely
-                for item in os.listdir(session_lfp_subfolder):
-                    item_path = os.path.join(session_lfp_subfolder, item)
-                    if os.path.isfile(item_path):
-                        os.unlink(item_path)
-                    elif os.path.isdir(item_path):
-                        shutil.rmtree(item_path)
-                # Ensure directory still exists
-                os.makedirs(session_lfp_subfolder, exist_ok=True)
+            os.makedirs(session_lfp_subfolder, exist_ok=True)
         
         # Set up logging
         process_stage = "Setting up"
@@ -1612,244 +1617,239 @@ def process_session(session_id, config):
             logger.warning(f"Session {session_id}: No probes with CA1 found, skipping.")
             return
             
-        # Create directories once we know we'll process this session
-        logger.info(f"Session {session_id}: Creating output directories")
-        os.makedirs(session_subfolder, exist_ok=True)
-        
-        if save_lfp:
-            os.makedirs(session_lfp_subfolder, exist_ok=True)
-        
         # Process probes
         process_stage = "Running through the probes in the session"
         
-        for this_probe in range(len(probelist)):
-
-            if dataset_to_process == 'ibl':
-                probe_name = probenames[this_probe]
-            probe_id = probelist[this_probe]
-            probe_id_log = str(probe_id)
-            logger.info(f"Session {session_id}: Processing probe {probe_id_log}")
-            
-            # Process the probe and get results
-            process_stage = f"Processing probe with id {probe_id_log}"
-            if dataset_to_process == 'abi_visual_coding' or dataset_to_process == 'abi_visual_behaviour':
-                results = loader.process_probe(probe_id, filter_ripple_band)
-            elif dataset_to_process == 'ibl':
-                results = loader.process_probe(this_probe, filter_ripple_band)
-            
-             
-            # Extract results using the standardized key names
-            peakripple_chan_raw_lfp = results['peak_ripple_raw_lfp']
-            lfp_time_index = results['lfp_time_index']
-            ca1_chans = results['ca1_channel_ids'] # Use standardized key
-            outof_hp_chans_lfp = results['control_lfps']
-            take_two = results['control_channel_ids'] # Use standardized key
-            peakrippleband = results['ripple_band_filtered'] # Use standardized key
-            peak_ripple_chan_id = results['peak_ripple_chan_id']
-            
-            # Save channel selection metadata only if the flag is enabled
-            if save_channel_metadata:
-                channel_metadata_path = os.path.join(
-                    session_subfolder,
-                    f"probe_{probe_id_log}_channel_selection_metadata.json.gz"
-                )
-                with gzip.open(channel_metadata_path, 'wt', encoding='utf-8') as f:
-                    json.dump(loader.channel_selection_metadata_dict, f)
-                logger.info(f"Session {session_id}: Saved channel selection metadata for probe {probe_id_log}")
-            
-            
-            # Save LFP data if enabled
-            if save_lfp:
-                np.savez(
-                    os.path.join(
-                        session_lfp_subfolder,
-                        f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_lfp_ca1_putative_pyramidal_layer.npz",
-                    ),
-                    lfp_ca1=peakripple_chan_raw_lfp,
-                )
-                np.savez(
-                    os.path.join(
-                        session_lfp_subfolder,
-                        f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_lfp_time_index_1500hz.npz",
-                    ),
-                    lfp_time_index=lfp_time_index,
-                )
+        # Normal probe processing
+        if not config['flags'].get('find_global', False):
+            logger.info(f"\n{'='*80}\nProcessing probes normally (find_global=False)\n{'='*80}")
+            for this_probe in range(len(probelist)):
+                if dataset_to_process == 'ibl':
+                    probe_name = probenames[this_probe]
+                probe_id = probelist[this_probe]
+                probe_id_log = str(probe_id)
+                logger.info(f"Session {session_id}: Processing probe {probe_id_log}")
                 
-                # Save control channel data
-                for i in range(2):
-                    channel_outside_hp = take_two[i]
+                # Process the probe and get results
+                process_stage = f"Processing probe with id {probe_id_log}"
+                if dataset_to_process == 'abi_visual_coding' or dataset_to_process == 'abi_visual_behaviour':
+                    results = loader.process_probe(probe_id, filter_ripple_band)
+                elif dataset_to_process == 'ibl':
+                    results = loader.process_probe(this_probe, filter_ripple_band)
+               
+                # Extract results using the standardized key names
+                peakripple_chan_raw_lfp = results['peak_ripple_raw_lfp']
+                lfp_time_index = results['lfp_time_index']
+                ca1_chans = results['ca1_channel_ids'] # Use standardized key
+                outof_hp_chans_lfp = results['control_lfps']
+                take_two = results['control_channel_ids'] # Use standardized key
+                peakrippleband = results['ripple_band_filtered'] # Use standardized key
+                peak_ripple_chan_id = results['peak_ripple_chan_id']
+                
+                # Save channel selection metadata only if the flag is enabled
+                if save_channel_metadata:
+                    channel_metadata_path = os.path.join(
+                        session_subfolder,
+                        f"probe_{probe_id_log}_channel_selection_metadata.json.gz"
+                    )
+                    with gzip.open(channel_metadata_path, 'wt', encoding='utf-8') as f:
+                        json.dump(loader.channel_selection_metadata_dict, f)
+                    logger.info(f"Session {session_id}: Saved channel selection metadata for probe {probe_id_log}")
+                
+                # Save LFP data if enabled
+                if save_lfp:
                     np.savez(
                         os.path.join(
                             session_lfp_subfolder,
-                            f"probe_{probe_id_log}_channel_{channel_outside_hp}_lfp_control_channel.npz",
+                            f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_lfp_ca1_putative_pyramidal_layer.npz",
                         ),
-                        lfp_control_channel=outof_hp_chans_lfp[i],
+                        lfp_ca1=peakripple_chan_raw_lfp,
                     )
-            
-            # Create dummy speed vector for ripple detection
-            dummy_speed = np.zeros_like(peakrippleband)
-            
-            # Detect putative ripples
-            process_stage = f"Detecting Putative Ripples on probe with id {probe_id_log}"
-            logger.info(f"Session {session_id}: Detecting putative ripples on probe {probe_id_log}")
-            
-            Karlsson_ripple_times = ripple_detection.Karlsson_ripple_detector(
-                time=lfp_time_index,
-                zscore_threshold=ripple_band_threshold,
-                filtered_lfps=peakrippleband[:, None],
-                speed=dummy_speed,
-                sampling_frequency=1500.0,
-            )
-            
-            # Filter by duration
-            Karlsson_ripple_times = Karlsson_ripple_times[
-                Karlsson_ripple_times.duration < 0.25
-            ]
-            
-            # Remove speed columns
-            speed_cols = [
-                col for col in Karlsson_ripple_times.columns if "speed" in col
-            ]
-            Karlsson_ripple_times = Karlsson_ripple_times.drop(columns=speed_cols)
-            
-            # Extract sharp wave component info
-            sharp_wave_lfp = results['sharpwave_chan_raw_lfp']
-            sw_chan_id = results['sharpwave_chan_id']
-            
-            # Save sharp wave LFP if enabled
-            if save_lfp:
-                np.savez(
-                    os.path.join(
-                        session_lfp_subfolder,
-                        f"probe_{probe_id_log}_channel_{sw_chan_id}_lfp_ca1_putative_str_radiatum.npz",
-                    ),
-                    lfp_ca1=sharp_wave_lfp,
-                )
-            
-            # Incorporate power metrics 
-            logger.info(f"Session {session_id}: Incorporating power metrics for probe {probe_id_log}")
-            Karlsson_ripple_times = loader.extending_edeno_event_stats(
-                events_df=Karlsson_ripple_times,
-                time_values=lfp_time_index,
-                ripple_filtered=peakrippleband
-            )
-            
-            # Then incorporate sharp wave component info
-            logger.info(f"Session {session_id}: Incorporating sharp wave component information for probe {probe_id_log}")
-            sw_filter_data = np.load(sharp_wave_component_path)
-            sharpwave_filter = sw_filter_data['sharpwave_componenet_8to40band_1500hz_band']
-            
-            Karlsson_ripple_times = loader.incorporate_sharp_wave_component_info(
-                events_df=Karlsson_ripple_times,
-                time_values=lfp_time_index,
-                ripple_filtered=peakrippleband,
-                sharp_wave_lfp=sharp_wave_lfp,
-                sharpwave_filter=sharpwave_filter
-            )
-                       
-            # Detect gamma events
-            process_stage = f"Detecting Gamma Events on probe with id {probe_id_log}"
-            logger.info(f"Session {session_id}: Detecting gamma events on probe {probe_id_log}")
-            
-            # Filter raw lfp to get gamma band
-            gamma_band_ca1 = np.convolve(
-                peakripple_chan_raw_lfp.reshape(-1), gamma_filter, mode="same"
-            )
-            
-            gamma_power = np.abs(signal.hilbert(gamma_band_ca1)) ** 2
-            gamma_times = event_boundary_detector(
-                time=lfp_time_index,
-                threshold_sd=gamma_event_thresh,
-                envelope=False,
-                minimum_duration=0.015,
-                maximum_duration=float("inf"),
-                five_to_fourty_band_power_df=gamma_power,
-            )
-            
-            # Save gamma events
-            csv_filename = f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_gamma_band_events.csv.gz"
-            csv_path = os.path.join(session_subfolder, csv_filename)
-            gamma_times.to_csv(csv_path, index=True, compression="gzip")
-            
-            # Detect movement artifacts
-            process_stage = f"Detecting Movement Artifacts on probe with id {probe_id_log}"
-            logger.info(f"Session {session_id}: Detecting movement artifacts on probe {probe_id_log}")
-            
-            movement_control_list = []
-            for i in [0, 1]:
-                channel_outside_hp = take_two[i]
-                process_stage = f"Detecting Movement Artifacts on control channel {channel_outside_hp} on probe {probe_id_log}"
+                    np.savez(
+                        os.path.join(
+                            session_lfp_subfolder,
+                            f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_lfp_time_index_1500hz.npz",
+                        ),
+                        lfp_time_index=lfp_time_index,
+                    )
+                    
+                    # Save control channel data
+                    for i in range(2):
+                        channel_outside_hp = take_two[i]
+                        np.savez(
+                            os.path.join(
+                                session_lfp_subfolder,
+                                f"probe_{probe_id_log}_channel_{channel_outside_hp}_lfp_control_channel.npz",
+                            ),
+                            lfp_control_channel=outof_hp_chans_lfp[i],
+                        )
                 
-                # Process control channel for movement artifacts
-                ripple_band_control = outof_hp_chans_lfp[i]
-                dummy_speed = np.zeros_like(ripple_band_control)
-                ripple_band_control = filter_ripple_band(ripple_band_control)
-                rip_power_controlchan = np.abs(signal.hilbert(ripple_band_control)) ** 2
+                # Create dummy speed vector for ripple detection
+                dummy_speed = np.zeros_like(peakrippleband)
                 
-                # Reshape arrays as needed for different datasets
-                if dataset_to_process == 'abi_visual_behaviour':
-                    lfp_time_index = lfp_time_index.reshape(-1)
-                    dummy_speed = dummy_speed.reshape(-1)
-                if dataset_to_process == 'ibl':
-                    # Reshape to ensure consistent (n_samples, n_channels) format for detector
-                    rip_power_controlchan = rip_power_controlchan.reshape(-1,1)
+                # Detect putative ripples
+                process_stage = f"Detecting Putative Ripples on probe with id {probe_id_log}"
+                logger.info(f"Session {session_id}: Detecting putative ripples on probe {probe_id_log}")
                 
-                # Detect movement artifacts
-                movement_controls = ripple_detection.Karlsson_ripple_detector(
-                    time=lfp_time_index.reshape(-1),
-                    filtered_lfps=rip_power_controlchan,
-                    speed=dummy_speed.reshape(-1),
-                    zscore_threshold=movement_artifact_ripple_band_threshold,
+                Karlsson_ripple_times = ripple_detection.Karlsson_ripple_detector(
+                    time=lfp_time_index,
+                    zscore_threshold=ripple_band_threshold,
+                    filtered_lfps=peakrippleband[:, None],
+                    speed=dummy_speed,
                     sampling_frequency=1500.0,
                 )
                 
+                # Filter by duration
+                Karlsson_ripple_times = Karlsson_ripple_times[
+                    Karlsson_ripple_times.duration < 0.25
+                ]
+                
                 # Remove speed columns
                 speed_cols = [
-                    col for col in movement_controls.columns if "speed" in col
+                    col for col in Karlsson_ripple_times.columns if "speed" in col
                 ]
-                movement_controls = movement_controls.drop(columns=speed_cols)
+                Karlsson_ripple_times = Karlsson_ripple_times.drop(columns=speed_cols)
                 
-                # Save movement artifact events
-                channel_outside_hp_str = f"channelsrawInd_{str(channel_outside_hp)}"
-                csv_filename = f"probe_{probe_id_log}_channel_{channel_outside_hp_str}_movement_artifacts.csv.gz"
+                # Extract sharp wave component info
+                sharp_wave_lfp = results['sharpwave_chan_raw_lfp']
+                sw_chan_id = results['sharpwave_chan_id']
+                
+                # Save sharp wave LFP if enabled
+                if save_lfp:
+                    np.savez(
+                        os.path.join(
+                            session_lfp_subfolder,
+                            f"probe_{probe_id_log}_channel_{sw_chan_id}_lfp_ca1_putative_str_radiatum.npz",
+                        ),
+                        lfp_ca1=sharp_wave_lfp,
+                    )
+                
+                # Incorporate power metrics 
+                logger.info(f"Session {session_id}: Incorporating power metrics for probe {probe_id_log}")
+                Karlsson_ripple_times = loader.extending_edeno_event_stats(
+                    events_df=Karlsson_ripple_times,
+                    time_values=lfp_time_index,
+                    ripple_filtered=peakrippleband
+                )
+                
+                # Then incorporate sharp wave component info
+                logger.info(f"Session {session_id}: Incorporating sharp wave component information for probe {probe_id_log}")
+                sw_filter_data = np.load(sharp_wave_component_path)
+                sharpwave_filter = sw_filter_data['sharpwave_componenet_8to40band_1500hz_band']
+                
+                Karlsson_ripple_times = loader.incorporate_sharp_wave_component_info(
+                    events_df=Karlsson_ripple_times,
+                    time_values=lfp_time_index,
+                    ripple_filtered=peakrippleband,
+                    sharp_wave_lfp=sharp_wave_lfp,
+                    sharpwave_filter=sharpwave_filter
+                )
+                           
+                # Detect gamma events
+                process_stage = f"Detecting Gamma Events on probe with id {probe_id_log}"
+                logger.info(f"Session {session_id}: Detecting gamma events on probe {probe_id_log}")
+                
+                # Filter raw lfp to get gamma band
+                gamma_band_ca1 = np.convolve(
+                    peakripple_chan_raw_lfp.reshape(-1), gamma_filter, mode="same"
+                )
+                
+                gamma_power = np.abs(signal.hilbert(gamma_band_ca1)) ** 2
+                gamma_times = event_boundary_detector(
+                    time=lfp_time_index,
+                    threshold_sd=gamma_event_thresh,
+                    envelope=False,
+                    minimum_duration=0.015,
+                    maximum_duration=float("inf"),
+                    five_to_fourty_band_power_df=gamma_power,
+                )
+                
+                # Save gamma events
+                csv_filename = f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_gamma_band_events.csv.gz"
                 csv_path = os.path.join(session_subfolder, csv_filename)
-                movement_controls.to_csv(csv_path, index=True, compression="gzip")
-                movement_control_list.append(movement_controls)
-            
-            # Apply filtering to remove events with gamma/movement overlap
-            logger.info(f"Session {session_id}: Filtering events for probe {probe_id_log}")
-            Karlsson_ripple_times = check_gamma_overlap(Karlsson_ripple_times, gamma_times)
-            Karlsson_ripple_times = check_movement_overlap(Karlsson_ripple_times, movement_control_list[0], movement_control_list[1])
-            
-            # Define the desired column order
-            column_order = [
-                'start_time', 'end_time', 'duration', 
-                'power_peak_time', 'power_max_zscore', 'power_median_zscore',
-                'power_mean_zscore', 'power_min_zscore', 'power_90th_percentile',
-                'sw_exceeds_threshold', 'sw_peak_power', 'sw_peak_time',
-                'sw_ripple_plv', 'sw_ripple_mi', 'sw_ripple_clcorr',
-                'envelope_peak_time','envelope_max_thresh', 'envelope_mean_zscore', 
-                'envelope_median_zscore', 'envelope_max_zscore', 'envelope_min_zscore',
-                'envelope_area', 'envelope_total_energy', 'envelope_90th_percentile',
-                'overlaps_with_gamma', 'gamma_overlap_percent',
-                'overlaps_with_movement', 'movement_overlap_percent'
-            ]
-            
-            # Reorder the DataFrame
-            Karlsson_ripple_times = Karlsson_ripple_times[column_order]
-            
-            # Save filtered ripple events
-            csv_filename = f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_karlsson_detector_events.csv.gz"
-            csv_path = os.path.join(session_subfolder, csv_filename)
-            Karlsson_ripple_times.to_csv(csv_path, index=True, compression="gzip")
-            probe_events_dict[probe_id_log] = Karlsson_ripple_times
-            logger.info(f"Session {session_id}: Saved {len(Karlsson_ripple_times)} filtered events for probe {probe_id_log}")
-            
-            # Collect probe metadata for successfully processed probes
-            # Allow errors from get_metadata_for_probe to propagate
-            logger.info(f"Session {session_id}: Collecting metadata for probe {probe_id_log}")
-            probe_metadata = loader.get_metadata_for_probe(probe_id, config=config)
-            all_probe_metadata.append(probe_metadata)
+                gamma_times.to_csv(csv_path, index=True, compression="gzip")
+                
+                # Detect movement artifacts
+                process_stage = f"Detecting Movement Artifacts on probe with id {probe_id_log}"
+                logger.info(f"Session {session_id}: Detecting movement artifacts on probe {probe_id_log}")
+                
+                movement_control_list = []
+                for i in [0, 1]:
+                    channel_outside_hp = take_two[i]
+                    process_stage = f"Detecting Movement Artifacts on control channel {channel_outside_hp} on probe {probe_id_log}"
+                    
+                    # Process control channel for movement artifacts
+                    ripple_band_control = outof_hp_chans_lfp[i]
+                    dummy_speed = np.zeros_like(ripple_band_control)
+                    ripple_band_control = filter_ripple_band(ripple_band_control)
+                    rip_power_controlchan = np.abs(signal.hilbert(ripple_band_control)) ** 2
+                    
+                    # Reshape arrays as needed for different datasets
+                    if dataset_to_process == 'abi_visual_behaviour':
+                        lfp_time_index = lfp_time_index.reshape(-1)
+                        dummy_speed = dummy_speed.reshape(-1)
+                    if dataset_to_process == 'ibl':
+                        # Reshape to ensure consistent (n_samples, n_channels) format for detector
+                        rip_power_controlchan = rip_power_controlchan.reshape(-1,1)
+                    
+                    # Detect movement artifacts
+                    movement_controls = ripple_detection.Karlsson_ripple_detector(
+                        time=lfp_time_index.reshape(-1),
+                        filtered_lfps=rip_power_controlchan,
+                        speed=dummy_speed.reshape(-1),
+                        zscore_threshold=movement_artifact_ripple_band_threshold,
+                        sampling_frequency=1500.0,
+                    )
+                    
+                    # Remove speed columns
+                    speed_cols = [
+                        col for col in movement_controls.columns if "speed" in col
+                    ]
+                    movement_controls = movement_controls.drop(columns=speed_cols)
+                    
+                    # Save movement artifact events
+                    channel_outside_hp_str = f"channelsrawInd_{str(channel_outside_hp)}"
+                    csv_filename = f"probe_{probe_id_log}_channel_{channel_outside_hp_str}_movement_artifacts.csv.gz"
+                    csv_path = os.path.join(session_subfolder, csv_filename)
+                    movement_controls.to_csv(csv_path, index=True, compression="gzip")
+                    movement_control_list.append(movement_controls)
+                
+                # Apply filtering to remove events with gamma/movement overlap
+                logger.info(f"Session {session_id}: Filtering events for probe {probe_id_log}")
+                Karlsson_ripple_times = check_gamma_overlap(Karlsson_ripple_times, gamma_times)
+                Karlsson_ripple_times = check_movement_overlap(Karlsson_ripple_times, movement_control_list[0], movement_control_list[1])
+                
+                # Define the desired column order
+                column_order = [
+                    'start_time', 'end_time', 'duration', 
+                    'power_peak_time', 'power_max_zscore', 'power_median_zscore',
+                    'power_mean_zscore', 'power_min_zscore', 'power_90th_percentile',
+                    'sw_exceeds_threshold', 'sw_peak_power', 'sw_peak_time',
+                    'sw_ripple_plv', 'sw_ripple_mi', 'sw_ripple_clcorr',
+                    'envelope_peak_time','envelope_max_thresh', 'envelope_mean_zscore', 
+                    'envelope_median_zscore', 'envelope_max_zscore', 'envelope_min_zscore',
+                    'envelope_area', 'envelope_total_energy', 'envelope_90th_percentile',
+                    'overlaps_with_gamma', 'gamma_overlap_percent',
+                    'overlaps_with_movement', 'movement_overlap_percent'
+                ]
+                
+                # Reorder the DataFrame
+                Karlsson_ripple_times = Karlsson_ripple_times[column_order]
+                
+                # Save filtered ripple events
+                csv_filename = f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_karlsson_detector_events.csv.gz"
+                csv_path = os.path.join(session_subfolder, csv_filename)
+                Karlsson_ripple_times.to_csv(csv_path, index=True, compression="gzip")
+                probe_events_dict[probe_id_log] = Karlsson_ripple_times
+                logger.info(f"Session {session_id}: Saved {len(Karlsson_ripple_times)} filtered events for probe {probe_id_log}")
+                
+                # Collect probe metadata for successfully processed probes
+                # Allow errors from get_metadata_for_probe to propagate
+                logger.info(f"Session {session_id}: Collecting metadata for probe {probe_id_log}")
+                probe_metadata = loader.get_metadata_for_probe(probe_id, config=config)
+                all_probe_metadata.append(probe_metadata)
+        else:
+            logger.info(f"\n{'='*80}\nSkipping probe processing (find_global=True)\n{'='*80}")
 
         # --- Save Probe Metadata CSV --- 
         # Saves metadata for all probes that were *successfully* processed (didn't return None)
@@ -1867,39 +1867,73 @@ def process_session(session_id, config):
             
             # Load the probe metadata we just saved to use for filtering
             try:
+                if not os.path.exists(metadata_filepath):
+                    logger.error(f"Session {session_id}: Probe metadata file not found at {metadata_filepath}")
+                    return
+                    
                 probe_metadata_df = pd.read_csv(metadata_filepath, compression='gzip')
+                
+                # Validate probe metadata
+                if 'probe_id' not in probe_metadata_df.columns:
+                    logger.error(f"Session {session_id}: 'probe_id' column missing from metadata CSV")
+                    return
+                    
                 # Convert probe_id column to string to ensure consistent type for matching keys
-                # (probe_events_dict keys are strings from probe_id_log)
-                if 'probe_id' in probe_metadata_df.columns:
-                     probe_metadata_df['probe_id'] = probe_metadata_df['probe_id'].astype(str)
-                else:
-                     raise ValueError("'probe_id' column missing from metadata CSV.")
-                     
+                probe_metadata_df['probe_id'] = probe_metadata_df['probe_id'].astype(str)
+                
+                # for reruning the global detection without reprocessing the probes, the -fg flag is used to load the existing probe events
+                # Check if we should load existing events instead of processing probes
+                find_global = config['flags'].get('find_global', False)
+                if find_global:
+                    logger.info(f"\n{'='*80}\nLoading existing probe events for global detection\n{'='*80}")
+                    probe_events_dict = {}
+                    # Load all existing probe event files
+                    for probe_id in probelist:
+                        event_file = os.path.join(session_subfolder, f"probe_{probe_id}_karlsson_detector_events.csv.gz")
+                        if os.path.exists(event_file):
+                            try:
+                                events_df = pd.read_csv(event_file, compression='gzip')
+                                probe_events_dict[str(probe_id)] = events_df
+                                logger.info(f"✓ Successfully loaded events for probe {probe_id} ({len(events_df)} events)")
+                            except Exception as e:
+                                logger.error(f"Session {session_id}: Error loading events for probe {probe_id}: {str(e)}")
+                                continue
+                        else:
+                            logger.warning(f"Session {session_id}: No event file found for probe {probe_id}")
+                    logger.info(f"\nLoaded events for {len(probe_events_dict)} probes")
+                
                 # Create global events, passing the DataFrame instead of probe_info dict
                 global_events = create_global_swr_events(
                     probe_events_dict, 
                     global_swr_config, 
-                    probe_metadata_df, # Pass the loaded DataFrame
+                    probe_metadata_df,
                     session_subfolder, 
                     session_id
                 )
                 
                 # Save global events if created successfully
-                # (create_global_swr_events now handles internal filtering logic)
                 if global_events is not None and not global_events.empty:
                     csv_filename = f"session_{session_id}_global_swr_events.csv.gz"
                     csv_path = os.path.join(session_subfolder, csv_filename)
-                    global_events.to_csv(csv_path, index=True, compression="gzip") # Keep index=True?
-                    logger.info(f"Session {session_id}: Created {len(global_events)} global events")
+                    
+                    # Save with a temporary file first
+                    temp_path = csv_path + '.tmp'
+                    global_events.to_csv(temp_path, index=True, compression="gzip")
+                    
+                    # Only rename to final path if save was successful
+                    if os.path.exists(temp_path):
+                        os.rename(temp_path, csv_path)
+                        logger.info(f"Session {session_id}: Created {len(global_events)} global events")
+                    else:
+                        logger.error(f"Session {session_id}: Failed to save global events")
                 else:
                     logger.info(f"Session {session_id}: No global events found that meet criteria after filtering.")
             
-            except FileNotFoundError:
-                 logger.error(f"Session {session_id}: Probe metadata CSV file not found at {metadata_filepath}. Cannot proceed with global event detection.")
             except Exception as e_global:
-                 logger.error(f"Session {session_id}: Error during global event processing: {e_global}")
-                 # Optionally re-raise if this should halt the session
-                 # raise e_global
+                logger.error(f"Session {session_id}: Error during global event processing: {str(e_global)}")
+                logger.error(f"Traceback:\n{traceback.format_exc()}")
+                # Don't delete session data on global event processing errors
+                return
 
         else:
             logger.warning(f"Session {session_id}: No probe events available for global detection")
@@ -1933,20 +1967,38 @@ def process_session(session_id, config):
             except Exception as e_cleanup:
                 logger.error(f"Session {session_id}: Error during loader cleanup after main exception: {e_cleanup}")
         
-        # Remove session directory if it exists (regardless of content)
+        # Check if session directory has existing probe metadata before deciding to delete
         if 'session_subfolder' in locals() and os.path.exists(session_subfolder):
-            try:
-                shutil.rmtree(session_subfolder)
-                logger.warning(f"Session {session_id}: Removed session folder after error")
-            except Exception as e_rm:
-                logger.error(f"Session {session_id}: Failed to remove session folder: {e_rm}")
+            # Look for probe metadata files
+            has_existing_data = any(
+                f.startswith('probe_') and f.endswith('_karlsson_detector_events.csv.gz')
+                for f in os.listdir(session_subfolder)
+            )
+            
+            if not has_existing_data:
+                try:
+                    shutil.rmtree(session_subfolder)
+                    logger.warning(f"Session {session_id}: Removed empty session folder after error")
+                except Exception as e_rm:
+                    logger.error(f"Session {session_id}: Failed to remove session folder: {e_rm}")
+            else:
+                logger.warning(f"Session {session_id}: Preserving session folder with existing probe data")
         
-        # Only try to remove the LFP directory if we were actually saving LFP data
+        # Check if LFP directory has existing data before deciding to delete
         if save_lfp and 'session_lfp_subfolder' in locals() and os.path.exists(session_lfp_subfolder):
-            try:
-                shutil.rmtree(session_lfp_subfolder)
-                logger.warning(f"Session {session_id}: Removed LFP folder after error")
-            except Exception as e_rm:
-                logger.error(f"Session {session_id}: Failed to remove LFP folder: {e_rm}")
-        
+            # Look for LFP files
+            has_existing_lfp = any(
+                f.endswith('_lfp_ca1_putative_pyramidal_layer.npz')
+                for f in os.listdir(session_lfp_subfolder)
+            )
+            
+            if not has_existing_lfp:
+                try:
+                    shutil.rmtree(session_lfp_subfolder)
+                    logger.warning(f"Session {session_id}: Removed empty LFP folder after error")
+                except Exception as e_rm:
+                    logger.error(f"Session {session_id}: Failed to remove LFP folder: {e_rm}")
+            else:
+                logger.warning(f"Session {session_id}: Preserving LFP folder with existing data")
+
 

@@ -1,8 +1,11 @@
-# SWR Neuropixels Detector Pipeline
+# Mouse Hippocampal Sharp Wave Ripple Dataset Curated From Public Neuropixels Datasets
 
 This pipeline processes Neuropixels electrophysiology data from different sources (IBL, Allen Brain Institute Visual Behaviour, Allen Brain Institute Visual Coding) to detect Sharp-Wave Ripples (SWRs).
 
 ## Overview
+![](Images/Workflow_with_scripts1.png)
+## Description
+A repo showcasing how to process and analyze Neuropixels LFP from the two largest publicly available datasets: the ABI Visual Behaviour and the IBL dataset.  Currently both the IBL and ABI datasets are missing NWB files on DANDI archive.  Once they are done I'd like to switch to a single pipeline that processes all of them but right now we have to use the individual APIs to get the full datasets.
 
 The pipeline performs the following main steps:
 
@@ -142,9 +145,7 @@ The `run_pipeline.sh` script accepts the following command-line flags, which can
 |------|-----------|-------------|
 | `-h` | `--help` | Display the help message and exit |
 | `-c FILE` | `--config FILE` | Specify a custom configuration YAML file (default: united_detector_config.yaml) |
-| `-p` | `--run-putative` | Run ONLY the Putative event detection stage |
-| `-f` | `--run-filter` | Run ONLY the event Filtering stage |
-| `-g` | `--run-global` | Run ONLY the Global event consolidation stage |
+| `-fg` | `--find-global` | Run global event detection using existing probe events (skip probe processing) |
 | `-s` | `--save-lfp` | Enable saving of LFP data (overrides config) |
 | `-m` | `--save-channel-metadata` | Enable saving of channel selection metadata |
 | `-o` | `--overwrite-existing` | Overwrite existing session output folders |
@@ -152,8 +153,7 @@ The `run_pipeline.sh` script accepts the following command-line flags, which can
 | `-d` | `--debug` | Enable debug mode (debugpy listening on port 5678) |
 
 **Notes:**
-- If no processing stage flags (`-p`, `-f`, `-g`) are provided, the script runs all processing stages by default.
-- If any processing stage flag is provided, only the specified stage(s) will be run.
+- The `-fg` flag is useful when you want to rerun global event detection using existing probe events without reprocessing the probes. This is helpful when you want to try different global event parameters without redoing the computationally expensive probe processing.
 - The save flags (`-s`, `-m`) and debug flag (`-d`) act as overrides/triggers and can be combined with other flags.
 - Before running the script, ensure the correct conda environment is activated (e.g., `ONE_ibl_env` for IBL data, `allensdk_env` for Allen Brain Institute data).
 
@@ -178,16 +178,18 @@ You can also control other aspects of the pipeline behavior by setting environme
 # Run only the IBL dataset
 ./run_pipeline.sh subset ibl
 
-# Run only putative detection on IBL dataset with LFP saving
-./run_pipeline.sh subset ibl -p -s
+# Run with LFP saving enabled
+./run_pipeline.sh subset ibl -s
 
-# Run filtering and global stages on multiple datasets with metadata saving
-./run_pipeline.sh subset "ibl,abi_visual_behaviour" -f -g -m
+# Rerun global event detection using existing probe events
+# we wanted this so that the user had to explicitly delete files or make 
+# a copy of the session folders without the gobal events 
+./run_pipeline.sh subset abi_visual_behaviour -fg -o
 
-# Run all stages for Visual Coding dataset with overwriting and cleanup
-./run_pipeline.sh subset abi_visual_coding -o -X
+# Run with metadata saving and overwrite existing output
+./run_pipeline.sh subset "ibl,abi_visual_behaviour" -m -o
 
-# Debug the IBL dataset (equivalent to ./run_pipeline.sh debug ibl)
+# Debug the IBL dataset
 ./run_pipeline.sh subset ibl -d
 ```
 

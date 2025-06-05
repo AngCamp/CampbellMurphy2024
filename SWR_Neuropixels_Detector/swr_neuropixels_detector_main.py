@@ -125,9 +125,7 @@ def main():
 
     # Parse command-line arguments for flags
     parser = argparse.ArgumentParser(description="Run SWR Pipeline Stages.")
-    parser.add_argument("-p", "--run-putative", action="store_true", help="Run Putative event detection stage.")
-    parser.add_argument("-f", "--run-filter", action="store_true", help="Run event Filtering stage.")
-    parser.add_argument("-g", "--run-global", action="store_true", help="Run Global event consolidation stage.")
+    parser.add_argument("-fg", "--find-global", action="store_true", help="Run global event detection using existing probe events (skip probe processing).")
     parser.add_argument("-C", "--cleanup-cache", action="store_true", help="Run cache cleanup after processing each session.")
     parser.add_argument("-s", "--save-lfp", action="store_true", help="Enable saving of LFP data.")
     parser.add_argument("-m", "--save-channel-metadata", action="store_true", default=True, help="Enable saving of channel selection metadata.")
@@ -139,6 +137,7 @@ def main():
 
     # Assign flags from args to variables used later
     save_lfp = args.save_lfp
+    find_global = args.find_global
 
     # Determine dataset from environment (still needed for config loading)
     DATASET_TO_PROCESS = os.environ.get('DATASET_TO_PROCESS', '').lower()
@@ -270,9 +269,7 @@ def main():
             "save_channel_metadata": args.save_channel_metadata,
             "overwrite_existing": args.overwrite_existing,
             "cleanup_cache": args.cleanup_cache,
-            "run_putative": args.run_putative,
-            "run_filter": args.run_filter,
-            "run_global": args.run_global,
+            "find_global": args.find_global,
         },
         "pool_size": pool_size,
         "ripple_detection": {
@@ -299,6 +296,7 @@ def main():
     # ===============================================================================
     # Create a partially applied function with the consolidated configuration
     process_func_partial = partial(process_session, config=config)
+    #all_sesh_with_ca1_eid = [1044385384,1065449881]
     
     # Run the processing with the specified number of cores
     print(f"Starting processing pool with {config['pool_size']} workers...")
@@ -345,17 +343,15 @@ def main():
                             # Clean out the directory
                             files_to_remove = []
                             for f in os.listdir(session_subfolder):
-                                # Putative/filter stage files
-                                if (args.run_putative or args.run_filter) and (
+                                # Global stage files
+                                if args.find_global and (
                                     re.match(r"probe_.*_channel_.*_karlsson_detector_events\\.csv\\.gz", f) or
                                     re.match(r"probe_.*_channel_.*_gamma_band_events\\.csv\\.gz", f) or
                                     re.match(r"probe_.*_channel_.*_movement_artifacts\\.csv\\.gz", f) or
                                     re.match(r"probe_.*_channel_selection_metadata\\.json\\.gz", f) or
-                                    re.match(r"session_.*_probe_metadata\\.csv\\.gz", f)
+                                    re.match(r"session_.*_probe_metadata\\.csv\\.gz", f) or
+                                    re.match(r"session_.*_global_swr_events\\.csv\\.gz", f)
                                 ):
-                                    files_to_remove.append(f)
-                                # Global stage files
-                                if args.run_global and re.match(r"session_.*_global_swr_events\\.csv\\.gz", f):
                                     files_to_remove.append(f)
                             for f in set(files_to_remove):
                                 try:

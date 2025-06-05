@@ -6,7 +6,7 @@
 
 # Output directory for all results
 export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_swr_data"}
-
+#export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/muckingabout"}
 
 # Cache directories for datasets (where raw data is stored/downloaded)
 export ABI_VISUAL_CODING_SDK_CACHE=${ABI_VISUAL_CODING_SDK_CACHE:-"/space/scratch/allen_viscoding_data"}
@@ -40,9 +40,7 @@ show_help() {
   echo "  -h, --help                      Show this help message and exit"
   echo "  -c, --config FILE               Specify a custom configuration YAML file"
   echo "                                  (default: united_detector_config.yaml)"
-  echo "  -p, --run-putative              Run ONLY the Putative event detection stage"
-  echo "  -f, --run-filter                Run ONLY the event Filtering stage"
-  echo "  -g, --run-global                Run ONLY the Global event consolidation stage"
+  echo "  -fg, --find-global             Run global event detection using existing probe events (skip probe processing)"
   echo "  -s, --save-lfp, --save-lfp-data Enable saving of LFP data (overrides config)"
   echo "  -m, --save-metadata             Enable saving of channel selection metadata"
   echo "  -o, --overwrite, --overwrite-existing   Overwrite existing session output folders"
@@ -54,8 +52,9 @@ show_help() {
   echo "  ./run_pipeline.sh subset ibl              # Run only the IBL dataset"
   echo "  ./run_pipeline.sh subset ibl,abi_visual_behaviour   # Run IBL and ABI Visual Behaviour"
   echo "  ./run_pipeline.sh debug ibl               # Debug the IBL dataset"
-  echo "  ./run_pipeline.sh subset ibl -p -s        # Run IBL with only putative stage and save LFP"
-  echo "  ./run_pipeline.sh subset ibl --save-lfp --run-putative  # Same as above with descriptive flags"
+  echo "  ./run_pipeline.sh subset ibl -s           # Run IBL and save LFP"
+  echo "  ./run_pipeline.sh subset ibl --save-lfp   # Same as above with descriptive flags"
+  echo "  ./run_pipeline.sh subset ibl -fg          # Run IBL with only global event detection using existing probe events"
   echo ""
   echo "Environment Variables:"
   echo "  DATASET_TO_PROCESS         Alternative way to specify dataset to process"
@@ -74,14 +73,12 @@ fi
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PYTHON_CMD="python"
 CONFIG_FILE="united_detector_config.yaml"
-RUN_PUTATIVE=false
-RUN_FILTER=false
-RUN_GLOBAL=false
 CLEANUP_AFTER=false
 SAVE_LFP=false
 SAVE_CHANNEL_METADATA=true
 OVERWRITE_EXISTING=false
 DEBUG_MODE=false
+FIND_GLOBAL=false
 
 # Initialize defaults
 COMMAND="all"
@@ -103,83 +100,46 @@ elif [[ "$1" == "debug" && -n "$2" ]]; then
 fi
 
 # Parse remaining options
-while getopts "c:pfgsmoXdh-:" opt; do
-  case ${opt} in
-    c)
-      CONFIG_FILE=$OPTARG
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -c|--config)
+      CONFIG_FILE="$2"
+      shift 2
       ;;
-    p)
-      RUN_PUTATIVE=true
+    -fg|--find-global)
+      FIND_GLOBAL=true
+      shift
       ;;
-    f)
-      RUN_FILTER=true
-      ;;
-    g)
-      RUN_GLOBAL=true
-      ;;
-    s)
+    -s|--save-lfp|--save-lfp-data)
       SAVE_LFP=true
+      shift
       ;;
-    m)
+    -m|--save-metadata|--save-channel-metadata)
       SAVE_CHANNEL_METADATA=true
+      shift
       ;;
-    o)
+    -o|--overwrite|--overwrite-existing)
       OVERWRITE_EXISTING=true
+      shift
       ;;
-    X)
+    -X|--cleanup|--cleanup-after)
       CLEANUP_AFTER=true
+      shift
       ;;
-    d)
+    -d|--debug)
       DEBUG_MODE=true
+      shift
       ;;
-    h)
+    -h|--help)
       show_help
       exit 0
       ;;
-    -)
-      case "${OPTARG}" in
-        help)
-          show_help
-          exit 0
-          ;;
-        config)
-          CONFIG_FILE="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
-          ;;
-        run-putative)
-          RUN_PUTATIVE=true
-          ;;
-        run-filter)
-          RUN_FILTER=true
-          ;;
-        run-global)
-          RUN_GLOBAL=true
-          ;;
-        save-lfp|save-lfp-data)
-          SAVE_LFP=true
-          ;;
-        save-metadata|save-channel-metadata)
-          SAVE_CHANNEL_METADATA=true
-          ;;
-        overwrite|overwrite-existing)
-          OVERWRITE_EXISTING=true
-          ;;
-        cleanup|cleanup-after)
-          CLEANUP_AFTER=true
-          ;;
-        debug)
-          DEBUG_MODE=true
-          ;;
-        *)
-          echo "Invalid option: --${OPTARG}" >&2
-          show_help
-          exit 1
-          ;;
-      esac
+    --)
+      shift
+      break
       ;;
-    \?)
-      echo "Invalid option: -$OPTARG" >&2
-      show_help
-      exit 1
+    *)
+      break
       ;;
   esac
 done
@@ -219,9 +179,7 @@ echo "- Datasets to process: $DATASETS"
 echo "- DATASET_TO_PROCESS: $DATASET_TO_PROCESS"
 echo "- Debug mode: $DEBUG_MODE"
 echo "- Configuration file: $CONFIG_FILE"
-if [[ "$RUN_PUTATIVE" == "true" ]]; then echo "- Running putative detection stage"; fi
-if [[ "$RUN_FILTER" == "true" ]]; then echo "- Running filtering stage"; fi
-if [[ "$RUN_GLOBAL" == "true" ]]; then echo "- Running global event stage"; fi
+if [[ "$FIND_GLOBAL" == "true" ]]; then echo "- Running global event detection using existing probe events"; fi
 if [[ "$SAVE_LFP" == "true" ]]; then echo "- Saving LFP data"; fi
 if [[ "$SAVE_CHANNEL_METADATA" == "true" ]]; then echo "- Saving channel selection metadata"; fi
 if [[ "$OVERWRITE_EXISTING" == "true" ]]; then echo "- Overwriting existing data"; fi
@@ -240,9 +198,7 @@ export CONFIG_PATH=${CONFIG_PATH:-"$(pwd)/united_detector_config.yaml"}
 
 # Build command-line arguments for the Python script
 PYTHON_ARGS=""
-if [[ "$RUN_PUTATIVE" == "true" ]]; then PYTHON_ARGS+=" --run-putative"; fi
-if [[ "$RUN_FILTER" == "true" ]]; then PYTHON_ARGS+=" --run-filter"; fi
-if [[ "$RUN_GLOBAL" == "true" ]]; then PYTHON_ARGS+=" --run-global"; fi
+if [[ "$FIND_GLOBAL" == "true" ]]; then PYTHON_ARGS+=" --find-global"; fi
 if [[ "$SAVE_LFP" == "true" ]]; then PYTHON_ARGS+=" --save-lfp"; fi
 if [[ "$SAVE_CHANNEL_METADATA" == "true" ]]; then PYTHON_ARGS+=" --save-channel-metadata"; fi
 if [[ "$OVERWRITE_EXISTING" == "true" ]]; then PYTHON_ARGS+=" --overwrite-existing"; fi

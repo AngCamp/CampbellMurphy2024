@@ -77,7 +77,7 @@ global_swr_detection:
   min_events_per_probe: 100  # Minimum number of events per probe
   min_filtered_events: 50    # Minimum number of events after filtering
   min_sw_power: 1.0          # Minimum sharpwave power (z-score)
-  merge_window: 0.02         # Merge window for global events (in seconds)
+  merge_window: 0.06         # Merge window for global events (in seconds)
   min_probe_count: 2         # Minimum number of probes for a global event
   exclude_gamma: true        # Whether to exclude events with gamma overlap
   exclude_movement: true     # Whether to exclude events with movement artifact overlap
