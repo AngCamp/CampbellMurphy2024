@@ -1952,6 +1952,13 @@ def process_session(session_id, config):
                             logger.error(f"Session {session_id}: Error loading events for probe {probe_id}: {str(e)}")
                             continue
                     logger.info(f"\nLoaded events for {len(probe_events_dict)} probes")
+                    
+                    # Regenerate metadata from cache for each probe
+                    all_probe_metadata = []
+                    for probe_id in probe_events_dict.keys():
+                        probe_metadata = loader.get_metadata_for_probe(probe_id, config=config)
+                        all_probe_metadata.append(probe_metadata)
+                    probe_metadata_df = pd.DataFrame(all_probe_metadata)
                 
                 # Create global events, passing the DataFrame instead of probe_info dict
                 global_events = create_global_swr_events(
