@@ -1613,6 +1613,13 @@ def process_session(session_id, config):
     loader = None  # Initialize loader to None
     
     try:
+        # Check if we're in find_global mode and the session folder doesn't exist
+        if config['flags'].get('find_global', False):
+            session_subfolder = os.path.join(swr_output_dir_path, f"swrs_session_{str(session_id)}")
+            if not os.path.exists(session_subfolder):
+                logger.info(f"Session {session_id}: No folder for Find Globals to run in, prior probe level detection likely failed, skipping")
+                return
+
         # Create session subfolder paths
         session_subfolder = os.path.join(swr_output_dir_path, f"swrs_session_{str(session_id)}")
         
