@@ -73,7 +73,7 @@ ibl:
   
 # Global SWR Detection Settings (common)
 global_swr_detection:
-  min_ca1_units: 0          # Minimum number of good units in CA1 to include a probe
+  min_ca1_units: 10          # Minimum number of good units in CA1 to include a probe
   min_events_per_probe: 100  # Minimum number of events per probe
   min_filtered_events: 50    # Minimum number of events after filtering
   min_sw_power: 1.0          # Minimum sharpwave power (z-score)

@@ -28,7 +28,7 @@ class abi_visual_behaviour_loader(BaseLoader):
     def set_up(self, cache_directory=None):
         """Sets up the EcephysProjectCache and loads the session."""
         # Set up the cache
-        config_path = os.environ.get('CONFIG_PATH', 'expanded_config.yaml')
+        config_path = os.environ.get('CONFIG_PATH')
         
         with open(config_path, "r") as f:
             raw_content = f.read()

@@ -499,31 +499,19 @@ class BaseLoader:
         # Initialize lists to store metrics for each channel
         channel_metrics = []
         
-        print(f"Processing {len(ca1_chan_ids)} CA1 channels for ripple channel selection") #debugging
-        print(f"CA1 channel IDs: {ca1_chan_ids}") #debugging
-        print(f"Channel positions shape: {channel_positions.shape}") #debugging
-        
         # Process each CA1 channel
         for chan_idx, chan_id in enumerate(ca1_chan_ids):
-            print(f"\nProcessing channel {chan_id} (index {chan_idx})") #debugging
-            
             # Get raw LFP for this channel
             chan_lfp = ca1_lfp[:, chan_idx]
-            print(f"Channel LFP shape: {chan_lfp.shape}") #debugging
             
             # Filter to ripple band
             ripple_band = ripple_filter_func(chan_lfp[:, None])
             ripple_band = ripple_band.flatten()  # Remove extra dimension
-            print(f"Ripple band shape after filtering: {ripple_band.shape}") #debugging
             
             # Calculate power and skewness
             ripple_power = np.abs(hilbert(ripple_band)) ** 2
             net_power = np.sum(ripple_power)
             skewness = skew(ripple_power)
-            
-            print(f"Channel {chan_id} metrics:") #debugging
-            print(f"  Net power: {net_power}") #debugging
-            print(f"  Skewness: {skewness}")  #debugging
             
             # Store metrics
             channel_metrics.append({
@@ -543,14 +531,9 @@ class BaseLoader:
             
         # Convert to DataFrame for easier selection
         metrics_df = pd.DataFrame(channel_metrics)
-        print("\nMetrics DataFrame:") #debugging
-        print(metrics_df) #debugging
-        print("\nMetrics DataFrame columns:", metrics_df.columns.tolist()) #debugging
         
         # Select channel with highest net power
         best_channel = metrics_df.loc[metrics_df['net_power'].idxmax()]
-        print(f"\nSelected best channel:") #debugging
-        print(best_channel) #debugging
             
         # Update metadata with selection info
         self.channel_selection_metadata_dict['ripple_band']['selected_channel_id'] = int(best_channel['channel_id'])
@@ -820,14 +803,85 @@ class BaseLoader:
 
         return out_df
 
-    def cleanup(self):
-        """Clean up resources."""
-        raise NotImplementedError("Subclasses must implement cleanup method")
+
+    def events_dict_from_files(self, session_subfolder, session_id, logger):
+        """Load probe events from existing files in the session directory.
+        
+        Args:
+            session_subfolder (str): Path to the session directory
+            session_id (str): Session ID for logging
+            logger: Logger instance for logging messages
+            
+        Returns:
+            dict: Dictionary mapping probe IDs to their event DataFrames
+        """
+        probe_events_dict = {}
+        # Find all probe event files in the session directory
+        event_files = [f for f in os.listdir(session_subfolder) if f.endswith('_karlsson_detector_events.csv.gz')]
+        for event_file in event_files:
+            # Extract probe_id from filename: probe_<probe_id>_channel_...
+            match = re.match(r'probe_(.*?)_channel_.*_karlsson_detector_events\.csv\.gz', event_file)
+            if match:
+                probe_id = match.group(1)
+            else:
+                logger.warning(f"Session {session_id}: Could not extract probe_id from {event_file}")
+                continue
+            full_path = os.path.join(session_subfolder, event_file)
+            try:
+                events_df = pd.read_csv(full_path, compression='gzip')
+                probe_events_dict[str(probe_id)] = events_df
+                logger.info(f"✓ Successfully loaded events for probe {probe_id} ({len(events_df)} events)")
+            except Exception as e:
+                logger.error(f"Session {session_id}: Error loading events for probe {probe_id}: {str(e)}")
+                continue
+        logger.info(f"\nLoaded events for {len(probe_events_dict)} probes")
+        return probe_events_dict
+
+    def save_settings_metadata(self, output_path, config, logger):
+        """
+        Save the detector settings metadata as a compressed JSON file.
+        
+        Args:
+            output_path: Full path where to save the settings file
+            config: The configuration dictionary containing all settings
+            logger: Logger instance to use for logging
+        """
+        try:
+            # Extract relevant settings
+            settings = {
+                "run_name": config["run_details"]["run_name"],
+                "thresholds": {
+                    "gamma_event_thresh": config["artifact_detection"]["gamma_event_thresh"],
+                    "ripple_band_threshold": config["ripple_detection"]["ripple_band_threshold"],
+                    "movement_artifact_ripple_band_threshold": config["ripple_detection"]["movement_artifact_ripple_band_threshold"],
+                    "merge_events_offset": 0.025  # Hardcoded in config
+                },
+                "global_swr_detection": config["global_swr"],
+                "dataset": config["run_details"]["dataset_to_process"],
+                "sampling_rates": config["sampling_rates"]
+            }
+            
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            
+            # Save as compressed JSON
+            with gzip.open(output_path, 'wt', encoding='utf-8') as f:
+                json.dump(settings, f, indent=2)
+                
+            logger.info(f"Saved settings metadata to {output_path}")
+        except Exception as e:
+            logger.error(f"Error saving settings metadata: {str(e)}")
+            raise
+    
     # Abstract method stubs that must be implemented by subclasses
     # Due to dependency conflicts in the apis, differences in metadata labels or conventions
     # the code is sufficiently different to implement all of these steps
     # that they have implmented in their own seperate classes, see the _loader.py files
     # for the code there
+    def cleanup(self):
+        """Clean up resources."""
+        raise NotImplementedError("Subclasses must implement cleanup method")
+    
     def set_up(self):
         """Setup the loader and initialize connections."""
         raise NotImplementedError("Subclasses must implement set_up method")
@@ -843,6 +897,11 @@ class BaseLoader:
     def process_probe(self, probe_id, filter_ripple_band_func=None):
         """Process a single probe."""
         raise NotImplementedError("Subclasses must implement process_probe method")  
+
+    def get_metadata_for_probe(self, probe_id, config=None):
+        """Get metadata for a specific probe."""
+        raise NotImplementedError("Subclasses must implement get_metadata_for_probe")
+
 
 # ===================================
 #  PROBE LEVEL EVENT DETECTOR
@@ -1253,9 +1312,13 @@ def add_participating_probes(global_events, probe_events_dict, offset=0.02):
                 
                 # Get peak time and power from the strongest overlapping event
                 overlapping_events = probe_df[overlap]
-                max_idx = overlapping_events['power_max_zscore'].idxmax()
-                global_events.at[i, 'peak_times'].append(overlapping_events.loc[max_idx, 'power_peak_time'])
-                global_events.at[i, 'peak_powers'].append(overlapping_events.loc[max_idx, 'power_max_zscore'])
+                if not overlapping_events.empty:
+                    max_idx = overlapping_events['power_max_zscore'].idxmax()
+                    if pd.notna(max_idx):  # Check if max_idx is not NaN
+                        global_events.at[i, 'peak_times'].append(overlapping_events.loc[max_idx, 'power_peak_time'])
+                        global_events.at[i, 'peak_powers'].append(overlapping_events.loc[max_idx, 'power_max_zscore'])
+                else:
+                    print("WARNING: No overlapping events found despite overlap=True")
 
     # Add count of participating probes
     global_events['probe_count'] = global_events['participating_probes'].apply(len)
@@ -1274,9 +1337,9 @@ def add_participating_probes(global_events, probe_events_dict, offset=0.02):
     
     return global_events
 
-def create_global_events(probe_events_dict, merge_window=0.02, min_probe_count=1):
+def merge_probe_events(probe_events_dict, merge_window, min_probe_count=1):
     """
-    Create global events by merging events across probes.
+    Identify potential multiprobe 'global' events by merging co-occurring events across probes.
     
     Parameters
     ----------
@@ -1459,13 +1522,13 @@ def create_global_swr_events(probe_events_dict, swr_config, probe_metadata_df, s
 
     # Create global events using the unit-filtered probes
     try:
-        global_events = create_global_events(
+        global_events = merge_probe_events(
             unit_filtered_probe_events_dict,
-            merge_window=swr_config.get('merge_window', 0.02),
+            merge_window=swr_config.get('merge_window'),
             min_probe_count=swr_config.get('min_probe_count', 1)
         )
     except ValueError as e_create:
-        # create_global_events raises ValueError if no intervals or merged events found
+        # merge_probe_events raises ValueError if no intervals or merged events found
         logger.warning(f"Session {session_id}: Error during global event creation: {e_create}")
         return None
     
@@ -1556,38 +1619,6 @@ def process_session(session_id, config):
         # Create LFP subfolder path
         if save_lfp:
             session_lfp_subfolder = os.path.join(lfp_output_dir_path, f"lfp_session_{str(session_id)}")
-        
-        # Handle overwrite based on which stages we're running
-        if os.path.exists(session_subfolder):
-            # Check if the session directory contains probe metadata
-            metadata_file = os.path.join(session_subfolder, f"session_{session_id}_probe_metadata.csv.gz")
-            if os.path.exists(metadata_file) and not overwrite_existing:
-                logger.info(f"Session {session_id}: Output directory exists and contains probe metadata. Skipping processing.")
-                return
-            elif os.path.exists(metadata_file) and overwrite_existing:
-                logger.info(f"Session {session_id}: Output directory exists and contains probe metadata. Overwriting enabled.")
-            elif not os.path.exists(metadata_file) and os.listdir(session_subfolder) and not overwrite_existing:
-                # Check if we need to skip based on what we're trying to do
-                if run_putative and any(f.startswith('probe_') for f in os.listdir(session_subfolder)):
-                    logger.info(f"Session {session_id}: Probe-level files exist and overwrite not enabled. Skipping putative detection.")
-                    return
-                if run_filter and any(f.endswith('_karlsson_detector_events.csv.gz') for f in os.listdir(session_subfolder)):
-                    logger.info(f"Session {session_id}: Filtered event files exist and overwrite not enabled. Skipping filtering.")
-                    return
-                if run_global and any(f.startswith('session_') and 'global_swr' in f for f in os.listdir(session_subfolder)):
-                    logger.info(f"Session {session_id}: Global event files exist and overwrite not enabled. Skipping global detection.")
-                    return
-            elif not os.path.exists(metadata_file) and os.listdir(session_subfolder) and overwrite_existing:
-                logger.info(f"Session {session_id}: Output directory exists and contains files. Overwriting enabled.")
-                # Clean out the directory
-                for item in os.listdir(session_subfolder):
-                    item_path = os.path.join(session_subfolder, item)
-                    if os.path.isfile(item_path):
-                        os.unlink(item_path)
-                    elif os.path.isdir(item_path):
-                        shutil.rmtree(item_path)
-                # Recreate the empty directory
-                os.makedirs(session_subfolder, exist_ok=True)
         
         # Create directories
         os.makedirs(session_subfolder, exist_ok=True)
@@ -1852,15 +1883,30 @@ def process_session(session_id, config):
             logger.info(f"\n{'='*80}\nSkipping probe processing (find_global=True)\n{'='*80}")
 
         # --- Save Probe Metadata CSV --- 
-        # Saves metadata for all probes that were *successfully* processed (didn't return None)
-        logger.info(f"Session {session_id}: Saving probe metadata CSV ({len(all_probe_metadata)} entries).")
-        metadata_df = pd.DataFrame(all_probe_metadata)
-        metadata_filename = f"session_{session_id}_probe_metadata.csv.gz"
-        metadata_filepath = os.path.join(session_subfolder, metadata_filename)
-        metadata_df.to_csv(metadata_filepath, index=False, compression="gzip")
-        logger.info(f"Session {session_id}: Saved probe metadata to {metadata_filepath}")
+        # Only save metadata if we're not in find_global mode (since we didn't process probes)
+        if not config['flags'].get('find_global', False):
+            metadata_filepath = os.path.join(session_subfolder, f"session_{session_id}_probe_metadata.csv.gz")
+            if os.path.exists(metadata_filepath) and not overwrite_existing:
+                logger.info(f"Session {session_id}: Metadata file exists and overwrite not enabled. Skipping metadata save.")
+            else:
+                if os.path.exists(metadata_filepath):
+                    os.remove(metadata_filepath)
+                    logger.info(f"Session {session_id}: Removed existing metadata file for overwrite.")
+                logger.info(f"Session {session_id}: Saving probe metadata CSV ({len(all_probe_metadata)} entries).")
+                metadata_df = pd.DataFrame(all_probe_metadata)
+                metadata_df.to_csv(metadata_filepath, index=False, compression="gzip")
+                logger.info(f"Session {session_id}: Saved probe metadata to {metadata_filepath}")
 
         # Process global ripples if we have probe events
+        if config['flags'].get('find_global', False):
+            logger.info(f"\n{'='*80}\nLoading existing probe events for global detection\n{'='*80}")
+            probe_events_dict = loader.events_dict_from_files(session_subfolder, session_id, logger)
+            # Set metadata filepath for find_global mode
+            metadata_filepath = os.path.join(session_subfolder, f"session_{session_id}_probe_metadata.csv.gz")
+        else:
+            logger.info(f"\n{'='*80}\nSkipping probe processing (find_global=True)\n{'='*80}")
+
+        # Process global events if we have probe events
         if probe_events_dict:
             process_stage = "Detecting Global Ripples"
             logger.info(f"Session {session_id}: Detecting global ripples")
@@ -1887,19 +1933,24 @@ def process_session(session_id, config):
                 if find_global:
                     logger.info(f"\n{'='*80}\nLoading existing probe events for global detection\n{'='*80}")
                     probe_events_dict = {}
-                    # Load all existing probe event files
-                    for probe_id in probelist:
-                        event_file = os.path.join(session_subfolder, f"probe_{probe_id}_karlsson_detector_events.csv.gz")
-                        if os.path.exists(event_file):
-                            try:
-                                events_df = pd.read_csv(event_file, compression='gzip')
-                                probe_events_dict[str(probe_id)] = events_df
-                                logger.info(f"✓ Successfully loaded events for probe {probe_id} ({len(events_df)} events)")
-                            except Exception as e:
-                                logger.error(f"Session {session_id}: Error loading events for probe {probe_id}: {str(e)}")
-                                continue
+                    # Find all probe event files in the session directory
+                    event_files = [f for f in os.listdir(session_subfolder) if f.endswith('_karlsson_detector_events.csv.gz')]
+                    for event_file in event_files:
+                        # Extract probe_id from filename: probe_<probe_id>_channel_...
+                        match = re.match(r'probe_(.*?)_channel_.*_karlsson_detector_events\.csv\.gz', event_file)
+                        if match:
+                            probe_id = match.group(1)
                         else:
-                            logger.warning(f"Session {session_id}: No event file found for probe {probe_id}")
+                            logger.warning(f"Session {session_id}: Could not extract probe_id from {event_file}")
+                            continue
+                        full_path = os.path.join(session_subfolder, event_file)
+                        try:
+                            events_df = pd.read_csv(full_path, compression='gzip')
+                            probe_events_dict[str(probe_id)] = events_df
+                            logger.info(f"✓ Successfully loaded events for probe {probe_id} ({len(events_df)} events)")
+                        except Exception as e:
+                            logger.error(f"Session {session_id}: Error loading events for probe {probe_id}: {str(e)}")
+                            continue
                     logger.info(f"\nLoaded events for {len(probe_events_dict)} probes")
                 
                 # Create global events, passing the DataFrame instead of probe_info dict
@@ -1916,18 +1967,19 @@ def process_session(session_id, config):
                     csv_filename = f"session_{session_id}_global_swr_events.csv.gz"
                     csv_path = os.path.join(session_subfolder, csv_filename)
                     
-                    # Save with a temporary file first
-                    temp_path = csv_path + '.tmp'
-                    global_events.to_csv(temp_path, index=True, compression="gzip")
-                    
-                    # Only rename to final path if save was successful
-                    if os.path.exists(temp_path):
-                        os.rename(temp_path, csv_path)
-                        logger.info(f"Session {session_id}: Created {len(global_events)} global events")
+                    # Check if file exists and handle overwrite
+                    if os.path.exists(csv_path):
+                        if not overwrite_existing:
+                            logger.warning(f"Session {session_id}: Global events file exists and overwrite not enabled. Skipping save.")
+                        else:
+                            logger.warning(f"Session {session_id}: Global events file exists and will be overwritten.")
+                            global_events.to_csv(csv_path, index=True, compression="gzip")
+                            logger.info(f"Session {session_id}: Created {len(global_events)} global events")
                     else:
-                        logger.error(f"Session {session_id}: Failed to save global events")
+                        global_events.to_csv(csv_path, index=True, compression="gzip")
+                        logger.info(f"Session {session_id}: Created {len(global_events)} global events")
                 else:
-                    logger.info(f"Session {session_id}: No global events found that meet criteria after filtering.")
+                    logger.warning(f"Session {session_id}: No global events were created - check probe criteria and event counts")
             
             except Exception as e_global:
                 logger.error(f"Session {session_id}: Error during global event processing: {str(e_global)}")
@@ -1937,6 +1989,10 @@ def process_session(session_id, config):
 
         else:
             logger.warning(f"Session {session_id}: No probe events available for global detection")
+        
+        # Save settings metadata for this run
+        run_settings_path = os.path.join(session_subfolder, f"session_{session_id}_run_settings.json.gz")
+        loader.save_settings_metadata(run_settings_path, config, logger)
         
         # Cleanup resources
         if loader is not None:
@@ -2000,5 +2056,26 @@ def process_session(session_id, config):
                     logger.error(f"Session {session_id}: Failed to remove LFP folder: {e_rm}")
             else:
                 logger.warning(f"Session {session_id}: Preserving LFP folder with existing data")
+
+        # Handle overwrite and skipping logic for global detection
+        if config['flags'].get('find_global', False):
+            # Only require probe metadata for global detection if -fg flag is present
+            metadata_file = os.path.join(session_subfolder, f"session_{session_id}_probe_metadata.csv.gz")
+            if not os.path.exists(metadata_file):
+                logger.info(f"Session {session_id}: Probe metadata missing, skipping global detection.")
+                return
+
+            # Check for existing global SWR files
+            global_swr_files = [f for f in os.listdir(session_subfolder) if f.startswith(f"session_{session_id}_global_swrs_") and f.endswith(".csv.gz")]
+            if global_swr_files:
+                if not overwrite_existing:
+                    logger.info(f"Session {session_id}: Global SWR file(s) exist and overwrite not enabled. Skipping global detection.")
+                    return
+                else:
+                    # Overwrite: delete existing global SWR files
+                    for f in global_swr_files:
+                        os.remove(os.path.join(session_subfolder, f))
+                    logger.info(f"Session {session_id}: Deleted existing global SWR files for overwrite.")
+            # (Continue to run global detection after this block)
 
 

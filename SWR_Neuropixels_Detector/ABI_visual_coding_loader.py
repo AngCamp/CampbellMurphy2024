@@ -186,31 +186,31 @@ class abi_visual_coding_loader(BaseLoader):
         
         # Find channel with highest ripple power - REMOVED conditional logic
         # --- Select Ripple Channel (Now runs unconditionally) --- 
-            this_chan_id, peakrippleband, peakripchan_lfp_ca1 = self.select_ripple_channel(
-                ca1_lfp=lfp_ca1,
-                ca1_chan_ids=lfp_ca1_chans,
-                channel_positions=all_channel_positions, # Pass the extracted positions
+        this_chan_id, peakrippleband, peakripchan_lfp_ca1 = self.select_ripple_channel(
+            ca1_lfp=lfp_ca1,
+            ca1_chan_ids=lfp_ca1_chans,
+            channel_positions=all_channel_positions, # Pass the extracted positions
             ripple_filter_func=filter_ripple_band_func, # Assumed to be valid
-                config=None # Pass config if needed
-            )
+            config=None # Pass config if needed
+        )
 
         # --- Select Sharp Wave Channel (Now runs unconditionally) --- 
-            best_sw_chan_id, best_sw_chan_lfp = super().select_sharpwave_channel(
-                ca1_lfp=lfp_ca1,
-                lfp_time_index=lfp_time_index,  
-                ca1_chan_ids=lfp_ca1_chans,
-                peak_ripple_chan_id=this_chan_id, # Pass selected ripple channel ID
-                channel_positions=all_channel_positions,
-                ripple_filtered=peakrippleband,
-                config=None, # Pass config if needed
-                filter_path=getattr(self, 'sw_component_filter_path', None) # Use attribute if exists
-            )
+        best_sw_chan_id, best_sw_chan_lfp = super().select_sharpwave_channel(
+            ca1_lfp=lfp_ca1,
+            lfp_time_index=lfp_time_index,  
+            ca1_chan_ids=lfp_ca1_chans,
+            peak_ripple_chan_id=this_chan_id, # Pass selected ripple channel ID
+            channel_positions=all_channel_positions,
+            ripple_filtered=peakrippleband,
+            config=None, # Pass config if needed
+            filter_path=getattr(self, 'sw_component_filter_path', None) # Use attribute if exists
+        )
 
         # Extract sharpwave channel information - Remove None check
         # Assumes select_sharpwave_channel raises error or returns valid LFP.
         # If it returns None unexpectedly, the next lines will raise an explicit error.
-                best_sw_chan_lfp = best_sw_chan_lfp.flatten()
-                best_sw_power_z = zscore(best_sw_chan_lfp)
+        best_sw_chan_lfp = best_sw_chan_lfp.flatten()
+        best_sw_power_z = zscore(best_sw_chan_lfp)
 
         del lfp_ca1
 
@@ -288,7 +288,7 @@ class abi_visual_coding_loader(BaseLoader):
 
         # --- CA1 Analysis ---
         # Allow potential KeyErrors to propagate
-            ca1_channels = probe_channels[probe_channels.ecephys_structure_acronym == "CA1"]
+        ca1_channels = probe_channels[probe_channels.ecephys_structure_acronym == "CA1"]
         metadata['ca1_channel_count'] = len(ca1_channels)
 
         # Calculate CA1 span (unconditionally, assuming >1 channel)
