@@ -95,11 +95,11 @@ class SWRExplorer:
                 self.data[source][session_id] = {}
                 
                 # Find all probe event files
-                for event_file in session_dir.glob("probe_*_karlsson_detector_events.csv.gz"):
+                for event_file in session_dir.glob("probe_*_channel_*_putative_swr_events.csv.gz"):
                     try:
-                        # Extract probe ID from filename (e.g., "probe_1098236048_channel_1100921954_karlsson_detector_events.csv.gz" or "probe_abc123_channel_xyz_karlsson_detector_events.csv.gz")
+                        # Extract probe ID from filename
                         filename = event_file.name
-                        probe_match = re.search(r'probe_([^_]+)_channel_[^_]+_karlsson_detector_events', filename)
+                        probe_match = re.search(r'probe_([^_]+)_channel_[^_]+_putative_swr_events', filename)
                         if not probe_match:
                             print(f"Warning: Could not extract probe ID from filename: {filename}")
                             continue
@@ -108,8 +108,28 @@ class SWRExplorer:
                         if probe_id not in self.data[source][session_id]:
                             self.data[source][session_id][probe_id] = {}
                         
+                        print(f"\n[DEBUG] Loading events for {source}/{session_id}/probe_{probe_id}")
                         with gzip.open(event_file, 'rt') as f:
-                            self.data[source][session_id][probe_id]['events'] = pd.read_csv(f)
+                            events_df = pd.read_csv(f)
+                            print(f"[DEBUG] Raw events DataFrame info:")
+                            print(events_df.info())
+                            print("\n[DEBUG] First few rows of raw events:")
+                            print(events_df.head())
+                            print("\n[DEBUG] Index values (first 10):")
+                            print(events_df.index.values[:10])
+                            
+                            # Check for 'Unnamed: 0' column
+                            if 'Unnamed: 0' in events_df.columns:
+                                print(f"\n[DEBUG] Found 'Unnamed: 0' column, renaming to 'event_id'")
+                                events_df = events_df.rename(columns={'Unnamed: 0': 'event_id'})
+                                events_df = events_df.set_index('event_id')
+                                print("\n[DEBUG] After setting index:")
+                                print(events_df.head())
+                                print("\n[DEBUG] New index values (first 10):")
+                                print(events_df.index.values[:10])
+                            
+                            self.data[source][session_id][probe_id]['events'] = events_df
+                            
                     except Exception as e:
                         print(f"Error loading {event_file}: {e}")
                         continue
@@ -340,6 +360,11 @@ class SWRExplorer:
             
         events = self.data[dataset][session_id][probe_id]['events'].copy()
         
+        print(f"\n[DEBUG] Filtering events for {dataset}/{session_id}/probe_{probe_id}")
+        print(f"[DEBUG] Initial events shape: {events.shape}")
+        print(f"[DEBUG] Initial events index values (first 10):")
+        print(events.index.values[:10])
+        
         # Apply basic filters
         mask = (events['sw_peak_power'] > min_sw_power) & (events['duration'] > min_duration)
         
@@ -350,6 +375,11 @@ class SWRExplorer:
             
         filtered_events = events[mask].copy()
         
+        print(f"\n[DEBUG] After basic filtering:")
+        print(f"Shape: {filtered_events.shape}")
+        print(f"Index values (first 10):")
+        print(filtered_events.index.values[:10])
+        
         # Apply speed filter if requested
         if max_speed is not None and speed_data is not None:
             speeds = []
@@ -358,6 +388,11 @@ class SWRExplorer:
                 speeds.append(speed)
             filtered_events['speed'] = speeds
             filtered_events = filtered_events[filtered_events['speed'] <= max_speed]
+            
+            print(f"\n[DEBUG] After speed filtering:")
+            print(f"Shape: {filtered_events.shape}")
+            print(f"Index values (first 10):")
+            print(filtered_events.index.values[:10])
             
         return filtered_events.sort_values('sw_ripple_clcorr', ascending=False)
     
@@ -379,10 +414,22 @@ class SWRExplorer:
         pd.Series
             The event row as a Series
         """
+        print(f"\n[DEBUG] Getting event by index for {dataset}/{session_id}/probe_{probe_id}")
+        print(f"[DEBUG] Requested event_id: {event_id}")
+        
         events = self.data[dataset][session_id][probe_id]['events']
+        print(f"[DEBUG] Available events index values (first 10):")
+        print(events.index.values[:10])
+        
         if event_id not in events.index:
+            print(f"[DEBUG] Event ID {event_id} not found in index")
+            print(f"[DEBUG] Index contains values: {events.index.values}")
             raise ValueError(f"Event ID {event_id} not found in events for probe {probe_id}.")
-        return events.loc[event_id]
+            
+        event = events.loc[event_id]
+        print(f"[DEBUG] Found event:")
+        print(event)
+        return event
 
     def plot_swr_event(self, events_df, event_idx, filter_path=None, show_info_title=False, window_padding=None, figsize_mm=None, panels_to_plot=None, time_per_mm=None, envelope_mode='zscore', show_peak_dots=False, **kwargs):
         """
@@ -486,12 +533,18 @@ class SWRExplorer:
         full_ripple_data = np.load(full_ripple_files[0])
         full_ripple_signal = full_ripple_data['array'] if 'array' in full_ripple_data else full_ripple_data[full_ripple_data.files[0]]
         full_ripple_band = filter_ripple_band(full_ripple_signal[:, None])
-        full_ripple_band_z = zscore(full_ripple_band, axis=0)
-        full_ripple_envelope = np.abs(hilbert(full_ripple_band))
-        full_ripple_envelope_smooth = gaussian_smooth(full_ripple_envelope, sigma=smoothing_sigma, sampling_frequency=sampling_frequency)
-        full_ripple_envelope_z = zscore(full_ripple_envelope_smooth, axis=0)
-        full_ripple_power = full_ripple_envelope_smooth ** 2
-        full_ripple_power_z = zscore(full_ripple_power, axis=0)
+        
+        # Compute envelope and smooth it for full session
+        full_envelope = np.abs(hilbert(full_ripple_band))
+        smoothing_sigma = 0.004  # 4ms smoothing
+        sampling_frequency = 1500
+        full_envelope_smooth = gaussian_smooth(full_envelope, sigma=smoothing_sigma, sampling_frequency=sampling_frequency)
+        full_envelope_smooth_z = zscore(full_envelope_smooth)
+        
+        # Compute power from smoothed envelope for full session
+        full_ripple_power = full_envelope_smooth ** 2
+        # Z-score the power using global statistics
+        full_ripple_power_z = (full_ripple_power - np.mean(full_ripple_power)) / np.std(full_ripple_power)
 
         # Sharp wave band
         full_sharp_wave_file = os.path.join(lfp_dir, f"probe_{probe_id}_channel*_lfp_ca1_putative_str_radiatum.npz")
@@ -501,12 +554,12 @@ class SWRExplorer:
         sw_filter_data = np.load(filter_path)
         sw_filter = sw_filter_data['sharpwave_componenet_8to40band_1500hz_band']
         full_sharp_wave_filtered = fftconvolve(full_sharp_wave_signal, sw_filter, mode='same')
-        full_sharp_wave_band_z = zscore(full_sharp_wave_filtered, axis=0)
+        full_sharp_wave_band_z = zscore(full_sharp_wave_filtered)
         full_sharp_wave_envelope = np.abs(hilbert(full_sharp_wave_filtered))
         full_sharp_wave_envelope_smooth = gaussian_smooth(full_sharp_wave_envelope, sigma=smoothing_sigma, sampling_frequency=sampling_frequency)
-        full_sharp_wave_envelope_z = zscore(full_sharp_wave_envelope_smooth, axis=0)
+        full_sharp_wave_envelope_z = zscore(full_sharp_wave_envelope_smooth)
         full_sharp_wave_power = full_sharp_wave_envelope_smooth ** 2
-        full_sharp_wave_power_z = zscore(full_sharp_wave_power, axis=0)
+        full_sharp_wave_power_z = (full_sharp_wave_power - np.mean(full_sharp_wave_power)) / np.std(full_sharp_wave_power)
 
         # --- Extract event window from z-scored full-session arrays ---
         start_idx = np.searchsorted(time_stamps, start_time)
@@ -515,7 +568,7 @@ class SWRExplorer:
         time_rel = time_window - (event['start_time'] + event['duration']/2)
         ripple_band_window_z = full_ripple_band_z[start_idx:end_idx].squeeze()
         sharp_wave_band_window_z = full_sharp_wave_band_z[start_idx:end_idx].squeeze()
-        ripple_envelope_window_z = full_ripple_envelope_z[start_idx:end_idx].squeeze()
+        ripple_envelope_window_z = full_envelope_smooth_z[start_idx:end_idx].squeeze()
         sharp_wave_envelope_window_z = full_sharp_wave_envelope_z[start_idx:end_idx].squeeze()
         ripple_power_window_z = full_ripple_power_z[start_idx:end_idx].squeeze()
         sharp_wave_power_window_z = full_sharp_wave_power_z[start_idx:end_idx].squeeze()
@@ -759,287 +812,108 @@ class SWRExplorer:
         # as the original events_df, so we don't need to manually set it
         return filtered_events
 
-    def plot_global_swr_event(self, dataset, session_id, global_event_idx, filter_path=None, window=0.15, save_path=None, save_png=False, show_ap_in_ylabel=False, additional_value='envelope'):
+    def plot_global_swr_event(self, dataset, session_id, global_event_idx, filter_path=None, window=0.15, output_dir=None, file_ext='png', show_ap_in_ylabel=False, additional_value='envelope', relative_time=True):
         """
         Plot a global SWR event, showing LFP (grey) and a selected additional value for all probes in the session, sorted by anterior-posterior coordinate.
-        Only show global event start/end (dotted green lines) and probe-level event shading (green) on probes in participating_probes.
-        Y-axis margin is 5% of the data range, with a minimum range to avoid excessive whitespace. Min/max are computed only on the plotted window.
-        If show_ap_in_ylabel is True, display the AP coordinate in the y-label for each subplot.
-        The plot title will include the computed direction label (anterior, posterior, or non-directional).
-        additional_value: one of:
-            'ripple_band': z-scored ripple band (no smoothing)
-            'envelope': z-scored, smoothed ripple envelope (abs(Hilbert), Gaussian smooth, z-score)
-            'power': z-scored, smoothed ripple envelope squared
+        The output file extension is controlled by the file_ext parameter (default 'png').
+        The function constructs the save_path using event/session info and file_ext.
+        Only one file is saved, with the requested extension.
+
+        Parameters:
+        - dataset: str
+        - session_id: str
+        - global_event_idx: int
+        - filter_path: str
+        - window: float (seconds, half-width of window around center)
+        - output_dir: str or None
+        - file_ext: str
+        - show_ap_in_ylabel: bool
+        - additional_value: str
+        - relative_time: bool (if True, plot time relative to global peak; if False, plot absolute time)
         """
-        # Load global event CSV
-        session_dir = self.base_path / dataset / f"swrs_session_{session_id}"
-        global_csv = list(session_dir.glob(f"session_{session_id}_global_swr_events.csv.gz"))
-        if not global_csv:
-            raise FileNotFoundError(f"No global event CSV found for session {session_id}")
-        global_events = pd.read_csv(global_csv[0], index_col=0)
-        event = global_events.loc[global_event_idx]
-        # Parse probe/channel info from global event
-        participating_probes = ast.literal_eval(event['participating_probes'])
-        peak_times = ast.literal_eval(event['peak_times'])
-        peak_powers = ast.literal_eval(event['peak_powers'])
-        global_start = event['start_time']
-        global_end = event['end_time']
-        # Determine event direction (same logic as filter)
-        # Get AP coordinates for all probes in this session
-        lfp_dir = self.base_path / self.lfp_sources[dataset] / f"lfp_session_{session_id}"
-        probe_ap_dict = {}
-        for lfp_file in glob.glob(str(lfp_dir / "probe_*_channel*_lfp_ca1_putative_pyramidal_layer.npz")):
-            m_probe = re.search(r'probe_(\d+)_channel', lfp_file)
-            m_chan = re.search(r'channel_(\d+)_lfp', lfp_file)
-            if not m_probe or not m_chan:
-                continue
-            probe_id = m_probe.group(1)
-            channel_id = int(m_chan.group(1))
-            ap = self.get_channel_ap_coordinate(channel_id) if channel_id is not None else None
-            probe_ap_dict[probe_id] = ap
-        
-        # Sort participating probes by AP coordinate
-        participating_probes_ap = [(pid, probe_ap_dict.get(pid, float('inf'))) for pid in participating_probes]
-        participating_probes_ap.sort(key=lambda x: x[1])
-        sorted_probe_ids = [p[0] for p in participating_probes_ap]
-        sorted_peak_times = [peak_times[participating_probes.index(pid)] for pid in sorted_probe_ids]
-        tolerance = 0.001
-        diffs = np.diff(sorted_peak_times)
-        increasing = np.all(diffs >= -tolerance)
-        decreasing = np.all(diffs <= tolerance)
-        if increasing:
-            direction = "Anterior → Posterior"
-        elif decreasing:
-            direction = "Posterior → Anterior"
+        print(f"\n[DEBUG] --- Starting plot_global_swr_event for global_event_idx={global_event_idx} ---")
+        print(f"[DEBUG] relative_time: {relative_time}")
+        # ... existing code ...
+        # Find the probe with the largest power_max_zscore
+        max_power_idx = np.argmax(peak_powers)
+        center_peak = peak_times[max_power_idx]
+        center_probe = sorted_probe_ids[max_power_idx]
+        start_time = center_peak - window
+        end_time = center_peak + window
+        print(f"[DEBUG] center_peak: {center_peak}, center_probe: {center_probe}, start_time: {start_time}, end_time: {end_time}")
+        # ... existing code ...
+        # For each probe, use the same mask for the window
+        # (Assume all time_traces are aligned in time, or use the first probe's time vector for the mask)
+        # We'll use the first probe's time vector for the mask
+        if len(time_traces) > 0:
+            t_ref = time_traces[0]
         else:
-            direction = "Non-directional"
-        # Print debug info for this event
-        print(f"[PLOT] Event {global_event_idx}:")
-        print(f"  Probes: {participating_probes}")
-        print(f"  APs: {[probe_ap_dict.get(pid, None) for pid in participating_probes]}")
-        print(f"  Sorted Probes: {sorted_probe_ids}")
-        print(f"  Sorted Peak Times: {sorted_peak_times}")
-        print(f"  Diffs: {diffs}")
-        print(f"  Increasing: {increasing}, Decreasing: {decreasing}")
-        print(f"  Computed Direction: {direction}")
-        # Find all probe/channel files for this session
-        lfp_dir = self.base_path / self.lfp_sources[dataset] / f"lfp_session_{session_id}"
-        probe_patterns = glob.glob(str(lfp_dir / "probe_*_channel*_lfp_ca1_putative_pyramidal_layer.npz"))
-        probe_infos = []
-        for lfp_file in probe_patterns:
-            m_probe = re.search(r'probe_(\d+)_channel', lfp_file)
-            m_chan = re.search(r'channel_(\d+)_lfp', lfp_file)
-            if not m_probe or not m_chan:
-                continue
-            probe_id = m_probe.group(1)
-            channel_id = int(m_chan.group(1))
-            ap = self.get_channel_ap_coordinate(channel_id) if channel_id is not None else None
-            probe_infos.append({
-                'probe_id': probe_id,
-                'channel_id': channel_id,
-                'lfp_file': lfp_file,
-                'ap': ap
-            })
-        # Sort by AP (anterior-most first)
-        probe_infos = sorted(probe_infos, key=lambda x: (x['ap'] if x['ap'] is not None else float('inf')))
-        
-        # Load LFP and additional value for each probe
-        lfp_traces = []
-        additional_traces = []
-        time_traces = []
-        probe_event_windows = []
-        probe_is_participant = []
-        windowed_lfp_minmax = []
-        windowed_additional_minmax = []
-        power_peak_times = []  # Store power peak times for each probe
-        middle_peak = np.median(peak_times)
-        start_time = middle_peak - window
-        end_time = middle_peak + window
-        
-        for info in probe_infos:
-            # Load LFP and time for this probe
-            lfp_data = np.load(info['lfp_file'])
-            lfp = lfp_data['array'] if 'array' in lfp_data else lfp_data[lfp_data.files[0]]
-            # Find time file
-            time_pattern = info['lfp_file'].replace('_lfp_ca1_putative_pyramidal_layer.npz', '_lfp_time_index_1500hz.npz')
-            time_data = np.load(time_pattern)
-            time_stamps = time_data['array'] if 'array' in time_data else time_data[time_data.files[0]]
-            # Ripple band
-            ripple_band = filter_ripple_band(lfp[:, None]).squeeze()
-            # Compute values as in plot_swr_event
-            smoothing_sigma = 0.004  # 4ms smoothing
-            sampling_frequency = 1500
-            if additional_value == 'ripple_band':
-                # Z-score ripple band, no smoothing
-                additional_traces.append(zscore(ripple_band))
+            t_ref = None
+        if t_ref is not None:
+            mask = (t_ref >= start_time) & (t_ref <= end_time)
+            if not np.any(mask):
+                print(f"[ERROR] No data in window for any probe! center_peak={center_peak}, start_time={start_time}, end_time={end_time}")
+                return None
+            t_window = t_ref[mask]
+            if relative_time:
+                t_plot = t_window - center_peak
             else:
-                ripple_envelope = np.abs(hilbert(ripple_band))
-                ripple_envelope_smooth = gaussian_smooth(ripple_envelope, sigma=smoothing_sigma, sampling_frequency=sampling_frequency)
-                ripple_envelope_z = zscore(ripple_envelope_smooth)
-                if additional_value == 'envelope':
-                    additional_traces.append(ripple_envelope_z)
-                elif additional_value == 'power':
-                    ripple_power = ripple_envelope_smooth ** 2
-                    ripple_power_z = zscore(ripple_power)
-                    additional_traces.append(ripple_power_z)
-                else:
-                    raise ValueError(f"Invalid additional_value: {additional_value}. Use 'ripple_band', 'envelope', or 'power'.")
-            lfp_traces.append(lfp.squeeze() * 1e6)
-            time_traces.append(time_stamps)
-            
-            # Only mark as participant if in participating_probes
-            is_participant = info['probe_id'] in participating_probes
-            probe_is_participant.append(is_participant)
-            
-            # For participating probes, find the first probe-level event that overlaps the global event
-            probe_event = None
-            ev_start, ev_end = None, None
-            power_peak_time = None
-            
-            if is_participant:
-                # Use glob to find the correct karlsson_detector_events file (with channel id)
-                event_files = list(session_dir.glob(f"probe_{info['probe_id']}_channel*_karlsson_detector_events.csv.gz"))
-                if event_files:
-                    event_file = event_files[0]
-                    with gzip.open(event_file, 'rt') as f:
-                        probe_events_df = pd.read_csv(f)
-                    # Find the first event that overlaps the global event window
-                    overlap_mask = (probe_events_df['start_time'] <= global_end) & (probe_events_df['end_time'] >= global_start)
-                    if overlap_mask.any():
-                        probe_event = probe_events_df[overlap_mask].iloc[0]
-                        # Clip probe event times to be within global event window
-                        ev_start = max(probe_event['start_time'], global_start)
-                        ev_end = min(probe_event['end_time'], global_end)
-                        # Get power peak time if available
-                        if 'power_peak_time' in probe_event:
-                            power_peak_time = probe_event['power_peak_time']
-                    else:
-                        print(f"[DEBUG] No overlapping probe event found for probe {info['probe_id']} in session {session_id} (global event {global_event_idx})")
-                else:
-                    print(f"[DEBUG] No karlsson_detector_events.csv.gz for probe {info['probe_id']} in session {session_id}")
-            
-            probe_event_windows.append((ev_start, ev_end))
-            power_peak_times.append(power_peak_time)
-            
-            # Compute min/max for the windowed data for y-axis scaling
-            mask = (time_stamps >= start_time) & (time_stamps <= end_time)
-            if np.any(mask):
-                windowed_lfp_minmax.append((lfp[mask].min() * 1e6, lfp[mask].max() * 1e6))
-                windowed_additional_minmax.append((additional_traces[-1][mask].min(), additional_traces[-1][mask].max()))
-            else:
-                windowed_lfp_minmax.append((0, 0))
-                windowed_additional_minmax.append((0, 0))
-        
-        # Find global min/max for axes (tight, 5% margin, min range) on plotted window only
-        lfp_min = min([v[0] for v in windowed_lfp_minmax])
-        lfp_max = max([v[1] for v in windowed_lfp_minmax])
-        add_min = min([np.min(additional_traces[i][(time_traces[i] >= start_time) & (time_traces[i] <= end_time)]) for i in range(len(additional_traces))])
-        add_max = max([np.max(additional_traces[i][(time_traces[i] >= start_time) & (time_traces[i] <= end_time)]) for i in range(len(additional_traces))])
-        min_add_range = 2.0
-        add_range = max(add_max - add_min, min_add_range)
-        add_margin = add_range * 0.05
-        add_center = (add_max + add_min) / 2
-        add_min = add_center - add_range / 2 - add_margin
-        add_max = add_center + add_range / 2 + add_margin
-        lfp_range = max(lfp_max - lfp_min, 100.0)  # μV
-        add_range = max(add_max - add_min, 2.0)  # Z
-        lfp_margin = lfp_range * 0.05
-        add_margin = add_range * 0.05
-        lfp_center = (lfp_max + lfp_min) / 2
-        add_center = (add_max + add_min) / 2
-        lfp_min = lfp_center - lfp_range / 2 - lfp_margin
-        lfp_max = lfp_center + lfp_range / 2 + lfp_margin
-        add_min = add_center - add_range / 2 - add_margin
-        add_max = add_center + add_range / 2 + add_margin
-        
-        n_probes = len(probe_infos)
-        fig, axes = plt.subplots(n_probes, 1, figsize=(10, 2.5 * n_probes), sharex=True)
-        if n_probes == 1:
-            axes = [axes]
-        
-        # Add direction label to the figure title
-        fig.suptitle(f"Global SWR Event - {direction}", fontsize=14, fontweight='bold')
-        
-        legend_handles = []
-        for i, (ax, lfp, add_trace, t, info, (ev_start, ev_end), is_participant, power_peak_time) in enumerate(zip(
-            axes, lfp_traces, additional_traces, time_traces, probe_infos, probe_event_windows, probe_is_participant, power_peak_times)):
-            
-            # Restrict to window for plotting
-            mask = (t >= start_time) & (t <= end_time)
-            t_rel = t[mask] - middle_peak
+                t_plot = t_window
+        else:
+            print(f"[ERROR] No time vector available for windowing.")
+            return None
+        # ...
+        # Now, for each probe, slice using the same mask
+        lfp_minmax = []
+        add_minmax = []
+        for lfp, add_trace in zip(lfp_traces, additional_traces):
             lfp_win = lfp[mask]
             add_win = add_trace[mask]
-            
-            # LFP: grey, thin
-            lfp_line, = ax.plot(t_rel, lfp_win, color='grey', lw=0.8, alpha=0.8, label='LFP (μV)')
-            
-            # Additional value: black, thicker
+            lfp_minmax.append((lfp_win.min(), lfp_win.max()))
+            add_minmax.append((add_win.min(), add_win.max()))
+        # ...
+        # Plotting loop
+        for i, (ax, lfp, add_trace, info, (ev_start, ev_end), is_participant, power_peak_time) in enumerate(zip(
+            axes, lfp_traces, additional_traces, probe_infos, probe_event_windows, probe_is_participant, power_peak_times)):
+            lfp_win = lfp[mask]
+            add_win = add_trace[mask]
+            # Plot LFP and additional value
+            ax.plot(t_plot, lfp_win, color='grey', lw=0.8, alpha=0.8, label='LFP (μV)')
             add_ax = ax.twinx()
-            if additional_value == 'ripple_band':
-                add_label = 'Ripple Band (Z)'
-            elif additional_value == 'envelope':
-                add_label = 'Ripple Envelope (Z)'
-            else:
-                add_label = 'Ripple Power (Z)'
-            add_line, = add_ax.plot(t_rel, add_win, color='black', lw=1.2, alpha=0.7, label=add_label)
-            
-            ax.set_ylim(lfp_min, lfp_max)
-            add_ax.set_ylim(add_min, add_max)
+            add_label = 'Ripple Power (Z)' if additional_value == 'power' else ('Ripple Envelope (Z)' if additional_value == 'envelope' else 'Ripple Band (Z)')
+            add_ax.plot(t_plot, add_win, color='black', lw=1.2, alpha=0.7, label=add_label)
+            ax.set_ylim(min([v[0] for v in lfp_minmax]), max([v[1] for v in lfp_minmax]))
+            add_ax.set_ylim(min([v[0] for v in add_minmax]), max([v[1] for v in add_minmax]))
             ax.margins(x=0)
             add_ax.margins(x=0)
-            
-            # Only shade probe-level event and show global event lines if participant
+            # Plot global event boundaries (green dotted lines)
             if is_participant:
-                # Shade probe-level event (only if exists)
+                if relative_time:
+                    ax.axvline(global_start - center_peak, color='green', linestyle=':', lw=3, zorder=2, label='Global Event Start')
+                    ax.axvline(global_end - center_peak, color='green', linestyle=':', lw=3, zorder=2, label='Global Event End')
+                else:
+                    ax.axvline(global_start, color='green', linestyle=':', lw=3, zorder=2, label='Global Event Start')
+                    ax.axvline(global_end, color='green', linestyle=':', lw=3, zorder=2, label='Global Event End')
+                # Plot probe-level event window (shaded green)
                 if ev_start is not None and ev_end is not None:
-                    # Shade from probe event's start_time to end_time
-                    ax.axvspan(ev_start - middle_peak, ev_end - middle_peak, color='green', alpha=0.25, zorder=1, label='Probe Event')
-                
-                # Add power peak marker if available
+                    if relative_time:
+                        ax.axvspan(ev_start - center_peak, ev_end - center_peak, color='green', alpha=0.25, zorder=1, label='Probe Event')
+                    else:
+                        ax.axvspan(ev_start, ev_end, color='green', alpha=0.25, zorder=1, label='Probe Event')
+                # Plot probe-level peak (black dotted line)
                 if power_peak_time is not None:
-                    ax.axvline(power_peak_time - middle_peak, color='black', linestyle='--', lw=1, zorder=3, label='Power Peak')
-                
-                # Dotted green lines for global event (only for participants)
-                ax.axvline(global_start - middle_peak, color='green', linestyle=':', lw=3, zorder=2, label='Global Event Start')
-                ax.axvline(global_end - middle_peak, color='green', linestyle=':', lw=3, zorder=2, label='Global Event End')
-            
-            # Both y-axes labeled with units
-            if show_ap_in_ylabel:
-                ap_str = f" (AP: {info['ap']:.1f})" if info['ap'] is not None else ""
-                ax.set_ylabel(f'Probe {info["probe_id"]}{ap_str}\nLFP (μV)', color='grey', fontsize=10, fontweight='bold')
-            else:
-                ax.set_ylabel(f'Probe {info["probe_id"]}\nLFP (μV)', color='grey', fontsize=10, fontweight='bold')
-            add_ax.set_ylabel(add_label, color='black', fontsize=10, fontweight='bold')
-            
-            for label in ax.get_yticklabels() + add_ax.get_yticklabels():
-                label.set_fontweight('bold')
-            
-            # For legend (only once)
-            if i == 0:
-                legend_handles = [lfp_line, add_line]
-        
-        axes[-1].set_xlabel('Time from Middle Peak (s)', fontsize=12, fontweight='bold')
-        
-        # Add a single legend for the overall figure
-        fig.legend(handles=legend_handles + [
-            mpl.lines.Line2D([], [], color='green', lw=8, alpha=0.25, label='Probe Event'),
-            mpl.lines.Line2D([], [], color='green', linestyle=':', lw=3, label='Global Event Start/End'),
-            mpl.lines.Line2D([], [], color='black', linestyle='--', lw=1, label='Power Peak')
-        ], loc='upper center', bbox_to_anchor=(0.5, 1.02), ncol=5, fontsize=11, frameon=True)
-        
-        plt.tight_layout(rect=[0, 0, 1, 0.97])
-        
-        if save_path:
-            ext = save_path.split('.')[-1]
-            fig.savefig(save_path, format=ext, dpi=300, bbox_inches='tight')
-            if save_png and not save_path.endswith('.png'):
-                fig.savefig(save_path.replace('.svg', '.png'), format='png', dpi=300, bbox_inches='tight')
-        
-        return fig
+                    if relative_time:
+                        ax.axvline(power_peak_time - center_peak, color='black', linestyle='--', lw=1, zorder=3, label='Power Peak')
+                    else:
+                        ax.axvline(power_peak_time, color='black', linestyle='--', lw=1, zorder=3, label='Power Peak')
+            # Y-labels, etc. (unchanged)
+            # ... existing code ...
 
     def plot_global_event_CSD_slice(self, dataset, session_id, global_event_idx, filter_path=None, 
-                                    window=0.15, save_path=None, ca1_only=True, show_scale=True):
+                                    window=0.15, save_path=None, ca1_only=True, show_scale=True, file_ext='png'):
         """
+        UNDER CONSTRUCTION
+
         Plot a CSD slice for a global event, overlaying the CSD from CA1 channels (or all hippocampus) on a sagittal view.
         - For each probe in CA1, extract a window of LFP data around the event peak.
         - Compute the CSD (second spatial derivative) across channels, smoothing in time.
@@ -1058,6 +932,7 @@ class SWRExplorer:
             save_path: str or None
             ca1_only: bool (default True, only plot CA1 channels)
             show_scale: bool (default True, show colorbar)
+            file_ext: str (default 'png') - file extension for the saved image
         """
 
         # 1. Load global event and get peak time
@@ -1097,6 +972,8 @@ class SWRExplorer:
             if not has_csd_method:
                 print(f"Session object methods: {dir(session)}")
             csd = session.get_current_source_density(int(probe_id))
+            print("[DEBUG] csd xarray object:")
+            print(csd)
             # Get the time window indices
             time = csd['time'].values
             mask = (time >= (peak_time - window)) & (time <= (peak_time + window))
@@ -1117,7 +994,7 @@ class SWRExplorer:
             horiz_pos_list.append(np.full_like(vertical_positions, ap_coord if ap_coord is not None else 0))
             ap_list.append(ap_coord if ap_coord is not None else 0)
             ml_list.append(ml_coord if ml_coord is not None else 0)
-            time_axis = time[mask]
+
             # Mark pyramidal and sharpwave layers if available (optional, placeholder)
             pyramidal_layer_pos.append(np.nanmin(vertical_positions))
             sharpwave_layer_pos.append(np.nanmax(vertical_positions))
@@ -1153,6 +1030,15 @@ class SWRExplorer:
         print(f"[DEBUG] CSD data written to temp file: {temp_path}")
 
         try:
+            # Create a dedicated folder for CSD and brainglobe images
+            csd_folder = os.path.join(os.path.dirname(save_path), 'csd_brainglobe_images')
+            os.makedirs(csd_folder, exist_ok=True)
+            
+            # Define paths for CSD and brainglobe images
+            csd_save_path = os.path.join(csd_folder, f'csd_heatmap_{session_id}_{global_event_idx}.{file_ext}')
+            brainglobe_save_path = os.path.join(csd_folder, f'brainglobe_sagittal_{session_id}_{global_event_idx}.{file_ext}')
+            
+            # Update the plot_script to save the CSD heatmap
             plot_script = f'''
 import json
 import numpy as np
@@ -1201,8 +1087,8 @@ for pyr in data.get('pyramidal_layer_pos', []):
     ax.axhline(pyr, color='magenta', linestyle='--', label='Pyramidal Layer')
 for sw in data.get('sharpwave_layer_pos', []):
     ax.axhline(sw, color='cyan', linestyle='--', label='Sharpwave Layer')
-print("[PLOT DEBUG] Saving figure...")
-plt.savefig("{save_path}", dpi=300, bbox_inches='tight')
+print("[PLOT DEBUG] Saving CSD heatmap...")
+plt.savefig("{csd_save_path}", dpi=300, bbox_inches='tight', format='{file_ext}')
 print("[PLOT DEBUG] Done.")
 '''
             with tempfile.NamedTemporaryFile(suffix='.py', delete=False, mode='w') as script_file:
@@ -1222,3 +1108,148 @@ print("[PLOT DEBUG] Done.")
             os.unlink(temp_path)
 
         return None  # Figure is saved or shown by the subprocess
+
+    def CSD_average_session(self, session_id, dataset='allen_visbehave_swr_murphylab2024', output_dir=None, window=0.25, plot_window=0.15, plot_brainglobe=True, file_ext='png'):
+        """
+        UNDER CONSTRUCTION
+        
+        Compute and plot the average CSD across all CA1 channels and all events in a session.
+        - For each probe with CA1, load LFP and event peaks.
+        - For each event, extract a window (±window s), compute CSD, and average.
+        - Plot the average CSD (±plot_window s) as a heatmap.
+        - Optionally, plot a brainglobe sagittal slice with CA1 channel locations.
+        """
+        import gzip, json, numpy as np, os
+        import matplotlib.pyplot as plt
+        from scipy.signal import savgol_filter
+        from scipy.ndimage import gaussian_filter
+        from pathlib import Path
+        import pandas as pd
+        
+        if output_dir is None:
+            output_dir = f"./csd_average_session_{session_id}"
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # 1. Find all probes with CA1 for this session
+        session_dir = self.base_path / dataset / f"swrs_session_{session_id}"
+        lfp_dir = self.base_path / self.lfp_sources[dataset] / f"lfp_session_{session_id}"
+        probe_metadata_path = session_dir / f"session_{session_id}_probe_metadata.csv.gz"
+        if not probe_metadata_path.exists():
+            print(f"[CSD AVG] Probe metadata not found: {probe_metadata_path}")
+            return
+        probe_metadata = pd.read_csv(probe_metadata_path)
+        ca1_probes = probe_metadata[probe_metadata['ca1_channel_count'] > 0]['probe_id'].astype(str).tolist()
+        print(f"[CSD AVG] Probes with CA1: {ca1_probes}")
+        
+        all_csd = []
+        all_vert = []
+        all_time = None
+        pyramidal_coords = []
+        radiatum_coords = []
+        ca1_coords = []
+        for probe_id in ca1_probes:
+            # Load channel selection metadata
+            chan_meta_path = session_dir / f"probe_{probe_id}_channel_selection_metadata.json.gz"
+            if not chan_meta_path.exists():
+                print(f"[CSD AVG] Channel selection metadata not found for probe {probe_id}")
+                continue
+            with gzip.open(chan_meta_path, 'rt') as f:
+                chan_meta = json.load(f)
+            ca1_chan_ids = chan_meta['ripple_band']['channel_ids']
+            ca1_depths = chan_meta['ripple_band']['depths']
+            # Check contiguity
+            diffs = np.diff(sorted(ca1_depths))
+            if np.any(diffs > 50):
+                print(f"[CSD AVG] Warning: CA1 channels for probe {probe_id} are not contiguous (depth jumps: {diffs})")
+            # Load LFP and time
+            lfp_file = lfp_dir / f"probe_{probe_id}_channel_{chan_meta['ripple_band']['selected_channel_id']}_lfp_ca1_putative_pyramidal_layer.npz"
+            time_file = lfp_dir / f"probe_{probe_id}_channel_{chan_meta['ripple_band']['selected_channel_id']}_lfp_time_index_1500hz.npz"
+            if not lfp_file.exists() or not time_file.exists():
+                print(f"[CSD AVG] LFP or time file missing for probe {probe_id}")
+                continue
+            lfp = np.load(lfp_file)['lfp_ca1']
+            time_vals = np.load(time_file)['lfp_time_index']
+            # Load events
+            events_file = session_dir / f"probe_{probe_id}_channel_{chan_meta['ripple_band']['selected_channel_id']}_putative_swr_events.csv.gz"
+            if not events_file.exists():
+                print(f"[CSD AVG] Events file missing for probe {probe_id}")
+                continue
+            events = pd.read_csv(events_file)
+            if 'power_peak_time' not in events.columns:
+                print(f"[CSD AVG] No power_peak_time in events for probe {probe_id}")
+                continue
+            # For each event, extract window and compute CSD
+            probe_csds = []
+            for peak_time in events['power_peak_time']:
+                mask = (time_vals >= (peak_time - window)) & (time_vals <= (peak_time + window))
+                if np.sum(mask) < 10:
+                    continue
+                lfp_win = lfp[mask, :]
+                # Compute CSD (second spatial derivative along channel axis)
+                csd = -np.diff(lfp_win, n=2, axis=1)
+                # Pad to match channel count
+                csd = np.pad(csd, ((0,0),(1,1)), mode='edge')
+                probe_csds.append(csd)
+            if not probe_csds:
+                print(f"[CSD AVG] No valid CSD windows for probe {probe_id}")
+                continue
+            avg_csd = np.mean(probe_csds, axis=0)
+            # For plotting, restrict to ±plot_window
+            center_idx = avg_csd.shape[0] // 2
+            plot_pts = int(plot_window * 1500)
+            t0 = np.searchsorted(time_vals, events['power_peak_time'].iloc[0])
+            t_idxs = np.arange(t0 - plot_pts, t0 + plot_pts)
+            t_idxs = t_idxs[(t_idxs >= 0) & (t_idxs < avg_csd.shape[0])]
+            avg_csd_plot = avg_csd[t_idxs, :]
+            # Save for stacking
+            all_csd.append(avg_csd_plot)
+            all_vert.append(ca1_depths)
+            if all_time is None:
+                all_time = time_vals[t_idxs] - time_vals[t0]
+            # For anatomical plot
+            ca1_coords.extend([(d, probe_id) for d in ca1_depths])
+            # Pyramidal and radiatum
+            pyramidal_coords.append((min(ca1_depths), probe_id))
+            radiatum_coords.append((max(ca1_depths), probe_id))
+        if not all_csd:
+            print("[CSD AVG] No CSD data found for this session.")
+            return
+        # Stack and average
+        csd_stack = np.stack(all_csd, axis=0)
+        csd_avg = np.mean(csd_stack, axis=0)
+        # Plot heatmap
+        plt.figure(figsize=(8,6))
+        plt.imshow(csd_avg.T, aspect='auto', cmap='bwr', origin='lower', extent=[all_time[0], all_time[-1], np.min(all_vert), np.max(all_vert)])
+        plt.colorbar(label='CSD (a.u.)')
+        plt.xlabel('Time (s)')
+        plt.ylabel('CA1 Channel Depth (μm)')
+        plt.title(f'Average CSD (Session {session_id})')
+        plt.tight_layout()
+        heatmap_path = os.path.join(output_dir, f'csd_average_session_{session_id}.{file_ext}')
+        plt.savefig(heatmap_path, dpi=300)
+        plt.close()
+        print(f"[CSD AVG] Saved average CSD heatmap: {heatmap_path}")
+        # Optionally plot brainglobe sagittal slice
+        if plot_brainglobe:
+            try:
+                import brainglobe_heatmap as bgh
+                # Use mean dorsal-ventral for CA1
+                dv_vals = [d for d, _ in ca1_coords]
+                mean_dv = np.mean(dv_vals)
+                heatmap = bgh.Heatmap({}, position=None, orientation="sagittal", thickness=1000, atlas_name="allen_mouse_25um", format="2D")
+                heatmap.show(figsize=(8, 6))
+                ax = plt.gca()
+                # Plot pyramidal (green) and radiatum (blue) dots
+                for d, pid in pyramidal_coords:
+                    ax.plot(0, d, 'o', color='green', label='Pyramidal' if pid==pyramidal_coords[0][1] else "")
+                for d, pid in radiatum_coords:
+                    ax.plot(0, d, 'o', color='blue', label='Str. Radiatum' if pid==radiatum_coords[0][1] else "")
+                plt.legend()
+                plt.title(f'CA1 Channel Locations (Session {session_id})')
+                plt.tight_layout()
+                anat_path = os.path.join(output_dir, f'ca1_locations_session_{session_id}.{file_ext}')
+                plt.savefig(anat_path, dpi=300)
+                plt.close()
+                print(f"[CSD AVG] Saved CA1 anatomical plot: {anat_path}")
+            except ImportError:
+                print("[CSD AVG] brainglobe_heatmap not available, skipping anatomical plot.")

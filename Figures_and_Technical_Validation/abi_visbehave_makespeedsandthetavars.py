@@ -123,7 +123,7 @@ def process_speed_and_theta(
         lfp_session_path = f"{abi_lfp_path}/lfp_session_{str(session_id)}"
         lfp_files = os.listdir(lfp_session_path)
         for file in folderfiles:
-            if not "karlsson" in file:
+            if not "putative_swr_events" in file:
                 continue
 
             events_df = pd.read_csv(os.path.join(folder_path, file), compression="gzip")

@@ -345,7 +345,7 @@ def main():
                             for f in os.listdir(session_subfolder):
                                 # Global stage files
                                 if args.find_global and (
-                                    re.match(r"probe_.*_channel_.*_karlsson_detector_events\\.csv\\.gz", f) or
+                                    re.match(r"probe_.*_channel_.*_putative_swr_events\\.csv\\.gz", f) or
                                     re.match(r"probe_.*_channel_.*_gamma_band_events\\.csv\\.gz", f) or
                                     re.match(r"probe_.*_channel_.*_movement_artifacts\\.csv\\.gz", f) or
                                     re.match(r"probe_.*_channel_selection_metadata\\.json\\.gz", f) or

@@ -103,7 +103,7 @@ for sessionfolder in os.listdir(ibl_ripples_path)[0:1]:
         for file in folderfiles:
             # we load lfp data for the karlsson files, then we compute theta power (zscored) and take that values
             # in a window around the peak of the swr
-            if not "karlsson" in file:
+            if not "putative_swr_events" in file:
                 continue
 
             # load the data

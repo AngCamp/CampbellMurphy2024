@@ -817,10 +817,10 @@ class BaseLoader:
         """
         probe_events_dict = {}
         # Find all probe event files in the session directory
-        event_files = [f for f in os.listdir(session_subfolder) if f.endswith('_karlsson_detector_events.csv.gz')]
+        event_files = [f for f in os.listdir(session_subfolder) if f.endswith('_putative_swr_events.csv.gz')]
         for event_file in event_files:
             # Extract probe_id from filename: probe_<probe_id>_channel_...
-            match = re.match(r'probe_(.*?)_channel_.*_karlsson_detector_events\.csv\.gz', event_file)
+            match = re.match(r'probe_(.*?)_channel_.*_putative_swr_events\.csv\.gz', event_file)
             if match:
                 probe_id = match.group(1)
             else:
@@ -1871,7 +1871,7 @@ def process_session(session_id, config):
                 Karlsson_ripple_times = Karlsson_ripple_times[column_order]
                 
                 # Save filtered ripple events
-                csv_filename = f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_karlsson_detector_events.csv.gz"
+                csv_filename = f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_putative_swr_events.csv.gz"
                 csv_path = os.path.join(session_subfolder, csv_filename)
                 Karlsson_ripple_times.to_csv(csv_path, index=True, compression="gzip")
                 probe_events_dict[probe_id_log] = Karlsson_ripple_times
@@ -1991,7 +1991,7 @@ def process_session(session_id, config):
         if 'session_subfolder' in locals() and os.path.exists(session_subfolder):
             # Look for probe metadata files
             has_existing_data = any(
-                f.startswith('probe_') and f.endswith('_karlsson_detector_events.csv.gz')
+                f.startswith('probe_') and f.endswith('_putative_swr_events.csv.gz')
                 for f in os.listdir(session_subfolder)
             )
             
