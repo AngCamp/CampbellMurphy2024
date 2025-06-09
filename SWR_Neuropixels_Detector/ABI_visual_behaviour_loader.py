@@ -235,9 +235,9 @@ class abi_visual_behaviour_loader(BaseLoader):
         dict
             Standardized probe metadata.
         """
-        # --- Basic Setup ---
-        # Assume session, channels, cache are loaded via set_up.
-        # Let access fail explicitly (AttributeError) if they aren't.
+        print(f"Getting metadata for probe {probe_id}")  # Debug print
+
+        # Initialize metadata dictionary
         metadata = {
             'probe_id': probe_id,
             'ca1_channel_count': 0,
@@ -248,37 +248,49 @@ class abi_visual_behaviour_loader(BaseLoader):
             'ca1_good_unit_count': 0
         }
 
-        # --- Get Data for Probe ---
-        # Allow potential KeyErrors etc. to propagate
-        probe_channels = self.session.channels[self.session.channels.probe_id == probe_id]
-        session_units = self.cache.get_unit_table()
-        probe_units = session_units[session_units.ecephys_probe_id == probe_id]
-
-        # Subsequent operations will fail explicitly if probe_channels is unexpectedly empty
-
-        metadata['total_unit_count'] = len(probe_units)
-
-        # --- Identify Good Units (Uses 'quality' column) ---
-        # Allow potential KeyError to propagate if 'quality' column is missing
-        good_units = probe_units[probe_units.quality == 'good']
-        metadata['good_unit_count'] = len(good_units)
-
-        # --- CA1 Analysis ---
-        # Allow potential KeyErrors to propagate
+        # Get all units and channels and filter by probe_id immediately
+        units = self.session.get_units()
+        print(f"Units DataFrame shape: {units.shape}")
+        print(f"Units columns: {units.columns.tolist()}")
+        
+        channels = self.session.get_channels()
+        print(f"Channels DataFrame shape: {channels.shape}")
+        print(f"Channels columns: {channels.columns.tolist()}")
+        
+        # Get channels for this probe
+        probe_channels = channels[channels.probe_id == probe_id]
+        print(f"Found {len(probe_channels)} total channels for probe {probe_id}")  # Debug print
+        
+        # Get units for this probe by matching peak_channel_id with probe channels
+        probe_units = units[units.peak_channel_id.isin(probe_channels.index)]
+        print(f"Found {len(probe_units)} total units for probe {probe_id}")  # Debug print
+        
+        # Get CA1 channels
         ca1_channels = probe_channels[probe_channels.structure_acronym == "CA1"]
-        metadata['ca1_channel_count'] = len(ca1_channels)
-
-        # Calculate CA1 span (unconditionally, assuming >1 channel)
-        ca1_depths = ca1_channels['probe_vertical_position']
-        metadata['ca1_span_microns'] = float(ca1_depths.max() - ca1_depths.min())
-
-        # Calculate CA1 unit counts (unconditionally)
-        ca1_channel_ids = ca1_channels.index
-        units_in_ca1 = probe_units[probe_units['ecephys_channel_id'].isin(ca1_channel_ids)]
-        metadata['ca1_total_unit_count'] = len(units_in_ca1)
-
-        # Good units in CA1 (using the pre-filtered good_units DataFrame)
-        good_units_in_ca1 = good_units[good_units['ecephys_channel_id'].isin(ca1_channel_ids)]
+        print(f"Found {len(ca1_channels)} CA1 channels for probe {probe_id}")  # Debug print
+        
+        # Calculate CA1 span if we have CA1 channels
+        if len(ca1_channels) > 0:
+            ca1_depths = ca1_channels['probe_vertical_position']
+            metadata['ca1_span_microns'] = float(ca1_depths.max() - ca1_depths.min())
+            metadata['ca1_channel_count'] = len(ca1_channels)
+        
+        # Get units in CA1
+        ca1_units = probe_units[probe_units.peak_channel_id.isin(ca1_channels.index)]
+        print(f"Found {len(ca1_units)} total units in CA1 for probe {probe_id}")  # Debug print
+        
+        # tutorial describes the quality annotation in more detail
+        good_units = probe_units[probe_units.quality == 'good']
+        print(f"Found {len(good_units)} good units for probe {probe_id}")  # Debug print
+        
+        # Get good units in CA1
+        good_units_in_ca1 = good_units[good_units.peak_channel_id.isin(ca1_channels.index)]
+        print(f"Found {len(good_units_in_ca1)} good units in CA1 for probe {probe_id}")  # Debug print
+        
+        # Update metadata
+        metadata['total_unit_count'] = len(probe_units)
+        metadata['good_unit_count'] = len(good_units)
+        metadata['ca1_total_unit_count'] = len(ca1_units)
         metadata['ca1_good_unit_count'] = len(good_units_in_ca1)
-
+        
         return metadata

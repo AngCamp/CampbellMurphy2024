@@ -15,6 +15,8 @@ import logging
 from math import ceil
 from scipy.signal import hilbert
 from scipy.stats import skew as stats_skew
+import gzip
+import json
 
 # Import the BaseLoader
 from swr_neuropixels_collection_core import BaseLoader
