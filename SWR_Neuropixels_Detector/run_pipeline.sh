@@ -5,7 +5,7 @@
 # =====================================================================
 
 # Output directory for all results
-export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_swr_data_backup"}
+export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_swr_data"}
 #export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/muckingabout"}
 
 # Cache directories for datasets (where raw data is stored/downloaded)
