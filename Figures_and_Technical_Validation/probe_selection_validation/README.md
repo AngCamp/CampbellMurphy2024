@@ -1,0 +1,68 @@
+I have channel selection metadata store in som json.gz files.  I want to make some figures from them.
+
+if I give you a base directiory it will contain fodlers like this...
+
+allen_visbehave_swr_murphylab2024           allen_viscoding_swr_murphylab2024_lfp_data  logs
+allen_visbehave_swr_murphylab2024_lfp_data  ibl_swr_murphylab2024
+allen_viscoding_swr_murphylab2024           ibl_swr_murphylab2024_lfp_data
+
+this has the derived data from three datasets, the lfp metadata for plotting and logs of the runs.
+
+I am interesting in these three 
+
+allen_visbehave_swr_murphylab2024 
+ibl_swr_murphylab2024
+allen_viscoding_swr_murphylab2024 
+
+Each will contain a series of folders named with the follwing pattern.
+
+swrs_session_<session ID>
+- the id is an integer string for the abi datasets and a uuid for the IBL data
+
+each will contain somehting like this...
+
+probe_1044506933_channel_1049370115_gamma_band_events.csv.gz
+probe_1044506933_channel_1049370115_putative_swr_events.csv.gz
+probe_1044506933_channel_channelsrawInd_1049369906_movement_artifacts.csv.gz
+probe_1044506933_channel_channelsrawInd_1049370210_movement_artifacts.csv.gz
+probe_1044506933_channel_selection_metadata.json.gz
+probe_1044506935_channel_1049370909_gamma_band_events.csv.gz
+probe_1044506935_channel_1049370909_putative_swr_events.csv.gz
+probe_1044506935_channel_channelsrawInd_1049370706_movement_artifacts.csv.gz
+probe_1044506935_channel_channelsrawInd_1049370750_movement_artifacts.csv.gz
+probe_1044506935_channel_selection_metadata.json.gz
+probe_1044506936_channel_1049371349_gamma_band_events.csv.gz
+probe_1044506936_channel_1049371349_putative_swr_events.csv.gz
+probe_1044506936_channel_channelsrawInd_1049371174_movement_artifacts.csv.gz
+probe_1044506936_channel_channelsrawInd_1049371417_movement_artifacts.csv.gz
+probe_1044506936_channel_selection_metadata.json.gz
+probe_1044506937_channel_1049372363_gamma_band_events.csv.gz
+probe_1044506937_channel_1049372363_putative_swr_events.csv.gz
+probe_1044506937_channel_channelsrawInd_1049372451_movement_artifacts.csv.gz
+probe_1044506937_channel_channelsrawInd_1049372737_movement_artifacts.csv.gz
+probe_1044506937_channel_selection_metadata.json.gz
+session_1044385384_global_swr_events.csv.gz
+session_1044385384_probe_metadata.csv.gz
+session_1044385384_run_settings.json.gz
+
+FOr our purposes we care about these files...
+probe_<probe ID>_channel_selection_metadata.json.gz
+
+Which will contain information like this....
+
+ripple_band: {'channel_ids': [1049370080, 1049370084, 1049370088, 1049370093, 1049370098, 1049370102, 1049370107, 1049370111, 1049370115, 1049370119, 1049370123, 1049370127, 1049370131, 1049370135, 1049370139, 1049370143, 1049370869, 1049370873, 1049370877, 1049370881, 1049370885, 1049370889, 1049370893, 1049370897, 1049370901, 1049370905, 1049370909, 1049370913, 1049370917, 1049370921, 1049370925, 1049370929, 1049370933, 1049370937, 1049370941, 1049371308, 1049371313, 1049371317, 1049371321, 1049371325, 1049371329, 1049371333, 1049371337, 1049371341, 1049371345, 1049371349, 1049371353, 1049371357, 1049371361, 1049371365, 1049371369, 1049372210, 1049372221, 1049372235, 1049372249, 1049372263, 1049372277, 1049372292, 1049372306, 1049372319, 1049372349, 1049372363, 1049372378, 1049372393, 1049372412, 1049372419, 1049372434], 'depths': [1960.0, 2000.0, 2040.0, 2080.0, 2120.0, 2160.0, 2200.0, 2240.0, 2280.0, 2320.0, 2360.0, 2400.0, 2440.0, 2480.0, 2520.0, 2560.0, 1840.0, 1880.0, 1920.0, 1960.0, 2000.0, 2040.0, 2080.0, 2120.0, 2160.0, 2200.0, 2240.0, 2280.0, 2320.0, 2360.0, 2400.0, 2440.0, 2480.0, 2520.0, 2560.0, 2280.0, 2320.0, 2360.0, 2400.0, 2440.0, 2480.0, 2520.0, 2560.0, 2600.0, 2640.0, 2680.0, 2720.0, 2760.0, 2800.0, 2840.0, 2880.0, 2160.0, 2200.0, 2240.0, 2280.0, 2320.0, 2360.0, 2400.0, 2440.0, 2480.0, 2520.0, 2560.0, 2600.0, 2640.0, 2680.0, 2720.0, 2760.0], 'skewness': [3.343425388568599, 4.077239907565743, 7.815175475137506, 14.677684012102654, 7.152087845233173, 7.292377346574806, 22.59162469530364, 54.1403597412929, 45.59889633327729, 26.207760025250227, 9.129466237352453, 8.120435301938988, 19.848183566836127, 26.39050603409449, 26.395532420901652, 18.936870663454286, 5.930295404029487, 10.083853274491466, 15.63916591863763, 18.107627186476083, 5.78041612929054, 4.381612028435968, 4.0452089868992624, 3.834644091939924, 13.726038240783474, 40.79005355549164, 58.02080520603423, 67.77435798475967, 70.00653353425548, 61.32896125801564, 25.40707796021052, 12.951030174017593, 16.924120974260976, 23.3946005778045, 17.79758066499532, 7.807037936468099, 10.707402265643028, 13.097051219169504, 14.068444011637649, 6.032598167683412, 5.633390602833751, 6.492296668882765, 17.011421188205112, 49.87111932209541, 72.61326856262822, 69.71032290044758, 75.65380452023042, 72.82861441019844, 38.881550259216425, 20.192355062970314, 18.152677416685965, 6.421723968640083, 9.745136808635875, 17.714183092315963, 21.806945279751936, 5.768511911107066, 4.551028509308408, 5.888695803701498, 21.69535759011409, 59.433127481065824, 82.30751042550695, 71.93679346825489, 79.14569713838145, 78.65178884707424, 20.36548706285144, 7.453258147400096, 11.795358504646574], 'net_power': [0.0019400341201731637, 0.0017973435022443352, 0.0015881319756847277, 0.001461905183419356, 0.0015452428414954136, 0.0016097979348427044, 0.0019499241138456315, 0.0029310009851943415, 0.004034571958419652, 0.0033259748130386292, 0.0026261214571245556, 0.002355673159209796, 0.002050501535697231, 0.0013148591253674049, 0.0007702132332163967, 0.0006836522055859817, 0.002636798107699288, 0.002467331815111153, 0.0023223882781370784, 0.001949847236203595, 0.0016875899098348817, 0.001787835457180726, 0.0018937806615580573, 0.0020830054853185477, 0.0023582801750710123, 0.003596007194848677, 0.006850912283531846, 0.006653368736671701, 0.003708442376080757, 0.002168712300218867, 0.001585749226180793, 0.0014457771428523106, 0.000924776837149602, 0.0006386368522458976, 0.0007102668574502769, 0.0014839878232809686, 0.001315141976402655, 0.0011357209208223615, 0.0011071077534069117, 0.0012259451404558546, 0.0013549519676506422, 0.0014382080403346025, 0.0016713485733819893, 0.002099619850123773, 0.0030296201788732476, 0.004809224305098088, 0.002943448162476379, 0.0015850115145425914, 0.0010815765190736357, 0.0009001664235922373, 0.0007617893135798499, 0.0022785975940908163, 0.00233002156205633, 0.0021584264035383986, 0.001776470918879623, 0.0020996029243752854, 0.0017645806789119796, 0.0018318888279164692, 0.0018740462168165659, 0.0022584602375989127, 0.003363802333079318, 0.005995649743352469, 0.004246441889528949, 0.0018724653399397493, 0.0014858965333931656, 0.0012931855554603221, 0.0008012995877802904], 'selected_channel_id': 1049372363, 'selection_method': 'max_power'}
+sharp_wave_band: {'channel_ids': [1049372370, 1049372374, 1049372378, 1049372381, 1049372385], 'depths': [2580.0, 2580.0, 2600.0, 2600.0, 2620.0], 'net_sw_power': [0.00020053325733233822, 0.0001805801150414713, 0.0001840148913914562, 0.00017166972295298483, 0.00013847568498802953], 'modulation_index': [8.984737421866071e-05, 8.568007714943687e-05, 5.891256955147793e-05, 6.280121557437844e-05, 7.199853247430044e-05], 'circular_linear_corrs': [0.025342576737160387, 0.009981554314905817, 0.016808182257840393, 0.019871644663423223, 0.016280560601203704], 'selected_channel_id': 1049372370, 'selection_method': 'modulation_index'}
+
+we want to load them as dictionaries from the json file.  I want to make a python script that does this using only input to a base directory containing all the data.
+
+then I want to make bar pltos for them where each probe is a data point and we plot as a funciton of depth on the probe certin things.  I will describe them here then in the caht I will paste some example images.
+
+We will plot skew and net ripple power as a funciton of their depth in CA1 relative to the chosen channel as a bar plot. THen we rotate the plot so that the depth goes along the y axis.  Note the input will be of different lengths relative to the chose channel, sometimes we will need to.  We will also make plts that show the mean value of the z-scored net ripple band power and skeness (within each probe) relative to the chosen channel so the bar plot will plot the average of these withing probe (each files) zscored data.
+have a setting for minimum number of probes with a channel at that depth values.
+
+so what you're going to do is make a dictionary of all the depths you encounter, adding a new values as you go.  in each you put a zscored value from the data.  then you check the len of the resutling lsits.  the smallest value of depth where there is data you can plot that on the bar plot, those become your min and max.  Your plot will then basically plot a vector of the length from your cut off of depth vs the mean zscored value of what your plotting.
+
+
+Then I wanto do something similar but as a funciton of depth below the ripple channel (putative pyramidal layer channel) then we plot the chosen putative striatum radiatum layer channel (sharp wave channel).  again rotated.   Again we do somethign similar but here the axis at the top will start at a negative value then we move down.  as before you will need to find the appropriate cut off using the len of the lsits you put in the dictionary.
+
+wait in the chat for example images so you understand what I want.
