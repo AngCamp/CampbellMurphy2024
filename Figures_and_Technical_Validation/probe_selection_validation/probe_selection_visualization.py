@@ -77,7 +77,7 @@ BAR_HEIGHT = DEPTH_BIN_SIZE * 0.8  # Make bars slightly smaller than bin size to
 # =============================================================================
 
 # Enable/disable anatomical channel smoothing (applied before z-scoring)
-USE_CHANNEL_SMOOTHING = True
+USE_CHANNEL_SMOOTHING = False
 
 # Smoothing parameter (sigma in micrometers for Gaussian kernel)
 CHANNEL_SMOOTHING_SIGMA = 50.0
