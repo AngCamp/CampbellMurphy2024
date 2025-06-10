@@ -38,7 +38,7 @@ if USE_ENV_VARS:
 else:
     # Use hardcoded values - EDIT THESE SETTINGS
     BASE_DIRECTORY = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_swr_data_backup"  # CHANGE THIS
-    RUN_NAME = "test_6"  # CHANGE THIS
+    RUN_NAME = "test_8_smoothed_selection"  # CHANGE THIS
 
 # Rest of your existing configuration...
 MIN_PROBE_COUNT = 3
@@ -71,6 +71,16 @@ SHARP_WAVE_DEPTH_LIMIT = 800    # Maximum depth below ripple channel (negative v
 
 # Bar thickness for plots (in units of the y-axis, i.e., micrometers)
 BAR_HEIGHT = DEPTH_BIN_SIZE * 0.8  # Make bars slightly smaller than bin size to show gaps
+
+# =============================================================================
+# CHANNEL SMOOTHING CONFIGURATION
+# =============================================================================
+
+# Enable/disable anatomical channel smoothing (applied before z-scoring)
+USE_CHANNEL_SMOOTHING = True
+
+# Smoothing parameter (sigma in micrometers for Gaussian kernel)
+CHANNEL_SMOOTHING_SIGMA = 50.0
 
 # =============================================================================
 # DATA LOADING AND PROCESSING FUNCTIONS
@@ -207,6 +217,11 @@ def process_ripple_data(metadata_files):
 def process_sharp_wave_data(metadata_files):
     """Process sharp wave band data from all metadata files."""
     sw_data = defaultdict(list)
+    sw_selections = {
+        'net_sw_power': [],
+        'modulation_index': [], 
+        'circular_linear_corr': []
+    }  # Track selected channel depths for each metric
     processed_probes = []
     skipped_probes = []
     depth_filtered_count = 0
@@ -240,10 +255,25 @@ def process_sharp_wave_data(metadata_files):
             sw_mod_index = sharp_wave_band['modulation_index']
             sw_corr = sharp_wave_band['circular_linear_corrs']
             
+            # Get selected sharp wave channel info if available
+            selected_sw_channel_id = sharp_wave_band.get('selected_channel_id', None)
+            selected_sw_depth = None
+            if selected_sw_channel_id is not None:
+                sw_channel_ids = sharp_wave_band.get('channel_ids', [])
+                if selected_sw_channel_id in sw_channel_ids:
+                    selected_idx = sw_channel_ids.index(selected_sw_channel_id)
+                    selected_sw_depth = sw_depths[selected_idx] - ripple_depth  # Relative to ripple
+            
             # Calculate relative depths
             relative_depths = [d - ripple_depth for d in sw_depths]
             
-            # Z-score within probe
+            # Apply anatomical smoothing if enabled (before z-scoring)
+            if USE_CHANNEL_SMOOTHING:
+                sw_net_power = anatomical_smooth_values(sw_net_power, sw_depths, CHANNEL_SMOOTHING_SIGMA)
+                sw_mod_index = anatomical_smooth_values(sw_mod_index, sw_depths, CHANNEL_SMOOTHING_SIGMA)
+                sw_corr = anatomical_smooth_values(sw_corr, sw_depths, CHANNEL_SMOOTHING_SIGMA)
+            
+            # Z-score within probe (after smoothing if enabled)
             z_net_power = stats.zscore(sw_net_power)
             z_mod_index = stats.zscore(sw_mod_index)
             z_corr = stats.zscore(sw_corr)
@@ -264,6 +294,33 @@ def process_sharp_wave_data(metadata_files):
                     'probe_info': f"{file_info['dataset']}/{file_info['session_id']}/{file_info['probe_id']}"
                 })
             
+            # Simulate selections for each metric (find channel with highest z-scored value)
+            probe_info = f"{file_info['dataset']}/{file_info['session_id']}/{file_info['probe_id']}"
+            
+            # For net_sw_power: select channel with highest z-scored net SW power
+            max_power_idx = np.argmax(z_net_power)
+            selected_power_depth = relative_depths[max_power_idx]
+            sw_selections['net_sw_power'].append({
+                'depth': selected_power_depth,
+                'probe_info': probe_info
+            })
+            
+            # For modulation_index: select channel with highest z-scored modulation index
+            max_mod_idx = np.argmax(z_mod_index)
+            selected_mod_depth = relative_depths[max_mod_idx]
+            sw_selections['modulation_index'].append({
+                'depth': selected_mod_depth,
+                'probe_info': probe_info
+            })
+            
+            # For circular_linear_corr: select channel with highest z-scored correlation
+            max_corr_idx = np.argmax(z_corr)
+            selected_corr_depth = relative_depths[max_corr_idx]
+            sw_selections['circular_linear_corr'].append({
+                'depth': selected_corr_depth,
+                'probe_info': probe_info
+            })
+            
             processed_probes.append(f"{file_info['dataset']}/{file_info['session_id']}/{file_info['probe_id']}")
             
         except Exception as e:
@@ -281,7 +338,7 @@ def process_sharp_wave_data(metadata_files):
     else:
         print(f"WARNING: No sharp wave data collected!")
     
-    return sw_data, processed_probes, skipped_probes
+    return sw_data, sw_selections, processed_probes, skipped_probes
 
 def filter_by_probe_count(data_dict, min_count=MIN_PROBE_COUNT):
     """Filter depths that don't meet minimum probe count threshold."""
@@ -303,6 +360,34 @@ def calculate_mean_values(data_dict):
                 if key != 'probe_info':  # Skip metadata
                     means[depth][key] = np.mean([v[key] for v in values])
     return means
+
+def anatomical_smooth_values(raw_values, channel_depths, sigma=CHANNEL_SMOOTHING_SIGMA):
+    """
+    Apply anatomical smoothing using Gaussian weights based on channel depth distances.
+    
+    Parameters:
+    - raw_values: Array of raw feature values for each channel
+    - channel_depths: Array of depth positions for each channel (in micrometers)
+    - sigma: Standard deviation of Gaussian kernel (in micrometers)
+    
+    Returns:
+    - smoothed_values: Array of smoothed feature values
+    """
+    raw_values = np.array(raw_values)
+    channel_depths = np.array(channel_depths)
+    smoothed_values = np.zeros_like(raw_values)
+    
+    for i in range(len(raw_values)):
+        # Calculate anatomical distances from current channel
+        anatomical_distances = np.abs(channel_depths - channel_depths[i])
+        
+        # Calculate Gaussian weights
+        weights = np.exp(-anatomical_distances**2 / (2 * sigma**2))
+        
+        # Apply weighted averaging
+        smoothed_values[i] = np.sum(weights * raw_values) / np.sum(weights)
+    
+    return smoothed_values
 
 # =============================================================================
 # PLOTTING FUNCTIONS
@@ -428,6 +513,105 @@ def plot_sharp_wave_features(sw_means, output_dir):
         traceback.print_exc()
         raise
 
+def plot_sharp_wave_selections(sw_selections, output_dir):
+    """Create histograms showing selected sharp wave channel depths for each metric."""
+    print(f"Sharp wave selection plotting for 3 metrics...")
+    
+    if not sw_selections or not any(sw_selections.values()):
+        print("No sharp wave selection data to plot")
+        return
+    
+    # Define colors and titles for each metric
+    metric_info = {
+        'net_sw_power': {'color': 'darkgreen', 'title': 'Net SW Power'},
+        'modulation_index': {'color': 'purple', 'title': 'Modulation Index'},
+        'circular_linear_corr': {'color': 'orange', 'title': 'Circular-Linear Correlation'}
+    }
+    
+    # Create figure with three subplots
+    fig, axes = plt.subplots(1, 3, figsize=(18, 10), sharey=True)
+    
+    for i, (metric, info) in enumerate(metric_info.items()):
+        ax = axes[i]
+        selections = sw_selections[metric]
+        
+        if not selections:
+            ax.text(0.5, 0.5, 'No Data', transform=ax.transAxes, 
+                   ha='center', va='center', fontsize=16)
+            ax.set_title(info['title'])
+            continue
+        
+        # Extract depths and bin them
+        depths = [sel['depth'] for sel in selections]
+        binned_depths = [bin_depth(d) for d in depths]
+        
+        # Count frequency of each binned depth
+        from collections import Counter
+        depth_counts = Counter(binned_depths)
+        
+        if not depth_counts:
+            ax.text(0.5, 0.5, 'No Depth Counts', transform=ax.transAxes, 
+                   ha='center', va='center', fontsize=16)
+            ax.set_title(info['title'])
+            continue
+        
+        # Convert to sorted lists for plotting (anatomical orientation)
+        original_depths = list(depth_counts.keys())
+        plot_depths = sorted([-d for d in original_depths])  # Convert to negative and sort
+        counts = [depth_counts[-d] for d in plot_depths]  # Use original keys for counts
+        
+        # Create horizontal bar chart
+        bars = ax.barh(plot_depths, counts, height=BAR_HEIGHT, 
+                      color=info['color'], alpha=0.7, edgecolor='black', linewidth=0.5)
+        
+        # Add reference line at y=0 to show the ripple channel
+        ax.axhline(y=0, color='red', linestyle='--', alpha=0.7, linewidth=2)
+        
+        # Formatting
+        ax.set_xlabel('Number of Selected Channels')
+        if i == 0:  # Only add ylabel to leftmost plot
+            ax.set_ylabel('Depth Relative to Ripple Channel (μm)')
+        ax.set_title(info['title'])
+        ax.grid(True, alpha=0.3, axis='x')
+        
+        # Add reference line label
+        ax.text(0.02, 0.98, 'Ripple Channel', transform=ax.transAxes, 
+                 verticalalignment='top', fontsize=9, color='red', fontweight='bold')
+        
+        # Add statistics
+        total_selections = len(selections)
+        depth_range = max(plot_depths) - min(plot_depths) if len(plot_depths) > 1 else 0
+        median_depth = np.median(depths)
+        
+        stats_text = f'N: {total_selections}\n'
+        stats_text += f'Range: {depth_range:.0f} μm\n'
+        stats_text += f'Median: {median_depth:.0f} μm'
+        
+        ax.text(0.98, 0.02, stats_text, transform=ax.transAxes, 
+                verticalalignment='bottom', horizontalalignment='right', 
+                fontsize=8, bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.7))
+        
+        print(f"{info['title']}: {len(plot_depths)} depth bins, median = {median_depth:.0f} μm")
+    
+    # Add overall title
+    title = 'Sharp Wave Channel Selection by Metric\n(Channels with Highest Z-scored Values)'
+    if USE_DEPTH_LIMITS:
+        title += f'\nDepth limit: ±{SHARP_WAVE_DEPTH_LIMIT} μm from ripple channel'
+    if USE_CHANNEL_SMOOTHING:
+        title += f' | Smoothing: σ={CHANNEL_SMOOTHING_SIGMA} μm'
+    
+    plt.suptitle(title, fontsize=14, y=0.95)
+    plt.tight_layout()
+    
+    # Save in specified formats
+    for fmt in OUTPUT_FORMATS:
+        output_file = os.path.join(output_dir, f'sharp_wave_selection_by_metric.{fmt}')
+        plt.savefig(output_file, format=fmt, dpi=DPI, bbox_inches='tight')
+        print(f"Saved selection by metric plot: {output_file}")
+    
+    plt.show()
+    print(f"Sharp wave selection by metric plots completed successfully")
+
 # =============================================================================
 # MAIN EXECUTION FUNCTION
 # =============================================================================
@@ -462,6 +646,12 @@ def main(base_directory, output_directory=None, run_name=None):
     else:
         print("Depth limits disabled")
     
+    # Print channel smoothing settings
+    if USE_CHANNEL_SMOOTHING:
+        print(f"Channel smoothing enabled: σ = {CHANNEL_SMOOTHING_SIGMA} μm")
+    else:
+        print("Channel smoothing disabled")
+    
     print("-" * 60)
     
     # Find all metadata files
@@ -490,7 +680,7 @@ def main(base_directory, output_directory=None, run_name=None):
     
     # Process sharp wave data
     print("\nProcessing sharp wave band data...")
-    sw_data, sw_processed, sw_skipped = process_sharp_wave_data(metadata_files)
+    sw_data, sw_selections, sw_processed, sw_skipped = process_sharp_wave_data(metadata_files)
     
     print(f"Successfully processed {len(sw_processed)} probes for sharp wave analysis")
     if sw_skipped:
@@ -512,6 +702,7 @@ def main(base_directory, output_directory=None, run_name=None):
     print(f"\nGenerating plots in {output_directory}...")
     plot_ripple_features(ripple_means, output_directory)
     plot_sharp_wave_features(sw_means, output_directory)
+    plot_sharp_wave_selections(sw_selections, output_directory)
     
     print("\nAnalysis complete!")
 
