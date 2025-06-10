@@ -5,8 +5,9 @@
 # =====================================================================
 
 # Output directory for all results
-export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_swr_data"}
+export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_final"}
 #export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/muckingabout"}
+#export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/testing_dir"}
 
 # Cache directories for datasets (where raw data is stored/downloaded)
 export ABI_VISUAL_CODING_SDK_CACHE=${ABI_VISUAL_CODING_SDK_CACHE:-"/space/scratch/allen_viscoding_data"}

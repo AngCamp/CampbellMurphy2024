@@ -296,7 +296,7 @@ def main():
     # ===============================================================================
     # Create a partially applied function with the consolidated configuration
     process_func_partial = partial(process_session, config=config)
-
+    all_sesh_with_ca1_eid = [1044385384]
     
     # Run the processing with the specified number of cores
     print(f"Starting processing pool with {config['pool_size']} workers...")

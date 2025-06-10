@@ -633,8 +633,15 @@ class BaseLoader:
         power_z = (ripple_power - np.mean(ripple_power)) / np.std(ripple_power)
         
         # Initialize lists for metrics
-        power_metrics = []
-        
+        power_peak_times = []
+        power_max_zscores = []
+        power_median_zscores = []
+        power_mean_zscores = []
+        power_min_zscores = []
+        power_90th_percentiles = []
+        envelope_90th_percentiles = []
+        envelope_peak_times = []
+
         # Process each event
         for _, event in events_df.iterrows():
             # Get event window
@@ -643,24 +650,26 @@ class BaseLoader:
             event_envelope = envelope_smoothed[mask]
             event_times = time_values[mask]
             event_envelope_smoothed_z = envelope_smoothed_z[mask]
-            # Compute metrics
-            metrics = {
-                'power_peak_time': event_times[np.argmax(event_power_z)],
-                'power_max_zscore': np.max(event_power_z),
-                'power_median_zscore': np.median(event_power_z),
-                'power_mean_zscore': np.mean(event_power_z),
-                'power_min_zscore': np.min(event_power_z),
-                'power_90th_percentile': np.percentile(event_power_z, 90),
-                'envelope_90th_percentile': np.percentile(event_envelope, 90),
-                'envelope_peak_time': event_times[np.argmax(event_envelope_smoothed_z)]
-            }
-            power_metrics.append(metrics)
-        
-        # Convert to DataFrame and merge with events
-        power_df = pd.DataFrame(power_metrics)
-        
-        # Merge the power metrics with the original events DataFrame
-        events_df = pd.concat([events_df, power_df], axis=1)
+            
+            # Append metrics to lists
+            power_peak_times.append(event_times[np.argmax(event_power_z)])
+            power_max_zscores.append(np.max(event_power_z))
+            power_median_zscores.append(np.median(event_power_z))
+            power_mean_zscores.append(np.mean(event_power_z))
+            power_min_zscores.append(np.min(event_power_z))
+            power_90th_percentiles.append(np.percentile(event_power_z, 90))
+            envelope_90th_percentiles.append(np.percentile(event_envelope, 90))
+            envelope_peak_times.append(event_times[np.argmax(event_envelope_smoothed_z)])
+
+        # ---------- add to dataframe -------------------------------------------------
+        events_df['power_peak_time'] = power_peak_times
+        events_df['power_max_zscore'] = power_max_zscores
+        events_df['power_median_zscore'] = power_median_zscores
+        events_df['power_mean_zscore'] = power_mean_zscores
+        events_df['power_min_zscore'] = power_min_zscores
+        events_df['power_90th_percentile'] = power_90th_percentiles
+        events_df['envelope_90th_percentile'] = envelope_90th_percentiles
+        events_df['envelope_peak_time'] = envelope_peak_times
         
         return events_df
 
@@ -828,7 +837,7 @@ class BaseLoader:
                 continue
             full_path = os.path.join(session_subfolder, event_file)
             try:
-                events_df = pd.read_csv(full_path, compression='gzip')
+                events_df = pd.read_csv(full_path, compression='gzip', index_col=0)
                 probe_events_dict[str(probe_id)] = events_df
                 logger.info(f"✓ Successfully loaded events for probe {probe_id} ({len(events_df)} events)")
             except Exception as e:
@@ -1298,6 +1307,7 @@ def add_participating_probes(global_events, probe_events_dict, offset=0.02):
     global_events['participating_probes'] = [[] for _ in range(len(global_events))]
     global_events['peak_times'] = [[] for _ in range(len(global_events))]
     global_events['peak_powers'] = [[] for _ in range(len(global_events))]
+    global_events['probe_event_file_index'] = [[] for _ in range(len(global_events))]
     
     # Check each probe against each global event
     for probe_id, probe_df in probe_events_dict.items():
@@ -1307,14 +1317,14 @@ def add_participating_probes(global_events, probe_events_dict, offset=0.02):
                       (probe_df['end_time'] >= event['start_time'] - offset))
             
             if any(overlap):
-                # Add this probe to the participating probes
-                global_events.at[i, 'participating_probes'].append(probe_id)
-                
                 # Get peak time and power from the strongest overlapping event
                 overlapping_events = probe_df[overlap]
                 if not overlapping_events.empty:
                     max_idx = overlapping_events['power_max_zscore'].idxmax()
                     if pd.notna(max_idx):  # Check if max_idx is not NaN
+                        # Add this probe to the participating probes
+                        global_events.at[i, 'participating_probes'].append(probe_id)
+                        global_events.at[i, 'probe_event_file_index'].append(max_idx)  # Store the probe event index
                         global_events.at[i, 'peak_times'].append(overlapping_events.loc[max_idx, 'power_peak_time'])
                         global_events.at[i, 'peak_powers'].append(overlapping_events.loc[max_idx, 'power_max_zscore'])
                 else:
@@ -1381,21 +1391,26 @@ def merge_probe_events(probe_events_dict, merge_window, min_probe_count=1):
     
     # Merge overlapping intervals
     merged_intervals = []
-    current = all_intervals[0]
+    current = list(all_intervals[0])  # Convert tuple to list so we can modify it
+    current_events = [current[2]]  # Track all events in this interval
+    
     for interval in all_intervals[1:]:
         if interval[0] <= current[1] + merge_window:
             # Merge intervals
-            current = (current[0], max(current[1], interval[1]), current[2])
+            current[1] = max(current[1], interval[1])  # Update end time
+            current_events.append(interval[2])  # Add this event's index
         else:
-            merged_intervals.append(current)
-            current = interval
-    merged_intervals.append(current)
+            merged_intervals.append((current[0], current[1], current_events))  # Store all event indices
+            current = list(interval)
+            current_events = [current[2]]
+    
+    merged_intervals.append((current[0], current[1], current_events))  # Add the last interval
     
     # Create DataFrame for global events
     global_events = pd.DataFrame({
         'start_time': [interval[0] for interval in merged_intervals],
         'end_time': [interval[1] for interval in merged_intervals],
-        'original_event_idx': [interval[2] for interval in merged_intervals]
+        'contributing_probe_events_idx': [interval[2] for interval in merged_intervals]  # Now contains list of all contributing events
     })
     
     global_events['duration'] = global_events['end_time'] - global_events['start_time']
@@ -1405,9 +1420,6 @@ def merge_probe_events(probe_events_dict, merge_window, min_probe_count=1):
     
     # Filter events based on minimum probe count
     global_events = global_events[global_events['probe_count'] >= min_probe_count]
-    
-    if len(global_events) == 0:
-        raise ValueError(f"No events meet the minimum probe count criteria (min_probe_count={min_probe_count})")
     
     return global_events
 
@@ -1848,7 +1860,7 @@ def process_session(session_id, config):
                     movement_controls.to_csv(csv_path, index=True, compression="gzip")
                     movement_control_list.append(movement_controls)
                 
-                # Apply filtering to remove events with gamma/movement overlap
+                # Apply filtering to label events with gamma/movement overlap
                 logger.info(f"Session {session_id}: Filtering events for probe {probe_id_log}")
                 Karlsson_ripple_times = check_gamma_overlap(Karlsson_ripple_times, gamma_times)
                 Karlsson_ripple_times = check_movement_overlap(Karlsson_ripple_times, movement_control_list[0], movement_control_list[1])
