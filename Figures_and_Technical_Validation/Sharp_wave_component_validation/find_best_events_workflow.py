@@ -131,8 +131,9 @@ def plot_and_save_events(explorer, events_df, output_dir):
         plt.close()
 
 def main():
-    # Initialize the explorer
-    explorer = SWRExplorer()
+    # Initialize the explorer with explicit base path
+    base_path = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_swr_data"
+    explorer = SWRExplorer(base_path=base_path)
     
     # Find top events
     top_events = find_top_events(

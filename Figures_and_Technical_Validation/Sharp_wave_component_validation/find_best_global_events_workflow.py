@@ -6,13 +6,14 @@ from pathlib import Path
 from SWRExplorer import SWRExplorer
 import os
 import ast
+from scipy.signal import fftconvolve, butter, filtfilt, hilbert, convolve
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1" # prevent pycache from being written
 
 # Path to sharp wave filter(s)
 filter_path = "/home/acampbell/NeuropixelsLFPOnRamp/SWR_Neuropixels_Detector/Filters/sharpwave_componenet_8to40band_1500hz_band.npz"
 output_dir = "/home/acampbell/NeuropixelsLFPOnRamp/Figures_and_Technical_Validation/Sharp_wave_component_validation/top_global_swr_events"
 file_ext = 'png'  # User can set this to 'svg', 'pdf', etc.
-window = 0.5  # seconds around middle-most peak
+window = 0.15  # seconds around middle-most peak
 
 # Set this to True to display AP coordinate in y-labels of plots
 show_ap_in_ylabel = True
@@ -98,15 +99,30 @@ def find_top_global_events(explorer, dataset="allen_visbehave_swr_murphylab2024"
             ap = explorer.get_channel_ap_coordinate(int(m_chan)) if m_chan.isdigit() else None
             probe_ap_dict[m_probe] = ap
         # Compute direction for each event
+        valid_events = []
         directions = []
         keep_mask = []
         for idx, row in global_events.iterrows():
             participating_probes = ast.literal_eval(row['participating_probes'])
             peak_times = ast.literal_eval(row['peak_times'])
             peak_powers = ast.literal_eval(row['peak_powers'])
+            # Convert all probe IDs to strings for consistent comparison
+            participating_probes = [str(pid) for pid in participating_probes]
             participating_probes_ap = [(pid, probe_ap_dict.get(pid, float('inf'))) for pid in participating_probes]
             participating_probes_ap.sort(key=lambda x: x[1])
             sorted_probe_ids = [p[0] for p in participating_probes_ap]
+            # Add error checking and debug info
+            print(f"[DEBUG] participating_probes: {participating_probes}")
+            print(f"[DEBUG] sorted_probe_ids: {sorted_probe_ids}")
+            print(f"[DEBUG] peak_times: {peak_times}")
+            # Ensure all sorted_probe_ids are in participating_probes
+            if not all(pid in participating_probes for pid in sorted_probe_ids):
+                print(f"[WARNING] Some sorted_probe_ids not in participating_probes. Skipping this event.")
+                continue
+            # Check if peak_times length matches participating_probes length
+            if len(peak_times) != len(participating_probes):
+                print(f"[WARNING] Mismatch between peak_times length ({len(peak_times)}) and participating_probes length ({len(participating_probes)}). Skipping this event.")
+                continue
             sorted_peak_times = [peak_times[participating_probes.index(pid)] for pid in sorted_probe_ids]
             diffs = np.diff(sorted_peak_times)
             # Require all diffs to be at least min_peak_delay in the same direction
@@ -118,20 +134,26 @@ def find_top_global_events(explorer, dataset="allen_visbehave_swr_murphylab2024"
                 directions.append('non_directional')
             # Power filter: all constituent probe events must be in range
             keep_mask.append(all((min_global_peak_power <= p < max_global_peak_power) for p in peak_powers))
-        global_events['direction'] = directions
-        global_events['all_probe_powers_in_range'] = keep_mask
+            valid_events.append(idx)
+        
+        # Create a new DataFrame with only valid events
+        filtered = global_events.loc[valid_events].copy()
+        filtered['direction'] = directions
+        filtered['all_probe_powers_in_range'] = keep_mask
+        
         # --- Apply directionality filter FIRST ---
         if direction_filter == 'anterior':
-            mask = global_events['direction'] == 'anterior'
+            mask = filtered['direction'] == 'anterior'
         elif direction_filter == 'posterior':
-            mask = global_events['direction'] == 'posterior'
+            mask = filtered['direction'] == 'posterior'
         elif direction_filter == 'directional':
-            mask = global_events['direction'].isin(['anterior', 'posterior'])
+            mask = filtered['direction'].isin(['anterior', 'posterior'])
         elif direction_filter == 'non_directional':
-            mask = global_events['direction'] == 'non_directional'
+            mask = filtered['direction'] == 'non_directional'
         else:
-            mask = np.ones(len(global_events), dtype=bool)
-        filtered = global_events[mask].copy()
+            mask = np.ones(len(filtered), dtype=bool)
+        filtered = filtered[mask].copy()
+        
         # --- Duration filter ---
         filtered = filtered[filtered['duration'] <= max_duration]
         # --- Power filter on constituent events ---
@@ -141,9 +163,10 @@ def find_top_global_events(explorer, dataset="allen_visbehave_swr_murphylab2024"
         for idx, row in filtered.iterrows():
             print(f"Event {idx}: peak_powers={ast.literal_eval(row['peak_powers'])}")
         # --- Speed filter ---
-        if 'running_speed' in global_events.columns:
-            speeds = explorer.get_allensdk_speed(global_events['running_speed'], filtered, window=0.5, agg='max')
+        if 'running_speed' in filtered.columns:
+            speeds = explorer.get_allensdk_speed(filtered['running_speed'], filtered, window=0.5, agg='max')
             filtered = filtered[speeds <= speed_threshold]
+        
         # --- Now apply all other filters ---
         if len(filtered) > 0:
             filtered['dataset'] = dataset
@@ -217,7 +240,9 @@ def plot_and_save_global_events(explorer, events_df, output_dir, file_ext='png')
             )
 
 def main():
-    explorer = SWRExplorer()
+    # Initialize the explorer with explicit base path
+    base_path = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_swr_data"
+    explorer = SWRExplorer(base_path=base_path)
     
     if collect_directional_stats:
         # Collect statistics about directional events
@@ -246,10 +271,24 @@ def main():
             for _, event in global_events.iterrows():
                 participating_probes = ast.literal_eval(event['participating_probes'])
                 peak_times = ast.literal_eval(event['peak_times'])
+                # Convert all probe IDs to strings for consistent comparison
+                participating_probes = [str(pid) for pid in participating_probes]
                 # Sort participating probes by AP coordinate
                 participating_probes_ap = [(pid, probe_ap_dict.get(pid, float('inf'))) for pid in participating_probes]
                 participating_probes_ap.sort(key=lambda x: x[1])
                 sorted_probe_ids = [p[0] for p in participating_probes_ap]
+                # Add error checking and debug info
+                print(f"[DEBUG] participating_probes: {participating_probes}")
+                print(f"[DEBUG] sorted_probe_ids: {sorted_probe_ids}")
+                print(f"[DEBUG] peak_times: {peak_times}")
+                # Ensure all sorted_probe_ids are in participating_probes
+                if not all(pid in participating_probes for pid in sorted_probe_ids):
+                    print(f"[WARNING] Some sorted_probe_ids not in participating_probes. Skipping this event.")
+                    continue
+                # Check if peak_times length matches participating_probes length
+                if len(peak_times) != len(participating_probes):
+                    print(f"[WARNING] Mismatch between peak_times length ({len(peak_times)}) and participating_probes length ({len(participating_probes)}). Skipping this event.")
+                    continue
                 sorted_peak_times = [peak_times[participating_probes.index(pid)] for pid in sorted_probe_ids]
                 diffs = np.diff(sorted_peak_times)
                 if np.all(diffs >= min_peak_delay):
