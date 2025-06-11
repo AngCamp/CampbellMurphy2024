@@ -5,7 +5,7 @@
 # =====================================================================
 
 # Output directory for all results
-export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_final"}
+export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_v2_final"}
 #export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/muckingabout"}
 #export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/testing_dir"}
 
@@ -15,7 +15,7 @@ export ABI_VISUAL_BEHAVIOUR_SDK_CACHE=${ABI_VISUAL_BEHAVIOUR_SDK_CACHE:-"/space/
 export IBL_ONEAPI_CACHE=${IBL_ONEAPI_CACHE:-"/space/scratch/IBL_data_cache"}
 
 # Run name used for organizing log files
-export RUN_NAME=${RUN_NAME:-"on_the_cluster"}
+export RUN_NAME=${RUN_NAME:-"campbell_murphy_2025_v2.0"}
 
 # prevents pycache files from being created in working directory
 export PYTHONDONTWRITEBYTECODE=1 

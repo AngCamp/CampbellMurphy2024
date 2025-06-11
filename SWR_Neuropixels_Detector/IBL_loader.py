@@ -215,7 +215,7 @@ class ibl_loader(BaseLoader):
             ca1_chan_ids=data['ca1_chans'],
             channel_positions=all_channel_positions, # Pass the extracted positions
             ripple_filter_func=filter_ripple_band_func,
-            config=None # Pass config if needed by base method
+            config=self.config # Pass config from the loader
         )
         
         # Create a channel ID string for naming files
@@ -230,7 +230,7 @@ class ibl_loader(BaseLoader):
             peak_ripple_chan_id=peak_id, # Pass selected ripple channel ID
             channel_positions=all_channel_positions,
             ripple_filtered=peakrippleband, # Pass ripple LFP from selected chan
-            config=None, # Pass config if needed
+            config=self.config, # Pass config from the loader
             filter_path=getattr(self, 'sw_component_filter_path', None) # Use attribute if exists
         )
 

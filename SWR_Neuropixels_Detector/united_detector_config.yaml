@@ -16,6 +16,12 @@ ripple_band_threshold: 2
 movement_artifact_ripple_band_threshold: 2
 merge_events_offset: 0.025  # For merging nearby events
 
+# Channel Selection Settings
+channel_selection:
+  ripple_channel_metric: 'net_power'  # Options: 'net_power', 'skewness'
+  sharpwave_channel_metric: 'modulation_index'  # Options: 'modulation_index', 'circular_linear_corr', 'net_sw_power'
+  max_distance_microns: 500  # Maximum distance from ripple channel for sharp wave channel candidates
+
 # Paths to Filters
 filters:
   gamma_filter: 'Filters/frank2008_gamma_1500hz_bandpass_filter.npz'

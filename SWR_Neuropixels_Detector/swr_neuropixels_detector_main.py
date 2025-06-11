@@ -175,6 +175,11 @@ def main():
     # save_lfp = full_config["save_lfp"] # Replaced by flag
     gamma_filters_path = full_config["filters"]["gamma_filter"]
     sharp_wave_component_path = full_config["filters"]["sw_component_filter"]
+    
+    # Load channel selection settings
+    ripple_channel_metric = full_config["channel_selection"]["ripple_channel_metric"]
+    sharpwave_channel_metric = full_config["channel_selection"]["sharpwave_channel_metric"]
+    max_distance_microns = full_config["channel_selection"]["max_distance_microns"]
 
     # Load dataset-specific settings
     if DATASET_TO_PROCESS == 'ibl':
@@ -285,6 +290,11 @@ def main():
             "gamma_filter": gamma_filter, # Loaded filter array
             "sharp_wave_component_path": sharp_wave_component_path, # Path to SW filter
             # Add other filter details if needed
+        },
+        "channel_selection": {
+            "ripple_channel_metric": ripple_channel_metric,
+            "sharpwave_channel_metric": sharpwave_channel_metric, 
+            "max_distance_microns": max_distance_microns
         },
         "global_swr": full_config.get("global_swr_detection", {}), # Pass the whole sub-dict
         # Add other top-level or dataset-specific configs from full_config if needed by process_session

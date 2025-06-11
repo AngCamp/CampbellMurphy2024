@@ -110,7 +110,8 @@ class BaseLoader:
     """
     def __init__(self, session_id):
         self.session_id = session_id
-
+        self.config = None  # Will be set later
+        
         # Initialize dictionary to store channel selection metadata
         self.channel_selection_metadata_dict = {
             'probe_id': str(session_id), # Store probe ID here during setup/processing
@@ -181,6 +182,17 @@ class BaseLoader:
                 
         else:
             raise ValueError(f"Unknown dataset type: {dataset_type}")
+
+    def set_config(self, config):
+        """
+        Set the configuration for this loader instance.
+        
+        Parameters
+        ----------
+        config : dict
+            Configuration dictionary containing all processing settings
+        """
+        self.config = config
 
     def resample_signal(self, signal_data, time_values, target_fs=1500.0):
         """
@@ -316,6 +328,89 @@ class BaseLoader:
 
         return np.sqrt(r_cl)
 
+    def select_ripple_channel(self, ca1_lfp, ca1_chan_ids, channel_positions, ripple_filter_func, config=None):
+        """Select the putative pyramidal layer (ripple band) channel for a given probe.
+        
+        Parameters
+        ----------
+        ca1_lfp : np.ndarray
+            LFP data array containing signals from channels located in the CA1 region.
+            Expected shape: (time, channels).
+        ca1_chan_ids : list of int
+            List of unique channel identifiers corresponding to the columns in `ca1_lfp`.
+        channel_positions : pd.Series
+            A pandas Series where the index contains channel IDs (including those in 
+            `ca1_chan_ids` and potentially others) and the values are the vertical
+            positions (depths) of those channels on the probe.
+        ripple_filter_func : callable
+            Function to filter the LFP data into the ripple band.
+        config : dict, optional
+            Configuration dictionary containing channel selection settings.
+        
+        Returns
+        -------
+        tuple
+            - peak_chan_id (int): The channel ID selected as the best ripple channel.
+            - peak_ripple_band_lfp (np.ndarray): The ripple-band filtered signal from the selected channel.
+            - peak_ripple_chan_lfp (np.ndarray): The raw LFP signal from the selected channel.
+        """
+        # Get selection metric from config - no defaults, must be specified
+        # Use passed config first, then self.config
+        effective_config = config or self.config
+        selection_metric = effective_config['channel_selection']['ripple_channel_metric']
+        
+        # Initialize lists to store metrics for each channel
+        channel_metrics = []
+        
+        # Process each CA1 channel
+        for chan_idx, chan_id in enumerate(ca1_chan_ids):
+            # Get raw LFP for this channel
+            chan_lfp = ca1_lfp[:, chan_idx]
+            
+            # Filter to ripple band
+            ripple_band = ripple_filter_func(chan_lfp[:, None])
+            ripple_band = ripple_band.flatten()  # Remove extra dimension
+            
+            # Calculate power and skewness
+            ripple_power = np.abs(hilbert(ripple_band)) ** 2
+            net_power = np.sum(ripple_power)
+            skewness = skew(ripple_power)
+            
+            # Store metrics
+            channel_metrics.append({
+                'channel_id': chan_id,
+                'depth': channel_positions.loc[chan_id],
+                'net_power': net_power,
+                'skewness': skewness,
+                'raw_lfp': chan_lfp,
+                'ripple_band': ripple_band
+            })
+            
+            # Update metadata dictionary
+            self.channel_selection_metadata_dict['ripple_band']['channel_ids'].append(int(chan_id))
+            self.channel_selection_metadata_dict['ripple_band']['depths'].append(float(channel_positions.loc[chan_id]))
+            self.channel_selection_metadata_dict['ripple_band']['skewness'].append(float(skewness))
+            self.channel_selection_metadata_dict['ripple_band']['net_power'].append(float(net_power))
+            
+        # Convert to DataFrame for easier selection
+        metrics_df = pd.DataFrame(channel_metrics)
+        
+        # Select channel based on configured metric
+        if selection_metric == 'skewness':
+            best_channel = metrics_df.loc[metrics_df['skewness'].idxmax()]
+        else:  # default to 'net_power'
+            best_channel = metrics_df.loc[metrics_df['net_power'].idxmax()]
+            
+        # Update metadata with selection info
+        self.channel_selection_metadata_dict['ripple_band']['selected_channel_id'] = int(best_channel['channel_id'])
+        self.channel_selection_metadata_dict['ripple_band']['selection_method'] = selection_metric
+        
+        return (
+            best_channel['channel_id'],
+            best_channel['ripple_band'],
+            best_channel['raw_lfp']
+        )
+
     def select_sharpwave_channel(
             self,
             ca1_lfp,
@@ -361,7 +456,8 @@ class BaseLoader:
             A configuration dictionary potentially containing parameters like 
             filter paths (`config['filter_paths']['sharpwave_filter']`), 
             analysis parameters (`config['analysis_params']` like thresholds, 
-            time buffers, MI bins).
+            time buffers, MI bins), and channel selection settings including
+            'sharpwave_channel_metric' and 'max_distance_microns'.
         filter_path : str, optional
             Direct path to the sharp wave filter coefficients (.mat file). Overrides
             path found in config.
@@ -369,11 +465,12 @@ class BaseLoader:
             A list where each tuple contains (start_time, end_time) in seconds, 
             indicating periods (e.g., due to animal movement) that should be excluded 
             from the phase-amplitude coupling analysis. Overrides any found in config.
-        selection_metric : {'modulation_index', 'circular_linear'}, optional
+        selection_metric : {'modulation_index', 'circular_linear', 'net_sw_power'}, optional
             Specifies the metric used to determine the "best" sharp wave channel from 
             the candidates below the ripple channel. Overrides config.
             - 'modulation_index': Uses the Tort Modulation Index (MI).
             - 'circular_linear': Uses the circular-linear correlation.
+            - 'net_sw_power': Uses the total sharp wave power.
             Default is 'modulation_index'.
 
         Returns:
@@ -392,6 +489,14 @@ class BaseLoader:
         ValueError
             If no suitable channel is found below the reference channel or if errors occur.
         """
+        # Get selection metric and distance constraint from config
+        # Use passed config first, then self.config, then default
+        effective_config = config or self.config
+
+        selection_metric = effective_config['channel_selection']['sharpwave_channel_metric']
+        max_distance_microns = effective_config['channel_selection']['max_distance_microns']
+
+        
         # Get the filter - implementers must override this if filter_path is None
         filter_path = self.sw_component_filter_path
                        
@@ -410,6 +515,8 @@ class BaseLoader:
         ripple_power_z = (ripple_power - ripple_power[mask].mean()) / ripple_power[mask].std()
 
         ref_depth = channel_positions.loc[peak_ripple_chan_id]
+        
+        # Get ALL channels below the reference channel (no distance filter yet)
         below_ids = channel_positions[channel_positions > ref_depth].index
         id_to_idx = {cid: i for i, cid in enumerate(ca1_chan_ids)}
         below_idx = [id_to_idx[cid] for cid in below_ids if cid in id_to_idx]
@@ -424,6 +531,7 @@ class BaseLoader:
         self.channel_selection_metadata_dict['sharp_wave_band']['modulation_index'] = []
         self.channel_selection_metadata_dict['sharp_wave_band']['circular_linear_corrs'] = []
 
+        # Compute metrics for ALL channels below the reference (for complete metadata)
         for cid, idx in zip(below_ids, below_idx):
             sw_filt = fftconvolve(ca1_lfp[:, idx], sharpwave_filter, mode='same')
             sw_an = hilbert(sw_filt)
@@ -454,11 +562,36 @@ class BaseLoader:
             self.channel_selection_metadata_dict['sharp_wave_band']['modulation_index'].append(float(modulation_index) if not np.isnan(modulation_index) else None)
             self.channel_selection_metadata_dict['sharp_wave_band']['circular_linear_corrs'].append(float(circular_linear_corr) if not np.isnan(circular_linear_corr) else None)
 
-        # Select best channel
-        best_cid = max(
-            results,
-            key=lambda k: results[k][selection_metric] if not np.isnan(results[k][selection_metric]) else -np.inf
-        )
+        # Now apply distance constraint for channel selection (but keep all metadata)
+        distance_filtered_candidates = []
+        for cid in results.keys():
+            distance_from_ref = abs(channel_positions.loc[cid] - ref_depth)
+            if distance_from_ref <= max_distance_microns:
+                distance_filtered_candidates.append(cid)
+
+        if not distance_filtered_candidates:
+            raise ValueError(f"No channels found within {max_distance_microns} microns of the reference channel")
+
+        # Select best channel based on the chosen metric (only from distance-filtered candidates)
+        if selection_metric == 'net_sw_power':
+            # For net_sw_power, we need to get the values from the metadata dict
+            sw_power_dict = {
+                cid: self.channel_selection_metadata_dict['sharp_wave_band']['net_sw_power'][i] 
+                for i, cid in enumerate(self.channel_selection_metadata_dict['sharp_wave_band']['channel_ids'])
+                if cid in distance_filtered_candidates  # Only consider distance-filtered candidates
+            }
+            best_cid = max(sw_power_dict, key=sw_power_dict.get)
+        else:
+            # For modulation_index and circular_linear_corr
+            metric_map = {
+                'modulation_index': 'modulation_index',
+                'circular_linear_corr': 'circular_linear_corr'
+            }
+            metric_key = metric_map.get(selection_metric, 'modulation_index')
+            best_cid = max(
+                distance_filtered_candidates,  # Only consider distance-filtered candidates
+                key=lambda k: results[k][metric_key] if not np.isnan(results[k][metric_key]) else -np.inf
+            )
 
         best_idx = results[best_cid]['idx']
         best_lfp = ca1_lfp[:, best_idx]
@@ -469,81 +602,6 @@ class BaseLoader:
         
         # Return the best channel ID and its raw LFP
         return best_cid, best_lfp
-
-    def select_ripple_channel(self, ca1_lfp, ca1_chan_ids, channel_positions, ripple_filter_func, config=None):
-        """Select the putative pyramidal layer (ripple band) channel for a given probe.
-        
-        Parameters
-        ----------
-        ca1_lfp : np.ndarray
-            LFP data array containing signals from channels located in the CA1 region.
-            Expected shape: (time, channels).
-        ca1_chan_ids : list of int
-            List of unique channel identifiers corresponding to the columns in `ca1_lfp`.
-        channel_positions : pd.Series
-            A pandas Series where the index contains channel IDs (including those in 
-            `ca1_chan_ids` and potentially others) and the values are the vertical
-            positions (depths) of those channels on the probe.
-        ripple_filter_func : callable
-            Function to filter the LFP data into the ripple band.
-        config : dict, optional
-            Configuration dictionary (not used in this implementation).
-        
-        Returns
-        -------
-        tuple
-            - peak_chan_id (int): The channel ID selected as the best ripple channel.
-            - peak_ripple_band_lfp (np.ndarray): The ripple-band filtered signal from the selected channel.
-            - peak_ripple_chan_lfp (np.ndarray): The raw LFP signal from the selected channel.
-        """
-        # Initialize lists to store metrics for each channel
-        channel_metrics = []
-        
-        # Process each CA1 channel
-        for chan_idx, chan_id in enumerate(ca1_chan_ids):
-            # Get raw LFP for this channel
-            chan_lfp = ca1_lfp[:, chan_idx]
-            
-            # Filter to ripple band
-            ripple_band = ripple_filter_func(chan_lfp[:, None])
-            ripple_band = ripple_band.flatten()  # Remove extra dimension
-            
-            # Calculate power and skewness
-            ripple_power = np.abs(hilbert(ripple_band)) ** 2
-            net_power = np.sum(ripple_power)
-            skewness = skew(ripple_power)
-            
-            # Store metrics
-            channel_metrics.append({
-                'channel_id': chan_id,
-                'depth': channel_positions.loc[chan_id],
-                'net_power': net_power,
-                'skewness': skewness,
-                'raw_lfp': chan_lfp,
-                'ripple_band': ripple_band
-            })
-            
-            # Update metadata dictionary
-            self.channel_selection_metadata_dict['ripple_band']['channel_ids'].append(int(chan_id))
-            self.channel_selection_metadata_dict['ripple_band']['depths'].append(float(channel_positions.loc[chan_id]))
-            self.channel_selection_metadata_dict['ripple_band']['skewness'].append(float(skewness))
-            self.channel_selection_metadata_dict['ripple_band']['net_power'].append(float(net_power))
-            
-        # Convert to DataFrame for easier selection
-        metrics_df = pd.DataFrame(channel_metrics)
-        
-        # Select channel with highest net power
-        best_channel = metrics_df.loc[metrics_df['net_power'].idxmax()]
-            
-        # Update metadata with selection info
-        self.channel_selection_metadata_dict['ripple_band']['selected_channel_id'] = int(best_channel['channel_id'])
-        self.channel_selection_metadata_dict['ripple_band']['selection_method'] = 'max_power'
-        
-        return (
-            best_channel['channel_id'],
-            best_channel['ripple_band'],
-            best_channel['raw_lfp']
-        )
 
     def global_events_probe_info(self):
         """
@@ -865,6 +923,7 @@ class BaseLoader:
                     "movement_artifact_ripple_band_threshold": config["ripple_detection"]["movement_artifact_ripple_band_threshold"],
                     "merge_events_offset": 0.025  # Hardcoded in config
                 },
+                "channel_selection": config["channel_selection"],
                 "global_swr_detection": config["global_swr"],
                 "dataset": config["run_details"]["dataset_to_process"],
                 "sampling_rates": config["sampling_rates"]
@@ -1647,6 +1706,7 @@ def process_session(session_id, config):
         # Initialize and set up the loader using the BaseLoader factory
         process_stage = "Setting up loader"
         loader = BaseLoader.create(dataset_to_process, session_id)
+        loader.set_config(config)  # Pass the config to the loader
         loader.set_up()
         
         # Get probe IDs and names

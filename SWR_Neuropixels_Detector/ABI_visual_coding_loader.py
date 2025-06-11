@@ -191,7 +191,7 @@ class abi_visual_coding_loader(BaseLoader):
             ca1_chan_ids=lfp_ca1_chans,
             channel_positions=all_channel_positions, # Pass the extracted positions
             ripple_filter_func=filter_ripple_band_func, # Assumed to be valid
-            config=None # Pass config if needed
+            config=self.config # Pass config from the loader
         )
 
         # --- Select Sharp Wave Channel (Now runs unconditionally) --- 
@@ -202,7 +202,7 @@ class abi_visual_coding_loader(BaseLoader):
             peak_ripple_chan_id=this_chan_id, # Pass selected ripple channel ID
             channel_positions=all_channel_positions,
             ripple_filtered=peakrippleband,
-            config=None, # Pass config if needed
+            config=self.config, # Pass config from the loader
             filter_path=getattr(self, 'sw_component_filter_path', None) # Use attribute if exists
         )
 
