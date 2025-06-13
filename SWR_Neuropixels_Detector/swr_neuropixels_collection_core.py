@@ -515,11 +515,20 @@ class BaseLoader:
         ripple_power_z = (ripple_power - ripple_power[mask].mean()) / ripple_power[mask].std()
 
         ref_depth = channel_positions.loc[peak_ripple_chan_id]
+        print(f"Reference channel {peak_ripple_chan_id} depth: {ref_depth}")
         
-        # Get ALL channels below the reference channel (no distance filter yet)
-        below_ids = channel_positions[channel_positions > ref_depth].index
+        # Get CA1 channels that are below the reference
+        below_ids = []
+        for cid in ca1_chan_ids:  # Only consider CA1 channels
+            if channel_positions.loc[cid] > ref_depth:  # Check if below reference
+                below_ids.append(cid)
+        
+        print(f"Found {len(below_ids)} CA1 channels below reference channel")
+        print(f"Channel depths below reference: {[channel_positions.loc[cid] for cid in below_ids]}")
+        
         id_to_idx = {cid: i for i, cid in enumerate(ca1_chan_ids)}
-        below_idx = [id_to_idx[cid] for cid in below_ids if cid in id_to_idx]
+        below_idx = [id_to_idx[cid] for cid in below_ids]  # All below_ids are now guaranteed to be in ca1_chan_ids
+        print(f"All {len(below_idx)} channels are in ca1_chan_ids")
 
         # Create dictionary to store detailed results for selection logic
         results = {}
@@ -564,34 +573,29 @@ class BaseLoader:
 
         # Now apply distance constraint for channel selection (but keep all metadata)
         distance_filtered_candidates = []
-        for cid in results.keys():
-            distance_from_ref = abs(channel_positions.loc[cid] - ref_depth)
-            if distance_from_ref <= max_distance_microns:
+        for cid in below_ids:  # Use the original list of channels below reference
+            distance_from_ref = channel_positions.loc[cid] - ref_depth
+            if 0 < distance_from_ref <= max_distance_microns:
                 distance_filtered_candidates.append(cid)
 
         if not distance_filtered_candidates:
-            raise ValueError(f"No channels found within {max_distance_microns} microns of the reference channel")
+            print(f"Warning: No channels found within {max_distance_microns} microns below the reference channel. Using ripple channel instead.")
+            # Use the ripple channel as the sharp wave channel
+            best_cid = peak_ripple_chan_id
+            best_idx = id_to_idx[best_cid]
+            best_lfp = ca1_lfp[:, best_idx]
+            
+            # Store selection info in the metadata dictionary
+            self.channel_selection_metadata_dict['sharp_wave_band']['selected_channel_id'] = int(best_cid)
+            self.channel_selection_metadata_dict['sharp_wave_band']['selection_method'] = 'ripple_channel_fallback'
+            
+            return best_cid, best_lfp
 
         # Select best channel based on the chosen metric (only from distance-filtered candidates)
-        if selection_metric == 'net_sw_power':
-            # For net_sw_power, we need to get the values from the metadata dict
-            sw_power_dict = {
-                cid: self.channel_selection_metadata_dict['sharp_wave_band']['net_sw_power'][i] 
-                for i, cid in enumerate(self.channel_selection_metadata_dict['sharp_wave_band']['channel_ids'])
-                if cid in distance_filtered_candidates  # Only consider distance-filtered candidates
-            }
-            best_cid = max(sw_power_dict, key=sw_power_dict.get)
-        else:
-            # For modulation_index and circular_linear_corr
-            metric_map = {
-                'modulation_index': 'modulation_index',
-                'circular_linear_corr': 'circular_linear_corr'
-            }
-            metric_key = metric_map.get(selection_metric, 'modulation_index')
-            best_cid = max(
-                distance_filtered_candidates,  # Only consider distance-filtered candidates
-                key=lambda k: results[k][metric_key] if not np.isnan(results[k][metric_key]) else -np.inf
-            )
+        best_cid = max(
+            distance_filtered_candidates,
+            key=lambda cid: results[cid][selection_metric]
+        )
 
         best_idx = results[best_cid]['idx']
         best_lfp = ca1_lfp[:, best_idx]
