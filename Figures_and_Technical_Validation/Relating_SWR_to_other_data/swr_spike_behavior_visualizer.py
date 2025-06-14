@@ -435,42 +435,73 @@ class SWRSpikeAnalyzer:
             
         return results
 
-def main():
+def find_best_spiking_coupling(
+    cache_dir,
+    swr_input_dir,
+    output_dir,
+    target_regions,
+    min_units_per_region,
+    window_size,
+    save_intermediate=True
+):
     """
-    Main function to run the SWR spike analysis and save results.
+    Find sessions with best spiking coupling to SWRs and analyze them.
+    
+    Parameters:
+    -----------
+    cache_dir : str
+        Path to the AllenSDK cache directory
+    swr_input_dir : str
+        Path to the directory containing SWR event files
+    output_dir : str
+        Path to save output files
+    target_regions : list
+        List of brain regions to analyze
+    min_units_per_region : int
+        Minimum number of units required in each region
+    window_size : float
+        Size of analysis windows in seconds
+    save_intermediate : bool
+        Whether to save intermediate results (unit-level data)
+        
+    Returns:
+    --------
+    pd.DataFrame
+        Summary DataFrame with significant unit counts for each session/region/direction
     """
     # Create output directory if it doesn't exist
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
     
     # Initialize analyzer
     analyzer = SWRSpikeAnalyzer(
-        cache_dir=CACHE_DIR,
-        swr_input_dir=SWR_INPUT_DIR
+        cache_dir=cache_dir,
+        swr_input_dir=swr_input_dir
     )
     
     # Get sessions with good unit counts
     search_df = abi_visual_behavior_units_session_search(
-        cache_dir=CACHE_DIR,
-        target_regions=TARGET_REGIONS,
-        min_units_per_region=MIN_UNITS_PER_REGION
+        cache_dir=cache_dir,
+        target_regions=target_regions,
+        min_units_per_region=min_units_per_region
     )
     
     # Add column to check if session has SWR data
     search_df['has_swr_data'] = search_df.index.map(
-        lambda x: os.path.exists(os.path.join(SWR_INPUT_DIR, DATASET_NAME, f"swrs_session_{x}"))
+        lambda x: os.path.exists(os.path.join(swr_input_dir, "allen_visbehave_swr_murphylab2024", f"swrs_session_{x}"))
     )
     
     # Filter for sessions with SWR data
     search_df = search_df[search_df['has_swr_data']]
     
-    # Save the search results
-    search_df.to_csv(os.path.join(OUTPUT_DIR, "abi_visual_behavior_units_session_search.csv"))
+    if save_intermediate:
+        # Save the search results
+        search_df.to_csv(os.path.join(output_dir, "abi_visual_behavior_units_session_search.csv"))
     
     # Initialize summary DataFrame
     summary_rows = []
     
     # Get the session with the most target region units for testing
-    target_region = 'SUB'
+    target_region = target_regions[0]  # Use first region as default
     if target_region in search_df.columns:
         test_session_id = search_df.index[0]  # First row has highest target_region count
         print(f"\nTesting with session {test_session_id} ({target_region} units: {search_df[target_region].iloc[0]})")
@@ -478,21 +509,21 @@ def main():
         # Analyze the test session
         results = analyzer.analyze_session_swr_spikes(
             session_id=test_session_id,
-            regions=TARGET_REGIONS,
-            window_size=0.1  # 100ms windows
+            regions=target_regions,
+            window_size=window_size
         )
         
-        # Save results for each region
+        # Save results for each region if requested
+        if save_intermediate:
+            for region, region_results in results.items():
+                # Create filename with timestamp
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                output_file = os.path.join(output_dir, f"swr_spike_analysis_{region}_{timestamp}.csv")
+                region_results.to_csv(output_file, index=False)
+                print(f"Saved results for {region} to {output_file}")
+        
+        # Generate summaries for different directions
         for region, region_results in results.items():
-            # Create filename with timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_file = os.path.join(OUTPUT_DIR, f"swr_spike_analysis_{region}_{timestamp}.csv")
-            
-            # Save to CSV
-            region_results.to_csv(output_file, index=False)
-            print(f"Saved results for {region} to {output_file}")
-            
-            # Generate summaries for different directions
             for direction in ['increase', 'decrease', 'any']:
                 # Get summary using corrected p-values
                 corrected_summary = analyzer.summarize_results(
@@ -520,16 +551,19 @@ def main():
                     'total_units': corrected_summary['total_units'].iloc[0]
                 })
         
-        # Create and save summary DataFrame
+        # Create summary DataFrame
         summary_df = pd.DataFrame(summary_rows)
-        summary_file = os.path.join(OUTPUT_DIR, f"swr_spike_analysis_summary_{timestamp}.csv")
-        summary_df.to_csv(summary_file, index=False)
-        print(f"\nSaved summary results to {summary_file}")
         
-        return results, summary_df
+        if save_intermediate:
+            # Save summary results
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            summary_file = os.path.join(output_dir, f"swr_spike_analysis_summary_{timestamp}.csv")
+            summary_df.to_csv(summary_file, index=False)
+            print(f"\nSaved summary results to {summary_file}")
+        
+        return summary_df
     else:
         print(f"No sessions found with {target_region} units")
-        return None, None
+        return None
 
-if __name__ == "__main__":
-    main()
+
