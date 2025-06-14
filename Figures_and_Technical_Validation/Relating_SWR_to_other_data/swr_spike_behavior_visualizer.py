@@ -566,4 +566,151 @@ def find_best_spiking_coupling(
         print(f"No sessions found with {target_region} units")
         return None
 
+def suggest_best_events(analyzer, session_id, region, k=3, p_threshold=0.05, use_corrected=True):
+    """
+    Suggest the top k (probe, event) combos with the most units showing significant increase in firing rate.
+    Returns a list of (probe_id, event_idx, n_significant_units).
+    """
+    # Find all probes for this session
+    session_path = os.path.join(analyzer.swr_input_dir, analyzer.dataset_name, f"swrs_session_{session_id}")
+    event_files = glob.glob(os.path.join(session_path, "probe_*_channel_*_putative_swr_events.csv.gz"))
+    probe_ids = set()
+    for event_file in event_files:
+        match = re.search(r'probe_([^_]+)_channel_', os.path.basename(event_file))
+        if match:
+            probe_ids.add(match.group(1))
+    results = []
+    for probe_id in probe_ids:
+        # Get events for this probe
+        events = analyzer.explorer.find_best_events(
+            dataset=analyzer.dataset_name,
+            session_id=str(session_id),
+            probe_id=str(probe_id),
+            min_sw_power=1,
+            min_duration=0.05,
+            max_duration=0.15,
+            min_clcorr=0.8,
+            exclude_gamma=True,
+            exclude_movement=True
+        )
+        if events.empty:
+            continue
+        # Get spikes for this region/probe
+        region_units, spike_times = analyzer.get_region_units_and_spikes(session_id, region)
+        if len(spike_times) == 0:
+            continue
+        # For each event, count significant units
+        for idx, event in events.iterrows():
+            event_df = pd.DataFrame([event])
+            fr_df = analyzer.calculate_firing_rate_changes(spike_times, event_df)
+            pvals = fr_df['during_vs_baseline_corrected' if use_corrected else 'during_vs_baseline']
+            n_sig = sum([(x[0] > 0) and (x[1] < p_threshold) for x in pvals])
+            results.append((probe_id, idx, n_sig))
+    # Sort and return top k
+    results.sort(key=lambda x: x[2], reverse=True)
+    return results[:k]
+
+def spikes_around_event_plot(
+    analyzer,
+    session_id,
+    probe_id,
+    event_idx,
+    region,
+    fr_df=None,
+    window=0.2,
+    p_threshold=0.05,
+    use_corrected=True,
+    show_all_units=False,
+    show_unit_ids=False,
+    show_yticks=True
+):
+    """
+    Plot a raster of spike times for units ranked by coupling to the SWR event.
+    Spikes are shown as thin rectangles, and the highest-coupled units are at the top.
+    """
+    # Get events for this probe
+    events = analyzer.explorer.find_best_events(
+        dataset=analyzer.dataset_name,
+        session_id=str(session_id),
+        probe_id=str(probe_id),
+        min_sw_power=1,
+        min_duration=0.05,
+        max_duration=0.15,
+        min_clcorr=0.8,
+        exclude_gamma=True,
+        exclude_movement=True
+    )
+    event = events.loc[event_idx]
+    t0 = event['start_time']
+    t1 = event['end_time']
+    t_peak = event['power_peak_time'] if 'power_peak_time' in event else (t0 + t1) / 2
+    t_center = (t0 + t1) / 2
+
+    # Get spikes for this region/probe
+    region_units, spike_times = analyzer.get_region_units_and_spikes(session_id, region)
+
+    # If no firing rate DataFrame is provided, compute it
+    if fr_df is None:
+        event_df = pd.DataFrame([event])
+        fr_df = analyzer.calculate_firing_rate_changes(spike_times, event_df)
+
+    # Rank units by effect size (during_vs_baseline, descending)
+    effect_col = 'during_vs_baseline_corrected' if use_corrected else 'during_vs_baseline'
+    fr_df['effect'] = [x[0] for x in fr_df[effect_col]]
+    fr_df['pval'] = [x[1] for x in fr_df[effect_col]]
+    fr_df = fr_df.sort_values('effect', ascending=False).reset_index(drop=True)
+
+    if show_all_units:
+        plot_units = fr_df['unit_id'].values
+    else:
+        # Only plot units with positive effect and significant p-value
+        mask = (fr_df['effect'] > 0) & (fr_df['pval'] < p_threshold)
+        plot_units = fr_df[mask]['unit_id'].values
+
+    # Raster data
+    yticklabels = []
+    spike_xs = []
+    spike_ys = []
+    for rank, unit_id in enumerate(plot_units):
+        spikes = spike_times[unit_id]
+        # Only keep spikes within window around event center
+        rel_spikes = spikes[(spikes >= t_center - window/2) & (spikes <= t_center + window/2)] - t_center
+        spike_xs.extend(rel_spikes)
+        spike_ys.extend([rank]*len(rel_spikes))
+        yticklabels.append(str(unit_id))
+
+    # Reverse y for highest coupling at top
+    n_units = len(plot_units)
+    spike_ys = [n_units - 1 - y for y in spike_ys]
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(10, 6))
+    # Plot spikes as thin rectangles
+    for x, y in zip(spike_xs, spike_ys):
+        ax.vlines(x, y - 0.4, y + 0.4, color='red', linewidth=1)
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Neuron (ranked by coupling)')
+    ax.set_title(f'Spikes for units (session {session_id}, probe {probe_id}, event {event_idx})')
+
+    # Mark event start/end/peak
+    ax.plot([t0-t_center], [-1], marker='v', color='green', markersize=12, label='Event Start')
+    ax.plot([t1-t_center], [-1], marker='v', color='green', markersize=12, label='Event End')
+    ax.plot([t_peak-t_center], [-1], marker='v', color='black', markersize=12, label='Event Peak')
+
+    # Only show one legend entry for start/end
+    handles, labels = ax.get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    ax.legend(by_label.values(), by_label.keys(), loc='upper right')
+
+    ax.set_ylim(-2, n_units+2)
+    ax.axvline(0, color='gray', linestyle='--', alpha=0.5)
+
+    if show_unit_ids and show_yticks:
+        ax.set_yticks(np.arange(n_units))
+        ax.set_yticklabels([yticklabels[n_units-1-i] for i in range(n_units)])
+    elif not show_yticks:
+        ax.set_yticks([])
+    plt.tight_layout()
+    return fig
+
 
