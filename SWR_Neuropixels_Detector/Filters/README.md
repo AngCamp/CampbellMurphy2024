@@ -50,6 +50,22 @@ The target sampling frequency for the LFP data after resampling in the main pipe
 
 *(Placeholder: Include the filter plot image or key MNE code snippet from the notebook if possible/desired)*
 
+### Gamma Band Filter (e.g., `gammafilter.mat`)
+
+*   **Type:** Band-pass FIR filter
+*   **Passband:** [20 Hz - 80 Hz] (based on Frank et al., 2008)
+*   **Stopband Attenuation:** *(Placeholder: Specify from notebook)*
+*   **Passband Ripple:** *(Placeholder: Specify from notebook)*
+*   **Transition Width:** 1.0 Hz
+*   **Filter Length/Order:** Auto-determined
+*   **Design Method:** FIR window method (firwin)
+
+The gamma band filter was designed following the frequency range specifications from Frank et al., 2008, which identified this band as being particularly relevant for hippocampal processing during memory consolidation.
+
+## References
+
+Frank, L. M., Stanley, G. B., & Brown, E. N. (2008). Hippocampal plasticity across multiple days of exposure to novel environments. Journal of Neuroscience, 28(12), 3092-3102.
+
 ## Saving Filters
 
 The designed filter coefficients (typically the numerator `b` for FIR filters) were saved into `.mat` files (e.g., using `scipy.io.savemat`) for use by the main detection script.
