@@ -1,4 +1,0 @@
-session_id,region,direction,corrected_significant_units,uncorrected_significant_units,total_units
-1047969464,SUB,increase,"{'pre_vs_post': 0.0, 'before_vs_after': 0.0, 'during_vs_baseline': 58.0}","{'pre_vs_post': 2.0, 'before_vs_after': 0.0, 'during_vs_baseline': 58.0}",72.0
-1047969464,SUB,decrease,"{'pre_vs_post': 0.0, 'before_vs_after': 0.0, 'during_vs_baseline': 3.0}","{'pre_vs_post': 3.0, 'before_vs_after': 1.0, 'during_vs_baseline': 3.0}",72.0
-1047969464,SUB,any,"{'pre_vs_post': 0.0, 'before_vs_after': 0.0, 'during_vs_baseline': 61.0}","{'pre_vs_post': 5.0, 'before_vs_after': 1.0, 'during_vs_baseline': 61.0}",72.0
