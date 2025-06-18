@@ -32,6 +32,7 @@ PER_REGION_UNIT_LIMITS_LIST = [30, 25, 10]  # Number of units per region, in the
 MIN_UNITS_PER_REGION = 100
 BIN_SIZE = 0.01  # seconds
 BASELINE_WINDOW = 0.25  # seconds around events to exclude from baseline
+WINDOW = 0.5  # seconds around event to plot
 
 # Debugging/limiting parameters
 session_limit = 2      # Number of sessions to check (False/None for all)
@@ -44,6 +45,8 @@ SESSION_ID = 1047969464  # Set to desired session
 PROBE_ID = 1048089915    # Set to desired probe
 EVENT_CSV_IDX = 2394     # Set to desired event index (row in CSV)
 limit_to_probe = False    # Toggle: if True, only plot units from the specified probe; if False, plot all units in target regions
+
+
 
 def find_sessions_with_units(cache_dir, target_regions, min_units_per_region, session_limit=session_limit):
     """Find sessions with enough good units in target regions. Limit to session_limit if set."""
@@ -249,7 +252,7 @@ def rank_units(session_id, cache_dir, swr_input_dir, target_regions, bin_size=BI
     return results_dict, flat_results
 
 def plot_spike_raster_for_event(
-    session, event, results_df, target_regions, window=0.2, align_to='peak', session_id=None,
+    session, event, results_df, target_regions, window=WINDOW, align_to='peak', session_id=None,
     only_increasing=True, shaded_event_region=True, event_idx=None, probe_id=None, per_region_unit_limits=None
 ):
     # Initialize per_region_unit_limits if None
@@ -332,7 +335,7 @@ def plot_spike_raster_for_event(
     plt.tight_layout()
     return fig
 
-def rank_events_by_spike_count(session, swr_events, results_df, window=0.2):
+def rank_events_by_spike_count(session, swr_events, results_df, window=WINDOW):
     """
     For each event, count total spikes from significant units within the window.
     Returns a DataFrame of events ranked by total spike count (descending), with the original event CSV index as 'event_csv_idx'.
@@ -409,7 +412,7 @@ def fdr_correct_and_summarize(flat_results):
     summary_df = pd.DataFrame(summary_rows)
     return summary_df
 
-def plot_specific_event(session_id, probe_id, event_csv_idx, cache_dir, swr_input_dir, target_regions, output_dir=OUTPUT_DIR, window=0.2, align_to='peak', limit_to_probe=True, per_region_unit_limits=None):
+def plot_specific_event(session_id, probe_id, event_csv_idx, cache_dir, swr_input_dir, target_regions, output_dir=OUTPUT_DIR, window=WINDOW, align_to='peak', limit_to_probe=True, per_region_unit_limits=None):
     """
     Plot a specific event for a given session, probe, and event index (row in CSV).
     If limit_to_probe is False, plot all good units in the target regions for the session (not just those on the probe).
@@ -515,14 +518,14 @@ def main():
         return
     swr_events = pd.concat(all_events, ignore_index=True)
     # Rank events by spike count (using only units from best probe)
-    ranked_df = rank_events_by_spike_count(session, swr_events, results_df, window=0.2)
+    ranked_df = rank_events_by_spike_count(session, swr_events, results_df, window=window)
     # Plot the best event
     if ranked_df.empty:
         print("No events to plot.")
         return
     best_event = ranked_df.iloc[0]
     fig = plot_spike_raster_for_event(
-        session, best_event, results_df, TARGET_REGIONS, window=0.2, align_to='peak', session_id=session_id,
+        session, best_event, results_df, TARGET_REGIONS, window=window, align_to='peak', session_id=session_id,
         only_increasing=True, shaded_event_region=True, event_idx=best_event.event_csv_idx, probe_id=best_probe_id,
         per_region_unit_limits=PER_REGION_UNIT_LIMITS_LIST
     )
@@ -534,6 +537,6 @@ def main():
 
 if __name__ == "__main__":
     # Uncomment the following to use the modular event plotting:
-    plot_specific_event(SESSION_ID, PROBE_ID, EVENT_CSV_IDX, CACHE_DIR, SWR_INPUT_DIR, TARGET_REGIONS, limit_to_probe=limit_to_probe, per_region_unit_limits=PER_REGION_UNIT_LIMITS_LIST)
+    plot_specific_event(SESSION_ID, PROBE_ID, EVENT_CSV_IDX, CACHE_DIR, SWR_INPUT_DIR, TARGET_REGIONS, window=WINDOW, limit_to_probe=limit_to_probe, per_region_unit_limits=PER_REGION_UNIT_LIMITS_LIST)
     # Or comment above and use the default main workflow:
     # main()

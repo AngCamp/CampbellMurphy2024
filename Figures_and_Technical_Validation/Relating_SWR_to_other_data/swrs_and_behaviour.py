@@ -14,8 +14,8 @@ from allensdk.brain_observatory.behavior.behavior_project_cache.\
 CACHE_DIR = "/space/scratch/allen_visbehave_data"
 SWR_INPUT_DIR = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_v2_final"
 DATASET_NAME = "allen_visbehave_swr_murphylab2024"
-SESSION_ID = 1047969464  # Example session
-WINDOW = 2.5  # seconds before and after transition
+SESSION_ID = 1047969464 #1104058216  # Example session
+WINDOW = 1  # seconds before and after transition
 MAX_PLOTS = 10
 OUTPUT_DIR = "/home/acampbell/NeuropixelsLFPOnRamp/Figures_and_Technical_Validation/Relating_SWR_to_other_data/swrs_pupils_and_running_results"
 SWR_COUNT_THRESHOLD = 1  # Minimum number of SWRs in window to plot
@@ -62,14 +62,44 @@ def find_speed_transitions(running_speed, threshold=2.0):
 def plot_transitions_with_swrs(session, running_speed, eye_tracking, swr_events, up_times, down_times, window=2.5, max_plots=10, swr_count_threshold=3):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     plots_made = 0
+    # Sort all transitions by time
     all_transitions = np.concatenate([
         np.array([(t, 'up') for t in up_times]),
         np.array([(t, 'down') for t in down_times])
     ], dtype=object)
-    # Sort by time
     all_transitions = all_transitions[np.argsort(all_transitions[:,0].astype(float))]
+
+    # --- Group transitions: only keep the first in each window, and avoid transitions near large gaps ---
+    # Compute large gap locations for running and pupil data
+    run_times_full = running_speed['timestamps'].values
+    run_gaps_full = np.diff(run_times_full)
+    median_run_gap = np.median(run_gaps_full)
+    large_run_gap_indices = np.where(run_gaps_full > 5 * median_run_gap)[0]
+    large_run_gap_times = set(run_times_full[large_run_gap_indices])
+
+    pupil_times_full = eye_tracking['timestamps'].values
+    pupil_gaps_full = np.diff(pupil_times_full)
+    median_pupil_gap = np.median(pupil_gaps_full)
+    large_pupil_gap_indices = np.where(pupil_gaps_full > 5 * median_pupil_gap)[0]
+    large_pupil_gap_times = set(pupil_times_full[large_pupil_gap_indices])
+
+    grouped_transitions = []
+    last_t = -np.inf
     for t, direction in all_transitions:
         t = float(t)
+        # Grouping: skip if within window of previous
+        if t - last_t < window:
+            continue
+        # Gap avoidance: skip if within window of a large gap in running or pupil data
+        near_run_gap = any(abs(t - gap_time) < window for gap_time in large_run_gap_times)
+        near_pupil_gap = any(abs(t - gap_time) < window for gap_time in large_pupil_gap_times)
+        if near_run_gap or near_pupil_gap:
+            print(f"Skipping transition at {t:.2f}s ({direction}) due to proximity to large data gap.")
+            continue
+        grouped_transitions.append((t, direction))
+        last_t = t
+
+    for t, direction in grouped_transitions:
         # Find SWR events in window (include any overlapping SWR)
         swrs_in_window = swr_events[(swr_events['end_time'] >= t-window) & (swr_events['start_time'] <= t+window)]
         n_swrs = len(swrs_in_window)
@@ -173,3 +203,22 @@ if __name__ == "__main__":
     up_times, down_times = find_speed_transitions(running_speed)
     # Plot
     plot_transitions_with_swrs(session, running_speed, eye_tracking_noblinks, swr_events, up_times, down_times, window=WINDOW, max_plots=MAX_PLOTS, swr_count_threshold=SWR_COUNT_THRESHOLD)
+
+    # --- Diagnostics for breaks/gaps in the full session data ---
+    print("\n==== SESSION-WIDE TIMESTAMP DIAGNOSTICS ====")
+    # Running speed
+    run_times = running_speed['timestamps'].values
+    run_gaps = np.diff(run_times)
+    if len(run_gaps) > 0:
+        print(f"Running speed: min gap={run_gaps.min():.4f}, max gap={run_gaps.max():.4f}, median gap={np.median(run_gaps):.4f}")
+        large_run_gaps = np.where(run_gaps > 5 * np.median(run_gaps))[0]
+        print(f"Large running speed gaps at indices: {large_run_gaps}")
+    print(f"Running speed: {len(run_times)} samples, time {run_times.min()} to {run_times.max()}")
+    # Pupil area
+    pupil_times = eye_tracking_noblinks['timestamps'].values
+    pupil_gaps = np.diff(pupil_times)
+    if len(pupil_gaps) > 0:
+        print(f"Pupil area: min gap={pupil_gaps.min():.4f}, max gap={pupil_gaps.max():.4f}, median gap={np.median(pupil_gaps):.4f}")
+        large_pupil_gaps = np.where(pupil_gaps > 5 * np.median(pupil_gaps))[0]
+        print(f"Large pupil area gaps at indices: {large_pupil_gaps}")
+    print(f"Pupil area: {len(pupil_times)} samples, time {pupil_times.min()} to {pupil_times.max()}")

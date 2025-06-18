@@ -254,7 +254,7 @@ def analyze_all_sessions(session_ids, cache_dir, swr_input_dir, target_regions, 
     return results_dict, flat_results
 
 def plot_spike_raster_for_event(
-    session, event, results_df, target_regions, window=0.2, align_to='peak', session_id=None,
+    session, event, results_df, target_regions, window=0.5, align_to='peak', session_id=None,
     per_region_unit_limits_list=None, only_increasing=True, shaded_event_region=True, event_idx=None
 ):
     """
@@ -385,7 +385,7 @@ def plot_spike_raster_for_event(
     plt.tight_layout()
     return fig
 
-def find_and_rank_events(session, swr_events, results_df, window=0.2, event_limit=event_limit):
+def find_and_rank_events(session, swr_events, results_df, window=0.5, event_limit=event_limit):
     """
     For each event, count total spikes from significant units within the window.
     Returns a DataFrame of events ranked by total spike count (descending). Limit to event_limit events if set.
@@ -485,7 +485,7 @@ def rank_sessions_by_multiunit(cache_dir, swr_input_dir, dataset_name, target_re
         df['qval'] = []
     return df
 
-def rank_events_by_spike_count(session, swr_events, results_df, window=0.2, event_limit=None):
+def rank_events_by_spike_count(session, swr_events, results_df, window=0.5, event_limit=None):
     """
     For each event, count total spikes from significant units within the window.
     Returns a DataFrame of events ranked by total spike count (descending), with the original event CSV index as 'event_csv_idx'.
@@ -607,13 +607,13 @@ def main():
         return
     swr_events = pd.concat(all_events, ignore_index=True)
     # Rank events by spike count (using new function)
-    ranked_events = rank_events_by_spike_count(session, swr_events, results_df, window=0.2, event_limit=event_limit)
+    ranked_events = rank_events_by_spike_count(session, swr_events, results_df, window=0.5, event_limit=event_limit)
     # Plot top n events
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     n_plot = event_limit if event_limit else 10
     for i, event in ranked_events.head(n_plot).iterrows():
         fig = plot_spike_raster_for_event(
-            session, event, results_df, TARGET_REGIONS, window=0.2, align_to='peak', session_id=session_id,
+            session, event, results_df, TARGET_REGIONS, window=0.5, align_to='peak', session_id=session_id,
             per_region_unit_limits_list=PER_REGION_UNIT_LIMITS_LIST, only_increasing=True, shaded_event_region=True, event_idx=event.event_csv_idx
         )
         base_path = os.path.join(OUTPUT_DIR, f'swr_spike_raster_session_{session_id}_event_{event.event_csv_idx}')
