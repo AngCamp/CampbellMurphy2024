@@ -24,7 +24,7 @@ This folder contains tutorials for understanding and analyzing Sharp Wave Ripple
 - **Threshold Selection Methods**: Demonstrates how to evaluate and choose appropriate thresholds for SWR detection
 - **Dataset-Level Infrastructure**: Provides the `SharpWaveComponentPlotter` object for managing data across multiple sessions and datasets
 - **Cross-Dataset Analysis**: Enables comparisons and analyses across entire datasets (e.g., Allen Visual Behavior, Allen Visual Coding, IBL)
-- **Statistical Framework**: Establishes the foundation for hypothesis testing using Generalized Linear Models (GLMs)
+
 
 **Use Case**: When you need to:
 - Test different threshold parameters for SWR detection
