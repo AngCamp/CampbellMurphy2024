@@ -16,7 +16,7 @@ This folder contains tutorials for understanding and analyzing Sharp Wave Ripple
 
 **Use Case**: When you need to examine SWR events within a specific recording session, understand the data structure, or perform preliminary analyses on individual sessions.
 
-### 2. `Chosing_Event_thresholds.ipynb` - Threshold Testing and Dataset-Level Analyses
+### 2. `choosing_event_thresholds.ipynb` - Threshold Testing and Dataset-Level Analyses
 
 **Purpose**: This notebook establishes methods for threshold testing and provides code infrastructure for performing analyses across **entire datasets**.
 
