@@ -122,12 +122,12 @@ def print_and_save_table(df, output_file, title):
 
 def main(dataset_name):
     """
-    Creates a summary demographics table from a raw demographics CSV.
+    Creates a summary subject information table from a raw subject info CSV.
     """
     file_map = {
-        'abi_visual_behaviour': 'visbehaviour_demographics.csv',
-        'abi_visual_coding': 'viscoding_demographics.csv',
-        'ibl': 'ibl_demographics.csv'
+        'abi_visual_behaviour': 'visbehaviour_subject_info.csv',
+        'abi_visual_coding': 'viscoding_subject_info.csv',
+        'ibl': 'ibl_subject_info.csv'
     }
 
     if dataset_name not in file_map:
@@ -136,15 +136,15 @@ def main(dataset_name):
         return
 
     input_filename = file_map[dataset_name]
-    input_filepath = os.path.join('demographics_data', input_filename)
+    input_filepath = os.path.join('subject_info_data', input_filename)
 
     if not os.path.exists(input_filepath):
         print(f"Error: Input file not found at {input_filepath}")
-        print("Please run the corresponding get_*_demographics.py script first.")
+        print("Please run the corresponding get_*_subject_info.py script first.")
         return
 
     output_filename = input_filename.replace('.csv', '_summary.csv')
-    output_filepath = os.path.join('demographics_summaries', output_filename)
+    output_filepath = os.path.join('subject_info_summaries', output_filename)
     
     df = pd.read_csv(input_filepath)
 
@@ -156,7 +156,7 @@ def main(dataset_name):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Create a summary demographics table from a previously generated data file.",
+        description="Create a summary subject information table from a previously generated data file.",
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
@@ -174,6 +174,6 @@ if __name__ == "__main__":
     main(args.dataset_name)
 
     # Example usage from command line:
-    # python create_summary_table.py visbehaviour_demographics.csv --output_file visbehaviour_summary.csv
-    # python create_summary_table.py viscoding_demographics.csv --output_file viscoding_summary.csv
-    # python create_summary_table.py ibl_demographics.csv --output_file ibl_summary.csv --is_ibl 
+    # python create_summary_table.py visbehaviour_subject_info.csv --output_file visbehaviour_summary.csv
+    # python create_summary_table.py viscoding_subject_info.csv --output_file viscoding_summary.csv
+    # python create_summary_table.py ibl_subject_info.csv --output_file ibl_summary.csv --is_ibl 
