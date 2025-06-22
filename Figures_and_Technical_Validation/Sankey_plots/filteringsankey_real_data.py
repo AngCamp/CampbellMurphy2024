@@ -30,7 +30,7 @@ def process_all_datasets(base_path):
         session_folders = glob.glob(os.path.join(dataset_path, "swrs_session_*"))
         
         for session in session_folders:
-            event_files = glob.glob(os.path.join(session, "*karlsson_detector_events.csv.gz"))
+            event_files = glob.glob(os.path.join(session, "*putative_swr_events.csv.gz"))
             
             for event_file in event_files:
                 df = pd.read_csv(event_file, compression='gzip')
@@ -72,7 +72,8 @@ def process_all_datasets(base_path):
     return total_stats
 
 # Process the data
-base_path = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_swr_data"
+#base_path = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_swr_data"
+base_path = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_v2_final"
 stats = process_all_datasets(base_path)
 
 # Format numbers for display
@@ -220,8 +221,8 @@ fig.update_layout(
 )
 
 # Save as PNG and SVG
-fig.write_image("real_data_filtering_sankey.png", width=1600, height=1200, scale=2)
-fig.write_image("real_data_filtering_sankey.svg", width=1600, height=1200, scale=2)
+fig.write_image("v2_real_data_filtering_sankey.png", width=1600, height=1200, scale=2)
+fig.write_image("v2_real_data_filtering_sankey.svg", width=1600, height=1200, scale=2)
 
 # Print summary statistics
 print("=" * 70)
