@@ -1,0 +1,4 @@
+full_genotype,Count (Male),Count (Female),Avg Age (Weeks) (Male),Avg Age (Weeks) (Female),Age Range (Weeks) (Male),Age Range (Weeks) (Female),Avg Probes in CA1 (Male),Avg Probes in CA1 (Female)
+Sst-IRES-Cre/wt;Ai32(RCL-ChR2(H134R)_EYFP)/wt,10,12,23.49,22.21,17.0-38.0,18.0-29.0,3.85,3.79
+Vip-IRES-Cre/wt;Ai32(RCL-ChR2(H134R)_EYFP)/wt,9,2,22.25,27.86,19.0-26.0,28.0-28.0,3.83,2.75
+wt/wt,11,8,19.47,23.33,17.0-25.0,20.0-27.0,4.27,4.44

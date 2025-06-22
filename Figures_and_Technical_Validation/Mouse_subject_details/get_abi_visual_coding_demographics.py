@@ -1,0 +1,82 @@
+import argparse
+import os
+import re
+import pandas as pd
+from allensdk.brain_observatory.ecephys.ecephys_project_cache import EcephysProjectCache
+from tqdm import tqdm
+
+def get_viscoding_demographics(swr_dir, sdk_dir, output_file):
+    """
+    Collects demographic and probe information for Allen Visual Coding sessions.
+
+    Args:
+        swr_dir (str): Path to the directory containing SWR processing results.
+        sdk_dir (str): Path to the Allen SDK cache directory.
+        output_file (str): Path to save the output CSV file.
+    """
+    manifest_path = os.path.join(sdk_dir, "manifest.json")
+    if not os.path.exists(manifest_path):
+        print(f"Manifest file not found at {manifest_path}. Check ABI_VISUAL_CODING_SDK_CACHE.")
+        return
+
+    if not os.path.exists(swr_dir):
+        print(f"SWR results directory not found at {swr_dir}. Check OUTPUT_DIR.")
+        return
+
+    cache = EcephysProjectCache.from_warehouse(manifest=manifest_path)
+    sessions_table = cache.get_session_table()
+
+    session_dirs = [d for d in os.listdir(swr_dir) if d.startswith("swrs_session_")]
+    session_ids = [int(re.sub("swrs_session_", "", d)) for d in session_dirs]
+
+    demographics = []
+    print("Collecting demographics for Allen Visual Coding sessions...")
+    for session_id in tqdm(session_ids, desc="Processing Visual Coding Sessions"):
+        try:
+            session_info = sessions_table.loc[session_id]
+            session_dir_name = f"swrs_session_{session_id}"
+            session_path = os.path.join(swr_dir, session_dir_name)
+            
+            if not os.path.isdir(session_path):
+                continue
+
+            probe_files = [f for f in os.listdir(session_path) if 'karlsson_detector_events' in f]
+            num_probes_in_ca1 = len(probe_files)
+
+            demographics.append({
+                'session_id': session_id,
+                'specimen_id': session_info['specimen_id'],
+                'age_in_days': session_info['age_in_days'],
+                'sex': session_info['sex'],
+                'full_genotype': session_info['full_genotype'],
+                'probes_in_ca1': num_probes_in_ca1
+            })
+        except KeyError:
+            print(f"Session ID {session_id} not found in the session table. Skipping.")
+        except Exception as e:
+            print(f"Could not process session {session_id}. Error: {e}")
+
+    if not demographics:
+        print("No demographic data collected.")
+        return
+        
+    df = pd.DataFrame(demographics)
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    df.to_csv(output_file, index=False)
+    print(f"Saved visual coding demographics to {output_file}")
+    print("\nDataFrame Head:")
+    print(df.head())
+
+if __name__ == "__main__":
+    output_dir_env = os.environ.get('OUTPUT_DIR')
+    sdk_cache_env = os.environ.get('ABI_VISUAL_CODING_SDK_CACHE')
+
+    if not all([output_dir_env, sdk_cache_env]):
+        print("Error: Please set the OUTPUT_DIR and ABI_VISUAL_CODING_SDK_CACHE environment variables.")
+        print("Example: export OUTPUT_DIR=/path/to/results")
+        print("         export ABI_VISUAL_CODING_SDK_CACHE=/path/to/sdk_cache")
+    else:
+        swr_results_dir = os.path.join(output_dir_env, 'allen_viscoding_swr_murphylab2024')
+        output_csv_path = "demographics_data/viscoding_demographics.csv"
+        
+        get_viscoding_demographics(swr_results_dir, sdk_cache_env, output_csv_path) 
