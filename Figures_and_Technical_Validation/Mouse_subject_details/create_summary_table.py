@@ -174,6 +174,6 @@ if __name__ == "__main__":
     main(args.dataset_name)
 
     # Example usage from command line:
-    # python create_summary_table.py visbehaviour_subject_info.csv --output_file visbehaviour_summary.csv
-    # python create_summary_table.py viscoding_subject_info.csv --output_file viscoding_summary.csv
-    # python create_summary_table.py ibl_subject_info.csv --output_file ibl_summary.csv --is_ibl 
+    # python create_summary_table.py abi_visual_behaviour
+    # python create_summary_table.py abi_visual_coding
+    # python create_summary_table.py ibl 

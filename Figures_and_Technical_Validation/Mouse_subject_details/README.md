@@ -55,6 +55,7 @@ python get_ibl_subject_info.py
 ```
 **Output:** `subject_info_data/ibl_subject_info.csv`
 
+> **Note on IBL Data Quality:** The `get_ibl_subject_info.py` script generates a detailed data quality report to `subject_info_data/ibl_data_quality_report.txt`. This report provides a breakdown of total sessions vs. unique subjects, and identifies subjects with missing `sex` or `age_weeks` information. For the purpose of generating the summary table, subjects with missing 'sex' are assumed to be male. A list of the session IDs for these subjects is saved to `subject_info_data/ibl_missing_sex_session_ids.npz` for reference.
 
 ## Step 2: Create Summary Tables
 

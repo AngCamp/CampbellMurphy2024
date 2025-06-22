@@ -1,0 +1,13 @@
+--- IBL Data Quality Report ---
+Found 157 session folders.
+Successfully processed info for 157 sessions.
+Found 111 unique subjects across all processed sessions.
+
+Note: 33 subjects have more than one session.
+The final summary counts unique subjects, not sessions.
+
+--- Missing Data Report ---
+No subjects found with missing 'sex' information.
+No subjects found with missing 'age_weeks' information.
+
+---------------------------------

@@ -1,4 +1,4 @@
-session_id,subject_id,age_weeks,sex,strain,genotype,source,probes_in_ca1
+session_id,subject_id,age_weeks,sex,strain,full_genotype,source,probes_in_ca1
 c51f34d8-42f6-4c9c-bb5b-669fd9c42cd9,NYU-48,226,M,,[],,1
 b52182e7-39f6-4914-9717-136db589706e,CSHL047,306,M,,[],,2
 38d95489-2e82-412a-8c1a-c5377b5f1555,SWC_023,313,M,,[],,1

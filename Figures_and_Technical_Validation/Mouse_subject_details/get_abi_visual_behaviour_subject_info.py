@@ -5,9 +5,9 @@ import pandas as pd
 from allensdk.brain_observatory.behavior.behavior_project_cache import VisualBehaviorNeuropixelsProjectCache
 from tqdm import tqdm
 
-def get_visbehaviour_demographics(swr_dir, sdk_dir, output_file):
+def get_visbehaviour_subject_info(swr_dir, sdk_dir, output_file):
     """
-    Collects demographic and probe information for Allen Visual Behaviour sessions.
+    Collects subject information for Allen Visual Behaviour sessions.
 
     Args:
         swr_dir (str): Path to the directory containing SWR processing results.
@@ -32,22 +32,22 @@ def get_visbehaviour_demographics(swr_dir, sdk_dir, output_file):
     session_dirs = [d for d in os.listdir(swr_dir) if d.startswith("swrs_session_")]
     session_ids = [int(re.sub("swrs_session_", "", d)) for d in session_dirs]
 
-    demographics = []
-    print("Collecting demographics for Allen Visual Behaviour sessions...")
+    subject_info_list = []
+    print("Collecting subject info for Allen Visual Behaviour sessions...")
     for session_id in tqdm(session_ids, desc="Processing Visual Behaviour Sessions"):
         try:
-            # The ecephys_session_id is the index for this table
-            session_info = sessions_table.set_index('ecephys_session_id').loc[session_id]
+            # The table is already indexed by ecephys_session_id. No need to set index.
+            session_info = sessions_table.loc[session_id]
             session_dir_name = f"swrs_session_{session_id}"
             session_path = os.path.join(swr_dir, session_dir_name)
             
             if not os.path.isdir(session_path):
                 continue
 
-            probe_files = [f for f in os.listdir(session_path) if 'karlsson_detector_events' in f]
+            probe_files = [f for f in os.listdir(session_path) if 'putative_swr_events' in f]
             num_probes_in_ca1 = len(probe_files)
 
-            demographics.append({
+            subject_info_list.append({
                 'session_id': session_id,
                 'specimen_id': session_info['mouse_id'],
                 'age_in_days': session_info['age_in_days'],
@@ -60,14 +60,14 @@ def get_visbehaviour_demographics(swr_dir, sdk_dir, output_file):
         except Exception as e:
             print(f"Could not process session {session_id}. Error: {e}")
     
-    if not demographics:
-        print("No demographic data collected.")
+    if not subject_info_list:
+        print("No subject information collected.")
         return
 
-    df = pd.DataFrame(demographics)
+    df = pd.DataFrame(subject_info_list)
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     df.to_csv(output_file, index=False)
-    print(f"Saved visual behaviour demographics to {output_file}")
+    print(f"Saved visual behaviour subject info to {output_file}")
     print("\nDataFrame Head:")
     print(df.head())
 
@@ -82,6 +82,6 @@ if __name__ == "__main__":
         print("         export ABI_VISUAL_BEHAVIOUR_SDK_CACHE=/path/to/sdk_cache")
     else:
         swr_results_dir = os.path.join(output_dir_env, 'allen_visbehave_swr_murphylab2024')
-        output_csv_path = "demographics_data/visbehaviour_demographics.csv"
+        output_csv_path = "subject_info_data/visbehaviour_subject_info.csv"
         
-        get_visbehaviour_demographics(swr_results_dir, sdk_cache_env, output_csv_path) 
+        get_visbehaviour_subject_info(swr_results_dir, sdk_cache_env, output_csv_path) 
