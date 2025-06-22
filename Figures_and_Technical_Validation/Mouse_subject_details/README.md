@@ -79,3 +79,14 @@ python create_summary_table.py abi_visual_coding
 python create_summary_table.py ibl
 ```
 **Output:** `subject_info_summaries/ibl_subject_info_summary.csv` 
+
+## Step 3: Generating Final Tables for Publication
+
+The CSV files generated in `subject_info_summaries/` provide the data for Tables 1, 2, and 3 in the manuscript.
+
+For publication-quality tables, LaTeX can be used.
+-   **LaTeX Source:** The file `SWRs_subjectdetails.tex` contains the LaTeX code to format the data from the summary CSVs into the final tables.
+-   **Compiled PDF:** A rendered version of these tables, used for the manuscript, is available in `tablesforscientificdatapub.pdf`.
+-   **Directory:** The `tables_latex_and_pdf/` directory is used for storing these and related files.
+
+You can modify the `.tex` file and re-compile it to update the PDF if the underlying summary data changes. 

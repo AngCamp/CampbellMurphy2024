@@ -1,0 +1,98 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage[table]{xcolor}
+\usepackage[x11names]{xcolor} % Ensure xcolor is properly included
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{adjustbox} % optional
+\usepackage{tabularx}
+\usepackage{rotating}
+\usepackage{booktabs}
+\usepackage{makecell}
+\usepackage{booktabs}
+\usepackage{makecell}
+\usepackage{graphicx}
+
+\title{tablesforscientificdatapub}
+\author{angus.j.g.campbell }
+\date{June 2024}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+% Updated Visual Behavior Table
+\begin{table}[h]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}l*{8}{c}@{}}
+\toprule
+\multirow{3}{*}{\textbf{Genotype}} & \multicolumn{2}{c}{\textbf{Count}} & \multicolumn{2}{c}{\textbf{Avg Age (Weeks)}} & \multicolumn{2}{c}{\textbf{Age Range (Weeks)}} & \multicolumn{2}{c}{\textbf{Avg Probes in CA1}} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+& \rotatebox{90}{\textbf{Male}} & \rotatebox{90}{\textbf{Female}} 
+& \rotatebox{90}{\textbf{Male}} & \rotatebox{90}{\textbf{Female}} 
+& \rotatebox{90}{\textbf{Male}} & \rotatebox{90}{\textbf{Female}} 
+& \rotatebox{90}{\textbf{Male}} & \rotatebox{90}{\textbf{Female}} \\[2ex]
+\midrule
+\textbf{Sst-Cre;Ai32} & \textbf{10} & \textbf{12} & \textbf{23.5} & \textbf{22.2} & \textbf{17-38} & \textbf{18-29} & \textbf{3.85} & \textbf{3.79} \\
+\textbf{Vip-Cre;Ai32} & \textbf{9} & \textbf{2} & \textbf{22.3} & \textbf{27.9} & \textbf{19-26} & \textbf{28-28} & \textbf{3.83} & \textbf{2.75} \\
+\textbf{wt/wt} & \textbf{11} & \textbf{8} & \textbf{19.5} & \textbf{23.3} & \textbf{17-25} & \textbf{20-27} & \textbf{4.27} & \textbf{4.44} \\
+\midrule
+\textbf{Total} & \textbf{30} & \textbf{22} & \textbf{21.6} & \textbf{23.1} & \textbf{17-38} & \textbf{18-29} & \textbf{4.00} & \textbf{3.93} \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Summary of ABI Behaviour mice by genotype, sex, age, and average probe count in CA1. Genotypes: Sst-IRES-Cre/wt;Ai32(RCL-ChR2(H134R)\_EYFP)/wt, Vip-IRES-Cre/wt;Ai32(RCL-ChR2(H134R)\_EYFP)/wt, and wild-type (wt/wt).}}
+\label{tab:comprehensive_summary_abi_behaviour}
+\end{table}
+
+% Updated Visual Coding Table
+\begin{table}[h]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}l*{8}{c}@{}}
+\toprule
+\multirow{3}{*}{\textbf{Genotype}} & \multicolumn{2}{c}{\textbf{Count}} & \multicolumn{2}{c}{\textbf{Avg Age (Weeks)}} & \multicolumn{2}{c}{\textbf{Age Range (Weeks)}} & \multicolumn{2}{c}{\textbf{Avg Probes in CA1}} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+& \rotatebox{90}{\textbf{Male}} & \rotatebox{90}{\textbf{Female}} 
+& \rotatebox{90}{\textbf{Male}} & \rotatebox{90}{\textbf{Female}} 
+& \rotatebox{90}{\textbf{Male}} & \rotatebox{90}{\textbf{Female}} 
+& \rotatebox{90}{\textbf{Male}} & \rotatebox{90}{\textbf{Female}} \\[2ex]
+\midrule
+\textbf{Pvalb-Cre;Ai32} & \textbf{4} & \textbf{2} & \textbf{16.0} & \textbf{15.9} & \textbf{15-18} & \textbf{14-18} & \textbf{4.00} & \textbf{3.00} \\
+\textbf{Sst-Cre;Ai32} & \textbf{6} & \textbf{3} & \textbf{16.8} & \textbf{17.1} & \textbf{15-20} & \textbf{16-18} & \textbf{3.67} & \textbf{4.33} \\
+\textbf{Vip-Cre;Ai32} & \textbf{3} & \textbf{4} & \textbf{16.1} & \textbf{16.6} & \textbf{14-17} & \textbf{13-19} & \textbf{4.33} & \textbf{4.00} \\
+\textbf{wt/wt} & \textbf{23} & \textbf{2} & \textbf{17.3} & \textbf{18.7} & \textbf{13-20} & \textbf{18-19} & \textbf{5.00} & \textbf{3.50} \\
+\midrule
+\textbf{Total} & \textbf{36} & \textbf{11} & \textbf{16.9} & \textbf{17.0} & \textbf{13-20} & \textbf{13-19} & \textbf{4.61} & \textbf{3.82} \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Summary of ABI Coding mice by genotype, sex, age, and average probe count in CA1. Genotypes: Pvalb-IRES-Cre/wt;Ai32(RCL-ChR2(H134R)\_EYFP)/wt, Sst-IRES-Cre/wt;Ai32(RCL-ChR2(H134R)\_EYFP)/wt, Vip-IRES-Cre/wt;Ai32(RCL-ChR2(H134R)\_EYFP)/wt, and wild-type (wt/wt).}}
+\label{tab:comprehensive_summary_abi_coding}
+\end{table}
+
+% Updated IBL Table
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}l*{4}{c}@{}}
+\toprule
+\textbf{Sex} & \textbf{Count} & \textbf{Avg Age (Weeks)} & \textbf{Age Range (Weeks)} & \textbf{Avg Probes in CA1} \\
+\midrule
+\textbf{Male} & 75 & 245.8 & 120-321 & 1.13 \\
+\textbf{Female} & 36 & 253.6 & 133-322 & 1.18 \\
+\midrule
+\textbf{Total} & 111 & 248.3 & 120-322 & 1.15 \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Summary of IBL mice by sex, age, and average probe count in CA1.}}
+\label{tab:summary_by_sex}
+\end{table}
+
+
+\end{document}
