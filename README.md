@@ -6,6 +6,13 @@
 ## Description
 A repo showcasing how to process and analyze Neuropixels LFP from the two largest publicly available datasets: the ABI Visual Behaviour and the IBL dataset.  Currently both the IBL and ABI datasets are missing NWB files on DANDI archive.  Once they are done I'd like to switch to a single pipeline that processes all of them but right now we have to use the individual APIs to get the full datasets.
 
+The data set is available at the [OSF](https://osf.io/9gm6x/).
+
+    ```
+    wget -O "swr_dataset.zip" 
+    "https://files.osf.io/v1/resources/9gm6x/providers/osfstorage/?zip="
+    ```
+
 ### Data_Usage
 
 Contains tutorials for understanding and analyzing Sharp Wave Ripple (SWR) data at different scales:
