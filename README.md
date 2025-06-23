@@ -6,9 +6,13 @@
 ## Description
 A repo showcasing how to process and analyze Neuropixels LFP from the two largest publicly available datasets: the ABI Visual Behaviour and the IBL dataset.  Currently both the IBL and ABI datasets are missing NWB files on DANDI archive.  Once they are done I'd like to switch to a single pipeline that processes all of them but right now we have to use the individual APIs to get the full datasets.
 
-### conda_env_ymls
+### Data_Usage
 
-Contains the .yaml files for recreating the environments used to run the allensdk and associated codes, as well as the .yaml for the ONE_ibl_env conda environment to run the IBL associated code.
+Contains tutorials for understanding and analyzing Sharp Wave Ripple (SWR) data at different scales:
+
+- **`swrs_allen_visual_behaviour.ipynb`**: Demonstrates single-session data alignment and analysis, showing how to load and organize SWR data for individual recording sessions. Useful for understanding data structure and performing preliminary analyses.
+
+- **`choosing_event_thresholds.ipynb`**: Establishes methods for threshold testing and provides infrastructure for dataset-level analyses. Includes the `SharpWaveComponentPlotter` object for managing data across multiple sessions and datasets, enabling cross-dataset comparisons and formal hypothesis testing.
 
 ### SWR_Neuropixels_Detector
 
@@ -47,21 +51,30 @@ Note:  We have also created scripts for running the pipelines on slurm for share
 The code outputs the following set of files for each session.
 ![](Images/figure_3_SWR_Dataset_v3.png)
 
-### Figures and Technical Validation
+### Figures_and_Technical_Validation
 
-Contains notebooks to create the images in the Background & Summary as well as the Technical Validation section. Includes methods for visualizing the ripples and methods for visualizing probe position in brainrender. In the IBL validation notebook, there are also methods for plotting the CSD plots.
+Contains scripts and workflows for generating publication figures and technical validation analyses. The subfolders contain automated pipelines that generate multiple visualizations for selection:
 
-- **ABI_visbehave_validation.ipynb**: All code is for the ABI Visual Behavior data. Contains code showing how to plot the probe in CA1 in brainrender for this dataset (Figure 1A). Includes plots for the theta power during ripples, wheel speed during ripples, ripple power, and duration distributions (Figure 6). Ripple power and duration also contain the sum of squares and Kolmogorov-Smirnov tests for the distribution fits of the normal, half-normal, and log-normal distributions.  Code to generate summary of ABI Visual Behavior in table 1 provided as well.  Run in the `allensdk_env`.
+- **`probe_selection_validation/`**: Contains scripts for analyzing channel selection metadata and generating depth-dependent plots showing ripple band power, skewness, and sharp wave features across probe depths. Includes automated workflows for creating bar plots and selection visualizations.
 
-- **ABI_viscoding_validation.ipynb**: All code is for the ABI Visual Coding data. Contains code showing the example ripple across many probes (Figure 1D). Contains code showing how to plot the probe in CA1 in brainrender for this dataset (Figure 1A). Includes plots for the theta power during ripples, wheel speed during ripples, ripple power, and duration distributions (Figure 6). Ripple power and duration code also contain the sum of squares and Kolmogorov-Smirnov tests for the distribution fits of the normal, half-normal, and log-normal distributions.  Code to generate summary of ABI Visual Coding in table 2 provided as well.  Run in the `allensdk_env`.
+- **`Sharp_wave_component_validation/`**: Contains the `SWRExplorer.py` tool and workflows for finding and visualizing the best SWR events across datasets. Includes scripts for generating multiple event visualizations and selecting the most representative examples for publication.
 
-- **IBL_validation.ipynb**: Most code is for the IBL Decision Making Task data, though there are also parts summarizing all the datasets (to be moved to their own notebook). Contains code showing how to plot the probe in CA1 in brainrender for this dataset (Figure 1C). Additionally, contains code to generate the CSD plot across one of the IBL probes (Figure 1). This was done in the IBL because the sampling density of the shared data was greater than in the ABI datasets. Includes Venn diagrams and bar plots summarizing the dataset, which uses data from the other two datasets (Figure 1F, G). Contains code visualizing putative SWRs shown against gamma-band event artifacts (Figure 4) and movement artifacts (Figure 5). Finally, contains code for the plots for the theta power during ripples, wheel speed during ripples, ripple power, and duration distributions of the IBL data (Figure 6). Ripple power and duration code also contain the sum of squares and Kolmogorov-Smirnov tests for the distribution fits of the normal, half-normal, and log-normal distributions.  Code to generate summary of IBL mice in Table 3 provided as well.  Run in the `ONE_ibl_env`.
+- **`Relating_SWR_to_other_data/`**: Contains scripts for relating SWR events to spiking activity, pupil data, and running behavior. Includes automated workflows for generating multiple raster plots and behavioral correlation analyses.
 
-- **figures**: folder containing images generated by the notebooks saved as .svg.  These were then used in inkscape to create the publication figures.
+- **`Sankey_plots/`**: Contains code to generate Sankey diagrams visualizing the filtering pipeline for SWR events, showing how events flow through different filters and classifications.
+
+- **`Mouse_subject_details/`**: Contains scripts for generating subject information summary tables (Tables 1, 2, and 3) by querying dataset APIs and SWR pipeline outputs, then creating formatted summary tables for publication.
+
+
 
 ### Images
 
 Images for the repo.
+
+
+### Setup
+
+Contains conda environment files and setup scripts for the different datasets.
 
 ### PowerBandFilters
 
