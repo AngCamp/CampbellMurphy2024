@@ -1,5 +1,6 @@
 # Mouse Hippocampal Sharp Wave Ripple Dataset Curated From Public Neuropixels Datasets
 
+![](Images/figure_one_revised.png)
 ![](Images/SupplementalSWRDetectorWorkflow.png)
 
 ## Description
@@ -41,6 +42,11 @@ Contains the main pipeline for running the detection scripts. It includes a conf
 
 Note:  We have also created scripts for running the pipelines on slurm for shared computing clusters.  (Will be provided)
 
+#### SWR session folder structure
+
+The code outputs the following set of files for each session.
+![](Images/figure_3_SWR_Dataset_v3.png)
+
 ### Figures and Technical Validation
 
 Contains notebooks to create the images in the Background & Summary as well as the Technical Validation section. Includes methods for visualizing the ripples and methods for visualizing probe position in brainrender. In the IBL validation notebook, there are also methods for plotting the CSD plots.
@@ -61,5 +67,6 @@ Images for the repo.
 
 The code used to create the filters for the SWR detection pipelines.  Uses environment for [mne package with core dependencies](https://mne.tools/stable/install/manual_install.html#installing-mne-python-with-core-dependencies).
 
-
-![](Images/figure_one_v6_opt.svg)
+![](Images/Figure4_version2_global_event_4_session_1086410738_id_2250.png)
+![](Images/Figure_5_MI_selection.png)
+![](Images/v2_real_data_filtering_sankey.png)
