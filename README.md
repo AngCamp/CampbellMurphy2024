@@ -58,6 +58,10 @@ Note:  We have also created scripts for running the pipelines on slurm for share
 The code outputs the following set of files for each session.
 ![](Images/figure_3_SWR_Dataset_v3.png)
 
+#### Filters
+
+Contains the filters and a readme displaying the code used to create the filters for the SWR detection pipelines.  Uses environment for [mne package with core dependencies](https://mne.tools/stable/install/manual_install.html#installing-mne-python-with-core-dependencies).
+
 ### Figures_and_Technical_Validation
 
 Contains scripts and workflows for generating publication figures and technical validation analyses. The subfolders contain automated pipelines that generate multiple visualizations for selection:
@@ -83,9 +87,7 @@ Images for the repo.
 
 Contains conda environment files and setup scripts for the different datasets.
 
-### PowerBandFilters
 
-The code used to create the filters for the SWR detection pipelines.  Uses environment for [mne package with core dependencies](https://mne.tools/stable/install/manual_install.html#installing-mne-python-with-core-dependencies).
 
 ![](Images/Figure4_version2_global_event_4_session_1086410738_id_2250.png)
 ![](Images/Figure_5_MI_selection.png)
