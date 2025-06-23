@@ -1,6 +1,6 @@
 # Mouse Hippocampal Sharp Wave Ripple Dataset Curated From Public Neuropixels Datasets
 
-![](Images/Workflow_with_scripts1.png)
+![](Images/SupplementalSWRDetectorWorkflow.png)
 
 ## Description
 A repo showcasing how to process and analyze Neuropixels LFP from the two largest publicly available datasets: the ABI Visual Behaviour and the IBL dataset.  Currently both the IBL and ABI datasets are missing NWB files on DANDI archive.  Once they are done I'd like to switch to a single pipeline that processes all of them but right now we have to use the individual APIs to get the full datasets.
