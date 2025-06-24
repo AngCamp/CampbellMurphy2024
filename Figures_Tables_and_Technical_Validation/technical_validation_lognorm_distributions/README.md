@@ -6,6 +6,7 @@ This directory contains the complete workflow for generating Figure 9, which sho
 
 ```bash
 # Run the complete workflow
+cd Figures_Tables_and_Technical_Validation/technical_validation_lognorm_distributions
 bash run_figure9_workflow.sh
 
 # For debugging: limit to first session per dataset
@@ -24,7 +25,7 @@ bash run_figure9_workflow.sh --skip-gathering
 
 ## Files
 
-- `gather_speed_theta_data.py`: Vectorized data collection script
+- `gather_validation_distributions_data.py`: Vectorized data collection script
 - `plot_figure9.py`: Plotting and statistical analysis script
 - `run_figure9_workflow.sh`: Complete workflow orchestration
 - `theta_1500hz_bandpass_filter.npz`: Theta band filter for LFP analysis
@@ -34,19 +35,23 @@ bash run_figure9_workflow.sh --skip-gathering
 ### `run_figure9_workflow.sh`
 
 - `--max_sessions N`: Limit processing to first N sessions per dataset (for debugging)
+- `--n_processes N`: Number of parallel processes for data gathering (default: 4)
 - `--skip-gathering`: Skip data gathering and go straight to plotting (for debugging)
 - `--help, -h`: Show help message
 
-### `gather_speed_theta_data.py`
+### `gather_validation_distributions_data.py`
 
 - `--dataset`: Choose dataset (`abi_visbehave`, `abi_viscoding`, `ibl`)
 - `--max_sessions N`: Limit number of sessions (for debugging)
+- `--n_processes N`: Number of parallel processes (default: 4)
 
 ## Output Files
 
-- `figure9.png` and `figure9.svg`: The complete figure
+- `figure9_combined_*.png` and `figure9_combined_*.svg`: The complete figure (timestamped)
 - `figure9_ks_results.json`: KS test results for distribution fitting
-- `figure9_caption_with_results.txt`: Figure caption with actual statistical values
+- `figure9_caption.txt`: Figure caption with actual statistical values
+- `individual_subplots/`: Folder with each subplot as a separate file
+- `distributions_for_plotting/`: Folder with all intermediate .npz data files
 
 ## Data Processing
 
@@ -56,9 +61,11 @@ The workflow processes putative SWR events that meet the following criteria:
 - No overlap with gamma events (`overlaps_with_gamma == False`)
 - No overlap with movement (`overlaps_with_movement == False`)
 - Valid start and end times
+- Duration ≤ 0.150 seconds
 
 ## Performance Features
 
+- **Multiprocessing**: Each session is processed in parallel, then results are combined in memory and written once per metric (no file locking needed)
 - **Vectorized processing**: Uses NumPy operations for fast data processing
 - **Lazy loading**: Loads APIs only when needed to avoid dependency conflicts
 - **NaN handling**: Robust handling of missing or invalid data
@@ -101,17 +108,18 @@ The script automatically manages conda environments:
 
 ## Scripts
 
-### `gather_speed_theta_data.py`
-Unified data gathering script that processes all three datasets using lazy loading.
+### `gather_validation_distributions_data.py`
+Unified data gathering script that processes all three datasets using lazy loading and multiprocessing.
 
 **Usage:**
 ```bash
-python gather_speed_theta_data.py --dataset [abi_visbehave|abi_viscoding|ibl] [--max_sessions N]
+python gather_validation_distributions_data.py --dataset [abi_visbehave|abi_viscoding|ibl] [--max_sessions N] [--n_processes N]
 ```
 
 **Parameters:**
 - `--dataset`: Required. Specify which dataset to process
 - `--max_sessions`: Optional. Limit number of sessions for debugging
+- `--n_processes`: Optional. Number of parallel processes (default: 4)
 
 ### `plot_figure9.py`
 Generates the figure, extracts KS test results, and creates the caption with statistical values.
@@ -126,11 +134,12 @@ Complete automation script that runs all steps in the correct environments.
 
 **Usage:**
 ```bash
-./run_figure9_workflow.sh [--max_sessions N] [--skip-gathering] [--help]
+./run_figure9_workflow.sh [--max_sessions N] [--n_processes N] [--skip-gathering] [--help]
 ```
 
 **Parameters:**
 - `--max_sessions N`: Optional. Limit processing to first N sessions per dataset (for debugging)
+- `--n_processes N`: Optional. Number of parallel processes (default: 4)
 - `--skip-gathering`: Optional. Skip data gathering and go straight to plotting (for debugging)
 - `--help, -h`: Show help message
 
@@ -142,7 +151,7 @@ Complete automation script that runs all steps in the correct environments.
 
 #### Full Processing
 ```bash
-cd Figures_Tables_and_Technical_Validation/Distribution_v2
+cd Figures_Tables_and_Technical_Validation/technical_validation_lognorm_distributions
 ./run_figure9_workflow.sh
 ```
 
@@ -154,6 +163,9 @@ cd Figures_Tables_and_Technical_Validation/Distribution_v2
 # Process first 5 sessions per dataset (moderate speed)
 ./run_figure9_workflow.sh --max_sessions 5
 
+# Use more processes for faster data gathering
+./run_figure9_workflow.sh --n_processes 8
+
 # Get help
 ./run_figure9_workflow.sh --help
 ```
@@ -164,15 +176,15 @@ cd Figures_Tables_and_Technical_Validation/Distribution_v2
 ```bash
 # ABI Visual Behaviour
 conda activate allensdk_env
-python gather_speed_theta_data.py --dataset abi_visbehave --max_sessions 1
+python gather_validation_distributions_data.py --dataset abi_visbehave --max_sessions 1
 
 # ABI Visual Coding  
 conda activate allensdk_env
-python gather_speed_theta_data.py --dataset abi_viscoding --max_sessions 1
+python gather_validation_distributions_data.py --dataset abi_viscoding --max_sessions 1
 
 # IBL
 conda activate ONE_ibl_env
-python gather_speed_theta_data.py --dataset ibl --max_sessions 1
+python gather_validation_distributions_data.py --dataset ibl --max_sessions 1
 ```
 
 #### Step 2: Plotting and Caption Generation
@@ -187,12 +199,11 @@ python plot_figure9.py
 
 After running the workflow, you will have:
 
-- **`figure9.png`** and **`figure9.svg`**: The complete figure with 3x4 grid
+- **`figure9_combined_*.png`** and **`figure9_combined_*.svg`**: The complete figure with 3x4 grid (timestamped)
 - **`figure9_ks_results.json`**: KS test results for statistical analysis
-- **`figure9_caption_with_results.txt`**: Caption with actual statistical values inserted
-- **`abi_visbehave_swr_theta_speed.npz`**: Processed data for ABI Visual Behaviour
-- **`abi_viscoding_swr_theta_speed.npz`**: Processed data for ABI Visual Coding  
-- **`ibl_swr_theta_speed.npz`**: Processed data for IBL
+- **`figure9_caption.txt`**: Caption with actual statistical values inserted
+- **`individual_subplots/`**: Folder with each subplot as a separate file
+- **`distributions_for_plotting/`**: Folder with all intermediate .npz data files
 
 ---
 
@@ -207,6 +218,16 @@ After running the workflow, you will have:
 ---
 
 ## Technical Details
+
+### Multiprocessing and Single-Write Approach
+- Each session is processed in parallel (one per process)
+- All results are collected in memory and written to disk in a single operation per metric
+- No file locking or status tracking is needed
+
+### Plotting
+- For duration and peak power: histogram is plotted as a density, and fitted PDFs are plotted directly from stored parameters
+- For theta and speed: histogram is plotted as event count (no density normalization)
+- Combined figure is built by re-plotting, not by copying matplotlib artists
 
 ### Lazy Loading Implementation
 The unified script uses lazy loading to avoid dependency conflicts:
@@ -252,11 +273,11 @@ Test specific datasets in isolation:
 ```bash
 # Test only ABI Visual Behaviour
 conda activate allensdk_env
-python gather_speed_theta_data.py --dataset abi_visbehave --max_sessions 1
+python gather_validation_distributions_data.py --dataset abi_visbehave --max_sessions 1
 
 # Test only IBL
 conda activate ONE_ibl_env  
-python gather_speed_theta_data.py --dataset ibl --max_sessions 1
+python gather_validation_distributions_data.py --dataset ibl --max_sessions 1
 ```
 
 ---
