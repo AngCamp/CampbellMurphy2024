@@ -41,6 +41,21 @@ Contains comprehensive validation of the channel selection methodology used in t
 - **Purpose**: Ensures the automated channel selection process is robust and appropriate for SWR detection
 - **Publication Figure**: Figure 5b,c,d Net ripple power and MI selection components are generated here.
 
+### 🌊 **CSD_plot/**
+Contains workflows and tools for computing and visualizing Current Source Density (CSD) from LFP data during SWR events:
+- **Main Workflows**: 
+  - `csd_swr_events_workflow.py` - Individual SWR event CSD analysis
+  - `csd_trial_average_workflow.py` - Trial-averaged CSD analysis
+- **Validation Notebook**: `IBL_validation.ipynb` - CSD analysis using IBL data with higher sampling rates
+- **CSD Computation**: Implements second spatial derivative method to reveal current sources and sinks
+- **Smoothing Options**: Multiple smoothing methods (exponential, Gaussian, Savitzky-Golay) for noise reduction
+- **Outputs**: 
+  - Individual event CSD plots and trial-averaged CSD plots
+  - Raw CSD data and visualization files
+  - Summary metadata for processed events
+- **Purpose**: Provides insights into the laminar organization of SWR events in the hippocampus
+- **Publication Figure**: Figure 5A CSD plots from IBL data showing laminar organization of SWR events
+
 ### 📈 **Relating_SWR_to_other_data/**
 Contains analysis and visualization tools for relating SWR events to other behavioral and neural data:
 - **Spike Raster Plots**: Tools for generating spike raster plots around SWR events
@@ -94,6 +109,7 @@ This directory generates:
 - Subject information tables for manuscript publication
 - Probe placement validation figures
 - Channel selection validation plots
+- Current Source Density (CSD) analysis and visualizations
 - SWR event quality assessments
 - Behavioral correlation analyses
 - Pipeline filtering visualizations

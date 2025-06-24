@@ -72,6 +72,8 @@ Contains scripts and workflows for generating publication figures and technical 
 
 - **`probe_selection_validation/`**: Contains scripts for analyzing channel selection metadata and generating depth-dependent plots showing ripple band power, skewness, and sharp wave features across probe depths. Includes automated workflows for creating bar plots and selection visualizations.
 
+- **`CSD_plot/`**: Contains workflows and tools for computing and visualizing Current Source Density (CSD) from LFP data during SWR events. Includes main workflows for individual SWR event CSD analysis and trial-averaged CSD analysis, plus a validation notebook using IBL data with higher sampling rates. Implements second spatial derivative method to reveal current sources and sinks, with multiple smoothing options for noise reduction. Generates individual event CSD plots and trial-averaged CSD plots, providing insights into the laminar organization of SWR events in the hippocampus. Figure 5A CSD plots from IBL data showing laminar organization of SWR events, as well as trial averaged CSD plots form ABI Visual Behaviour for single probes.
+
 - **`Sharp_wave_component_validation/`**: Contains the `SWRExplorer.py` tool and workflows for finding and visualizing the best SWR events across datasets. Includes scripts for generating multiple event visualizations and selecting the most representative examples for publication.
 
 - **`Relating_SWR_to_other_data/`**: Contains scripts for relating SWR events to spiking activity, pupil data, and running behavior. Includes automated workflows for generating multiple raster plots and behavioral correlation analyses.
