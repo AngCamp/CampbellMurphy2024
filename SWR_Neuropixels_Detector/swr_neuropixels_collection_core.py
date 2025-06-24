@@ -1918,7 +1918,7 @@ def process_session(session_id, config):
                     movement_controls = movement_controls.drop(columns=speed_cols)
                     
                     # Save movement artifact events
-                    channel_outside_hp_str = f"channelsrawInd_{str(channel_outside_hp)}"
+                    channel_outside_hp_str = f"{str(channel_outside_hp)}"
                     csv_filename = f"probe_{probe_id_log}_channel_{channel_outside_hp_str}_movement_artifacts.csv.gz"
                     csv_path = os.path.join(session_subfolder, csv_filename)
                     movement_controls.to_csv(csv_path, index=True, compression="gzip")
