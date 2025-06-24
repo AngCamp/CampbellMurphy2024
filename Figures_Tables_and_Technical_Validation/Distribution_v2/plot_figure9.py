@@ -5,6 +5,9 @@ import matplotlib.ticker as ticker
 from fitter import Fitter
 import json
 import pandas as pd
+import datetime
+import shutil
+import scipy.stats as stats
 
 # Paths
 DATA_DIR = "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/Distribution_v2/distributions_for_plotting"
@@ -14,6 +17,12 @@ DATASETS = [
     ("ABI Behaviour", "abi_visbehave"),
     ("ABI Coding", "abi_viscoding"),
     ("IBL", "ibl"),
+]
+METRICS = [
+    ("Mean Theta Power (Z-score)", "theta_power"),
+    ("Wheel Speed (cm/s)", "speed"),
+    ("Duration (ms)", "duration"),
+    ("Peak Ripple Power (Z-score)", "peak_power"),
 ]
 
 # Plot settings
@@ -36,32 +45,32 @@ def generate_caption(ks_results):
     """Generate caption with actual statistical values"""
     caption = """**Figure 9.  Detected events show expected properties for probe level putative events, occurring in the absence of the wheel movement and at lower theta power.   Plots for ABI Behaviour events are on the left, ABI Coding in the middle, and IBL on the right.  a) The mean instantaneous theta power z-scored during probe level event windows.  b) The wheel speed during the global events, note that for the ABI datasets this can be interpreted as a running speed but from the IBL the mouse uses ambulation to turn a wheel. c) The distribution of global level event durations.  The best fit distribution of the normal, half-normal and lognormal were fit to the data, the lognormal was shown to be the best fit by the Kolmogrov-Smirnov (KS) test in all entities."""
     
-    # Add duration results
-    if 'abi_visbehave' in ks_results and 'duration' in ks_results['abi_visbehave']:
-        dur = ks_results['abi_visbehave']['duration']
+    # Add duration results (using lognorm as specified in caption)
+    if 'abi_visbehave' in ks_results and 'duration' in ks_results['abi_visbehave'] and 'lognorm' in ks_results['abi_visbehave']['duration']:
+        dur = ks_results['abi_visbehave']['duration']['lognorm']
         caption += f"  ABI Behaviour (SSE {format_scientific_notation(dur['sse'])}, KS {format_scientific_notation(dur['ks_stat'])}, KS p-value <0.0001)"
     
-    if 'abi_viscoding' in ks_results and 'duration' in ks_results['abi_viscoding']:
-        dur = ks_results['abi_viscoding']['duration']
+    if 'abi_viscoding' in ks_results and 'duration' in ks_results['abi_viscoding'] and 'lognorm' in ks_results['abi_viscoding']['duration']:
+        dur = ks_results['abi_viscoding']['duration']['lognorm']
         caption += f", ABI Coding (SSE {format_scientific_notation(dur['sse'])}, KS {format_scientific_notation(dur['ks_stat'])}, KS p-value <0.0001)"
     
-    if 'ibl' in ks_results and 'duration' in ks_results['ibl']:
-        dur = ks_results['ibl']['duration']
+    if 'ibl' in ks_results and 'duration' in ks_results['ibl'] and 'lognorm' in ks_results['ibl']['duration']:
+        dur = ks_results['ibl']['duration']['lognorm']
         caption += f" and the IBL (SSE {format_scientific_notation(dur['sse'])}, KS {format_scientific_notation(dur['ks_stat'])}, KS p-value <0.0001)"
     
     caption += """  d)  The distribution of global event level peak ripple power (z-scored) is best fit by the lognormal distribution in all entities, all fits pass significance."""
     
-    # Add peak power results
-    if 'abi_visbehave' in ks_results and 'peak_power' in ks_results['abi_visbehave']:
-        pow = ks_results['abi_visbehave']['peak_power']
+    # Add peak power results (using lognorm as specified in caption)
+    if 'abi_visbehave' in ks_results and 'peak_power' in ks_results['abi_visbehave'] and 'lognorm' in ks_results['abi_visbehave']['peak_power']:
+        pow = ks_results['abi_visbehave']['peak_power']['lognorm']
         caption += f"  ABI Behaviour (SSE {format_scientific_notation(pow['sse'])}, KS {format_scientific_notation(pow['ks_stat'])}, KS p-value <0.0001)"
     
-    if 'abi_viscoding' in ks_results and 'peak_power' in ks_results['abi_viscoding']:
-        pow = ks_results['abi_viscoding']['peak_power']
+    if 'abi_viscoding' in ks_results and 'peak_power' in ks_results['abi_viscoding'] and 'lognorm' in ks_results['abi_viscoding']['peak_power']:
+        pow = ks_results['abi_viscoding']['peak_power']['lognorm']
         caption += f", ABI Coding (SSE {format_scientific_notation(pow['sse'])}, KS {format_scientific_notation(pow['ks_stat'])}, KS p-value <0.0001)"
     
-    if 'ibl' in ks_results and 'peak_power' in ks_results['ibl']:
-        pow = ks_results['ibl']['peak_power']
+    if 'ibl' in ks_results and 'peak_power' in ks_results['ibl'] and 'lognorm' in ks_results['ibl']['peak_power']:
+        pow = ks_results['ibl']['peak_power']['lognorm']
         caption += f" and the IBL (SSE {format_scientific_notation(pow['sse'])}, KS {format_scientific_notation(pow['ks_stat'])}, KS p-value <0.0001)"
     
     caption += "."
@@ -69,152 +78,111 @@ def generate_caption(ks_results):
 
 # Create figure
 fig, axes = plt.subplots(4, 3, figsize=(12, 16))
-fig.suptitle("Figure 9: SWR Event Properties", fontsize=12, fontweight="bold")
+fig.subplots_adjust(hspace=0.4, wspace=0.3)
+fig.suptitle("Figure 9: SWR Event Properties", fontsize=16, fontweight="bold")
 
 ks_results = {}
 
-for col, (title, dataset_key) in enumerate(DATASETS):
-    print(f"Processing dataset: {dataset_key}")
+# Create output directory for individual subplots
+INDIVIDUAL_DIR = os.path.join(OUT_DIR, 'individual_subplots')
+if os.path.exists(INDIVIDUAL_DIR):
+    shutil.rmtree(INDIVIDUAL_DIR)
+os.makedirs(INDIVIDUAL_DIR, exist_ok=True)
+
+for col, (dataset_title, dataset_key) in enumerate(DATASETS):
     ks_results[dataset_key] = {}
-    
-    # Row 1: Histogram of mean theta power (z-score)
-    ax = axes[0, col]
-    theta_file = os.path.join(DATA_DIR, f"{dataset_key}_theta_power.npz")
-    if os.path.exists(theta_file):
-        theta_data = np.load(theta_file)['data']
-        if len(theta_data) > 0:
-            ax.hist(theta_data, bins=20, edgecolor="black", facecolor="steelblue", alpha=0.7)
-        else:
-            ax.text(0.5, 0.5, "No valid theta data", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
-    else:
-        ax.text(0.5, 0.5, "No theta data file", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
-    ax.set_xlabel("Mean Theta Power (z-score)", fontweight="bold")
-    ax.set_ylabel("Count", fontweight="bold")
-    ax.set_title(f"{title}", fontweight="bold")
-    ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
-    ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
-    
-    # Row 2: Histogram of mean speed
-    ax = axes[1, col]
-    speed_file = os.path.join(DATA_DIR, f"{dataset_key}_speed.npz")
-    if os.path.exists(speed_file):
-        speed_data = np.load(speed_file)['data']
-        if len(speed_data) > 0:
-            ax.hist(speed_data, bins=20, edgecolor="black", facecolor="lightcoral", alpha=0.7)
-        else:
-            ax.text(0.5, 0.5, "No valid speed data", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
-    else:
-        ax.text(0.5, 0.5, "No speed data file", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
-    ax.set_xlabel("Mean Speed (cm/s)", fontweight="bold")
-    ax.set_ylabel("Count", fontweight="bold")
-    ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
-    ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
-    
-    # Row 3: Density plot of duration
-    ax = axes[2, col]
-    f_duration = None  # Initialize to None
-    duration_file = os.path.join(DATA_DIR, f"{dataset_key}_duration.npz")
-    if os.path.exists(duration_file):
-        durations = np.load(duration_file)['data'] * 1000  # Convert to ms
-        if len(durations) > 0:
-            f_duration = Fitter(durations, distributions=['norm', 'halfnorm', 'lognorm'])
-            f_duration.fit()
-            best_dist_duration = f_duration.get_best(method='sumsquare_error')
-            f_duration.hist()
-            f_duration.plot_pdf()
-        else:
-            ax.text(0.5, 0.5, "No valid duration data", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
-    else:
-        ax.text(0.5, 0.5, "No duration data file", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
-    ax.set_xlabel("Duration (ms)", fontweight="bold")
-    ax.set_ylabel("Density", fontweight="bold")
-    ax.grid(False)
-    ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
-    ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
-    
-    # Store KS results for duration
-    if f_duration is not None and 'lognorm' in f_duration.fitted_param:
-        try:
-            summary = f_duration.summary()
-            ks_results[dataset_key]['duration'] = {
-                'sse': summary['sumsquare_error']['lognorm'],
-                'ks_stat': summary.get('ks_stat', {}).get('lognorm', np.nan),
-                'ks_pvalue': summary.get('ks_pvalue', {}).get('lognorm', np.nan)
-            }
-        except (KeyError, TypeError) as e:
-            print(f"Warning: Could not extract KS results for {dataset_key} duration: {e}")
-            ks_results[dataset_key]['duration'] = {
-                'sse': np.nan,
-                'ks_stat': np.nan,
-                'ks_pvalue': np.nan
-            }
-    else:
-        print(f"Warning: No valid duration data for {dataset_key}")
-        ks_results[dataset_key]['duration'] = {
-            'sse': np.nan,
-            'ks_stat': np.nan,
-            'ks_pvalue': np.nan
-        }
-    
-    # Row 4: Density plot of peak ripple power
-    ax = axes[3, col]
-    f_power = None  # Initialize to None
-    power_file = os.path.join(DATA_DIR, f"{dataset_key}_peak_power.npz")
-    if os.path.exists(power_file):
-        peak_power = np.load(power_file)['data']
-        if len(peak_power) > 0:
-            f_power = Fitter(peak_power, distributions=['norm', 'halfnorm', 'lognorm'])
-            f_power.fit()
-            best_dist_power = f_power.get_best(method='sumsquare_error')
-            f_power.hist()
-            f_power.plot_pdf()
-        else:
-            ax.text(0.5, 0.5, "No valid peak power data", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
-        ax.set_xlabel("Peak Ripple Power (z-score)", fontweight="bold")
-        ax.set_ylabel("Density", fontweight="bold")
-        ax.grid(False)
-        ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
-        ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
-        
-        # Store KS results for peak power
-        if f_power is not None and 'lognorm' in f_power.fitted_param:
+    for row, (metric_label, metric_key) in enumerate(METRICS):
+        ax = axes[row, col]
+        plt.sca(ax)  # Ensure all plotting happens on the correct axes
+        npz_file = os.path.join(DATA_DIR, f"{dataset_key}_{metric_key}.npz")
+        if not os.path.exists(npz_file):
+            ax.text(0.5, 0.5, f"No data", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
+            continue
+        data = np.load(npz_file)['data']
+        nan_count = np.isnan(data).sum()
+        total_count = len(data)
+        nan_pct = 100 * nan_count / total_count if total_count > 0 else 0
+        print(f"{dataset_key} {metric_key}: {nan_count}/{total_count} ({nan_pct:.1f}%) NaN values")
+        if nan_pct > 10:
+            print(f"WARNING: More than 10% NaN in {dataset_key} {metric_key}!")
+        data = data[~np.isnan(data)]
+        if metric_key == "duration":
+            data = data * 1000  # Convert to ms
+        if len(data) == 0:
+            ax.text(0.5, 0.5, f"No valid data", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
+            continue
+        # Plot
+        if metric_key in ["theta_power", "speed"]:
+            ax.hist(data, bins=30, edgecolor="black", facecolor="steelblue", alpha=0.7)
+        else:  # duration, peak_power: density plot with fits
+            # Plot histogram on ax
+            ax.hist(data, bins=30, edgecolor="black", facecolor="steelblue", alpha=0.7, density=True)
+            # Fit and plot distributions on ax
+            f = Fitter(data, distributions=['norm', 'halfnorm', 'lognorm'])
+            f.fit()
+            xlim = ax.get_xlim()
+            x = np.linspace(xlim[0], xlim[1], 200)
+            for dist_name, color in zip(['norm', 'halfnorm', 'lognorm'], ['red', 'orange', 'green']):
+                if dist_name in f.fitted_param:
+                    params = f.fitted_param[dist_name]
+                    dist = getattr(stats, dist_name)
+                    y = dist.pdf(x, *params)
+                    ax.plot(x, y, color=color, label=dist_name)
+            # Store KS results for all distributions
             try:
-                summary = f_power.summary()
-                ks_results[dataset_key]['peak_power'] = {
-                    'sse': summary['sumsquare_error']['lognorm'],
-                    'ks_stat': summary.get('ks_stat', {}).get('lognorm', np.nan),
-                    'ks_pvalue': summary.get('ks_pvalue', {}).get('lognorm', np.nan)
+                summary = f.summary()
+                ks_results[dataset_key][metric_key] = {}
+                for dist_name in ['norm', 'halfnorm', 'lognorm']:
+                    if dist_name in summary.index:
+                        ks_results[dataset_key][metric_key][dist_name] = {
+                            'sse': summary.loc[dist_name, 'sumsquare_error'],
+                            'ks_stat': summary.loc[dist_name, 'ks_statistic'],
+                            'ks_pvalue': summary.loc[dist_name, 'ks_pvalue'],
+                            'aic': summary.loc[dist_name, 'aic'],
+                            'bic': summary.loc[dist_name, 'bic']
+                        }
+                    else:
+                        ks_results[dataset_key][metric_key][dist_name] = {
+                            'sse': np.nan,
+                            'ks_stat': np.nan,
+                            'ks_pvalue': np.nan,
+                            'aic': np.nan,
+                            'bic': np.nan
+                        }
+            except Exception as e:
+                print(f"Error extracting KS results for {dataset_key} {metric_key}: {e}")
+                ks_results[dataset_key][metric_key] = {
+                    'norm': {'sse': np.nan, 'ks_stat': np.nan, 'ks_pvalue': np.nan, 'aic': np.nan, 'bic': np.nan},
+                    'halfnorm': {'sse': np.nan, 'ks_stat': np.nan, 'ks_pvalue': np.nan, 'aic': np.nan, 'bic': np.nan},
+                    'lognorm': {'sse': np.nan, 'ks_stat': np.nan, 'ks_pvalue': np.nan, 'aic': np.nan, 'bic': np.nan}
                 }
-            except (KeyError, TypeError) as e:
-                print(f"Warning: Could not extract KS results for {dataset_key} peak power: {e}")
-                ks_results[dataset_key]['peak_power'] = {
-                    'sse': np.nan,
-                    'ks_stat': np.nan,
-                    'ks_pvalue': np.nan
-                }
-        else:
-            print(f"Warning: No valid peak power data for {dataset_key}")
-            ks_results[dataset_key]['peak_power'] = {
-                'sse': np.nan,
-                'ks_stat': np.nan,
-                'ks_pvalue': np.nan
-            }
-    else:
-        ax.text(0.5, 0.5, "No peak power data file", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
-        ax.set_xlabel("Peak Ripple Power (z-score)", fontweight="bold")
-        ax.set_ylabel("Density", fontweight="bold")
-        # Set default peak power results
-        ks_results[dataset_key]['peak_power'] = {
-            'sse': np.nan,
-            'ks_stat': np.nan,
-            'ks_pvalue': np.nan
-        }
+            if row in [2, 3]:
+                ax.legend(fontsize=10, loc='upper right')
+        # Axis labels
+        if row == 0:
+            ax.set_title(dataset_title, fontweight="bold", fontsize=16)
+        if col == 0:
+            # Row labels (a, b, c, d)
+            label = ['a', 'b', 'c', 'd'][row]
+            ax.annotate(label, xy=(-0.18, 1.05), xycoords='axes fraction', fontsize=18, fontweight='bold', va='top', ha='right')
+        ax.set_xlabel(metric_label, fontweight="bold", fontsize=14)
+        ax.set_ylabel("Event Count" if metric_key in ["theta_power", "speed"] else "Density", fontweight="bold", fontsize=14)
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(5))
+        ax.yaxis.set_major_locator(ticker.MaxNLocator(5))
+        # Save individual subplot
+        subplot_filename = f"{dataset_key}_{metric_key}.png"
+        subplot_svg = f"{dataset_key}_{metric_key}.svg"
+        ax.figure.savefig(os.path.join(INDIVIDUAL_DIR, subplot_filename), dpi=300, bbox_inches='tight')
+        ax.figure.savefig(os.path.join(INDIVIDUAL_DIR, subplot_svg), bbox_inches='tight')
 
-plt.tight_layout()
+plt.tight_layout(rect=[0, 0, 1, 0.97])
 
-# Save figure
-plt.savefig(os.path.join(OUT_DIR, "figure9.png"), dpi=300, bbox_inches='tight')
-plt.savefig(os.path.join(OUT_DIR, "figure9.svg"), bbox_inches='tight')
+# Save with timestamp to avoid overwriting
+timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+plt.savefig(os.path.join(OUT_DIR, f"figure9_{timestamp}.png"), dpi=300, bbox_inches='tight')
+plt.savefig(os.path.join(OUT_DIR, f"figure9_{timestamp}.svg"), bbox_inches='tight')
+plt.close(fig)
+print(f"Figure saved to {OUT_DIR} as figure9_{timestamp}.png/svg")
 
 # Save KS results
 with open(os.path.join(OUT_DIR, "figure9_ks_results.json"), 'w') as f:
