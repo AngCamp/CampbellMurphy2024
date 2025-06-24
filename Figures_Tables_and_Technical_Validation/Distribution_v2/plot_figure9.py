@@ -200,6 +200,24 @@ for col, (dataset_title, dataset_key) in enumerate(DATASETS):
         
         plt.close(fig)
 
+# Save KS results and generate caption BEFORE trying to create combined figure
+print("Saving KS results and generating caption...")
+ks_results_path = os.path.join(OUT_DIR, "figure9_ks_results.json")
+with open(ks_results_path, 'w') as f:
+    json.dump(ks_results, f, indent=2, default=str)
+
+print(f"KS results saved to: {ks_results_path}")
+
+# Generate and save caption
+caption = generate_caption(ks_results)
+caption_path = os.path.join(OUT_DIR, "figure9_caption.txt")
+with open(caption_path, 'w') as f:
+    f.write(caption)
+
+print(f"Caption saved to: {caption_path}")
+print("\nCaption:")
+print(caption)
+
 # Create combined figure
 print("Creating combined figure...")
 combined_fig, combined_axes = plt.subplots(4, 3, figsize=(15, 20))
@@ -266,22 +284,5 @@ combined_fig.savefig(combined_fig_path_svg, bbox_inches='tight')
 print(f"Combined figure saved as:")
 print(f"  PNG: {combined_fig_path_png}")
 print(f"  SVG: {combined_fig_path_svg}")
-
-# Save KS results
-ks_results_path = os.path.join(OUT_DIR, "figure9_ks_results.json")
-with open(ks_results_path, 'w') as f:
-    json.dump(ks_results, f, indent=2, default=str)
-
-print(f"KS results saved to: {ks_results_path}")
-
-# Generate and save caption
-caption = generate_caption(ks_results)
-caption_path = os.path.join(OUT_DIR, "figure9_caption.txt")
-with open(caption_path, 'w') as f:
-    f.write(caption)
-
-print(f"Caption saved to: {caption_path}")
-print("\nCaption:")
-print(caption)
 
 plt.close(combined_fig) 
