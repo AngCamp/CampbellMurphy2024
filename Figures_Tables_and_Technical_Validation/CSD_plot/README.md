@@ -6,6 +6,35 @@ This directory contains code and workflows for computing and visualizing Current
 
 Current Source Density analysis computes the second spatial derivative of the LFP signal across electrode channels, revealing the underlying current sources and sinks in the brain tissue. This is particularly useful for understanding the laminar organization of SWR events in the hippocampus.
 
+## Dataset Differences: IBL vs ABI
+
+This workflow works with two different datasets that have distinct data sharing approaches, each with their own advantages and challenges:
+
+### IBL (International Brain Laboratory) Data
+- **Data Format**: Raw, uncleaned data requiring user preprocessing
+- **Advantages**: 
+  - Higher sampling rate (30 kHz vs 2.5 kHz) providing superior temporal resolution
+  - Complete channel information available for comprehensive CSD analysis
+  - Raw data allows for custom preprocessing and filtering approaches
+- **Challenges**:
+  - Requires significant computational resources for destriping and preprocessing
+  - Data cleaning and validation must be performed by the end user
+  - Longer processing times due to higher sampling rates and raw data volume
+
+### ABI (Allen Brain Institute) Data
+- **Data Format**: Pre-processed, expert-validated data
+- **Advantages**:
+  - Faster processing due to lower sampling rate (2.5 kHz)
+  - Expert-validated and cleaned channels reduce preprocessing burden
+  - Easier to test and debug analyses due to reduced computational requirements
+- **Challenges**:
+  - Often missing complete CA1 LFP data, limiting channel selection validation
+  - Lower sampling rate reduces temporal resolution for CSD visualization
+  - Limited channel availability can hinder comprehensive laminar analysis
+
+### Implications for CSD Analysis
+The IBL data is used for **Figure 5A** in the manuscript due to its superior sampling rate and complete channel information, providing the highest quality CSD visualizations. The ABI data is used for trial-averaged analyses and validation workflows where computational efficiency and ease of testing are priorities.
+
 ## Files and Workflows
 
 ### 📊 **IBL_validation.ipynb**
