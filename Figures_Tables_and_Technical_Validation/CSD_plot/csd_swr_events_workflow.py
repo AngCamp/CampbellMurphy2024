@@ -106,38 +106,26 @@ def finitimpresp_filter_for_csd(
     filtered_signal = signal.lfilter(fir_coeff, 1.0, LFP_array, axis=0)
     return filtered_signal
 
-def compute_csd(lfp_data, spacing_between_channels, chan_rows):
+def compute_csd(lfp_data, spacing_between_channels):
     """
     Compute Current Source Density (CSD) from Local Field Potential (LFP) data.
 
     Parameters:
-        lfp_data (numpy.ndarray): 2D array of LFP data, shape (n_channels, n_samples).
+        lfp_data (numpy.ndarray): 2D array of LFP data, shape (n_channels, n_timepoints).
         spacing_between_channels (float): Distance (in micrometers) between adjacent channels.
-        chan_rows list of int :  the index on the 2d dimension of lfp data for which channels are to be included
 
     Returns:
-        csd_data (numpy.ndarray): 2D array of CSD data, shape (n_channels, n_samples).
+        csd_data (numpy.ndarray): 2D array of CSD data, shape (n_channels, n_timepoints).
     """
-    # Ensure the input LFP data is a NumPy array
-    lfp_data = np.array(lfp_data)
-    lfp_data = lfp_data[:, chan_rows]
+    # Optionally filter LFP if needed (uncomment if desired)
+    # lfp_data = finitimpresp_filter_for_csd(lfp_data)
 
-    lfp_data = finitimpresp_filter_for_csd(lfp_data)
-    lfp_data = average_channels(lfp_data)
-
-    # Get the number of channels and samples
-    n_channels, n_samples = lfp_data.shape
-
-    # Define the finite difference coefficients for second spatial derivative
-    fd_coefficients = np.array([1, -2, 1]) / spacing_between_channels**2
-
-    # Function to compute CSD for a single channel
-    def compute_csd_single_channel(channel_data):
-        return np.convolve(channel_data, fd_coefficients, mode="same")
-
-    # Apply the second spatial derivative to each channel using apply_along_axis
-    csd_data = np.apply_along_axis(compute_csd_single_channel, axis=0, arr=lfp_data)
-
+    # Compute second spatial derivative (across channels, for each timepoint)
+    csd_data = np.zeros_like(lfp_data)
+    csd_data[1:-1, :] = (lfp_data[2:, :] - 2 * lfp_data[1:-1, :] + lfp_data[:-2, :]) / (spacing_between_channels ** 2)
+    # Optionally, set edges to zero or nan
+    csd_data[0, :] = 0
+    csd_data[-1, :] = 0
     return csd_data
 
 def exponential_smoothing_2d(data, alpha, axis):
@@ -576,7 +564,7 @@ class CSDSWREventsWorkflow:
         chan_rows = list(range(lfp_data.shape[1]))
         
         # Compute CSD
-        csd_data = compute_csd(lfp_data, self.channel_spacing, chan_rows)
+        csd_data = compute_csd(lfp_data, self.channel_spacing)
         
         return csd_data
     
