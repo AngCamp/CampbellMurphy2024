@@ -98,7 +98,7 @@ fi
 echo ""
 
 # Data output directory
-DATA_DIR="/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/Distribution_v2/distributions_for_plotting"
+DATA_DIR="/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/technical_validation_lognorm_distributions/distributions_for_plotting"
 
 # Remove old data files to ensure fresh data (only if not skipping gathering)
 if [[ "$SKIP_GATHERING" == false ]]; then
