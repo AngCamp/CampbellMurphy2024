@@ -161,12 +161,19 @@ for col, (dataset_title, dataset_key) in enumerate(DATASETS):
                 ks_results[dataset_key][metric_key] = {}
                 for dist_name in ['norm', 'halfnorm', 'lognorm']:
                     if dist_name in f.fitted_param:
+                        # Try to get KS statistics with more detailed debugging
+                        sse = summary['sumsquare_error'].get(dist_name, np.nan)
+                        ks_stat = summary.get('ks_statistic', {}).get(dist_name, np.nan)
+                        ks_pvalue = summary.get('ks_pvalue', {}).get(dist_name, np.nan)
+                        aic = summary.get('aic', {}).get(dist_name, np.nan)
+                        bic = summary.get('bic', {}).get(dist_name, np.nan)
+                        
                         ks_results[dataset_key][metric_key][dist_name] = {
-                            'sse': summary['sumsquare_error'].get(dist_name, np.nan),
-                            'ks_stat': summary.get('ks_stat', {}).get(dist_name, np.nan),
-                            'ks_pvalue': summary.get('ks_pvalue', {}).get(dist_name, np.nan),
-                            'aic': summary.get('aic', {}).get(dist_name, np.nan),
-                            'bic': summary.get('bic', {}).get(dist_name, np.nan)
+                            'sse': sse,
+                            'ks_stat': ks_stat,
+                            'ks_pvalue': ks_pvalue,
+                            'aic': aic,
+                            'bic': bic
                         }
                     else:
                         ks_results[dataset_key][metric_key][dist_name] = {
@@ -175,6 +182,8 @@ for col, (dataset_title, dataset_key) in enumerate(DATASETS):
                         }
             except Exception as e:
                 print(f"Error extracting KS statistics for {dataset_key} {metric_key}: {e}")
+                import traceback
+                traceback.print_exc()
                 ks_results[dataset_key][metric_key] = {
                     'norm': {'sse': np.nan, 'ks_stat': np.nan, 'ks_pvalue': np.nan, 'aic': np.nan, 'bic': np.nan},
                     'halfnorm': {'sse': np.nan, 'ks_stat': np.nan, 'ks_pvalue': np.nan, 'aic': np.nan, 'bic': np.nan},
