@@ -45,10 +45,15 @@ activate_environment() {
 # Parse command line arguments
 MAX_SESSIONS=""
 SKIP_GATHERING=false
+N_PROCESSES="--n_processes 4"  # Default to 4 processes
 while [[ $# -gt 0 ]]; do
     case $1 in
         --max_sessions)
             MAX_SESSIONS="--max_sessions $2"
+            shift 2
+            ;;
+        --n_processes)
+            N_PROCESSES="--n_processes $2"
             shift 2
             ;;
         --skip-gathering)
@@ -56,18 +61,20 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --help|-h)
-            echo "Usage: $0 [--max_sessions N] [--skip-gathering]"
+            echo "Usage: $0 [--max_sessions N] [--n_processes N] [--skip-gathering]"
             echo ""
             echo "Options:"
             echo "  --max_sessions N    Limit processing to first N sessions per dataset (for debugging)"
+            echo "  --n_processes N     Number of parallel processes for data gathering (default: 4)"
             echo "  --skip-gathering    Skip data gathering and go straight to plotting (for debugging)"
             echo "  --help, -h          Show this help message"
             echo ""
             echo "Examples:"
-            echo "  $0                    # Process all sessions"
+            echo "  $0                    # Process all sessions with 4 processes"
             echo "  $0 --max_sessions 1   # Process only first session per dataset (fast debugging)"
+            echo "  $0 --n_processes 8    # Use 8 parallel processes for faster processing"
             echo "  $0 --skip-gathering   # Skip gathering, just plot existing data"
-            echo "  $0 --max_sessions 5   # Process first 5 sessions per dataset"
+            echo "  $0 --max_sessions 5 --n_processes 2  # Process first 5 sessions with 2 processes"
             exit 0
             ;;
         *)
@@ -82,6 +89,9 @@ echo "=== Figure 9 Workflow Starting ==="
 if [[ -n "$MAX_SESSIONS" ]]; then
     echo "Debug mode: $MAX_SESSIONS sessions per dataset"
 fi
+if [[ -n "$N_PROCESSES" ]]; then
+    echo "Multiprocessing: $N_PROCESSES"
+fi
 if [[ "$SKIP_GATHERING" == true ]]; then
     echo "Skipping data gathering - using existing data files"
 fi
@@ -93,9 +103,9 @@ DATA_DIR="/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Vali
 # Remove old data files to ensure fresh data (only if not skipping gathering)
 if [[ "$SKIP_GATHERING" == false ]]; then
     echo "Removing old data files to ensure fresh data..."
-    rm -f "$DATA_DIR"/abi_visbehave_swr_theta_speed.npz
-    rm -f "$DATA_DIR"/abi_viscoding_swr_theta_speed.npz
-    rm -f "$DATA_DIR"/ibl_swr_theta_speed.npz
+    rm -f "$DATA_DIR"/abi_visbehave_*.npz
+    rm -f "$DATA_DIR"/abi_viscoding_*.npz
+    rm -f "$DATA_DIR"/ibl_*.npz
     echo "✓ Old data files removed"
     echo ""
 fi
@@ -104,7 +114,7 @@ fi
 if [[ "$SKIP_GATHERING" == false ]]; then
     echo "Step 1: Gathering ABI Visual Behaviour data..."
     activate_environment "abi_visual_behaviour"
-    python gather_speed_theta_data.py --dataset abi_visbehave $MAX_SESSIONS
+    python gather_validation_distributions_data.py --dataset abi_visbehave $MAX_SESSIONS $N_PROCESSES
     echo "✓ ABI Visual Behaviour data gathered"
     conda deactivate
 else
@@ -115,7 +125,7 @@ fi
 if [[ "$SKIP_GATHERING" == false ]]; then
     echo "Step 2: Gathering ABI Visual Coding data..."
     activate_environment "abi_visual_coding"
-    python gather_speed_theta_data.py --dataset abi_viscoding $MAX_SESSIONS
+    python gather_validation_distributions_data.py --dataset abi_viscoding $MAX_SESSIONS $N_PROCESSES
     echo "✓ ABI Visual Coding data gathered"
     conda deactivate
 else
@@ -126,7 +136,7 @@ fi
 if [[ "$SKIP_GATHERING" == false ]]; then
     echo "Step 3: Gathering IBL data..."
     activate_environment "ibl"
-    python gather_speed_theta_data.py --dataset ibl $MAX_SESSIONS
+    python gather_validation_distributions_data.py --dataset ibl $MAX_SESSIONS $N_PROCESSES
     echo "✓ IBL data gathered"
     conda deactivate
 else
@@ -143,8 +153,9 @@ conda deactivate
 echo "=== Figure 9 Workflow Complete ==="
 echo ""
 echo "Output files:"
-echo "- figure9.png and figure9.svg (the figure)"
-echo "- figure9_ks_results.json (KS test results)"
-echo "- figure9_caption_with_results.txt (caption with actual values)"
+echo "- figure9_combined_*.png and figure9_combined_*.svg (the combined figure)"
+echo "- individual_subplots/ (individual subplot files)"
+echo "- figure9_ks_results.json (KS test results for all distributions)"
+echo "- figure9_caption.txt (caption with actual values)"
 echo ""
 echo "All files are saved in: $(pwd)" 

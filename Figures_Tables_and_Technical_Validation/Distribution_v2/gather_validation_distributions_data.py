@@ -198,7 +198,7 @@ def process_session(args):
                 (~events_df['start_time'].isna()) &
                 (~events_df['end_time'].isna()) &
                 (events_df['end_time'] > events_df['start_time']) &
-                ((events_df['end_time'] - events_df['start_time']) <= 0.150)
+                ((events_df['end_time'] - events_df['start_time']) <= 0.25) # duration of 250ms
             ]
             
             if len(events_df) == 0:
