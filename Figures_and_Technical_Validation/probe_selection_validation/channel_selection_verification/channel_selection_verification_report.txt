@@ -20,7 +20,7 @@ allen_viscoding_swr_murphylab2024:
   Problem rate: 0.0%
 
 ibl_swr_murphylab2024:
-  Total probes: 147
+  Total probes: 157
   No channels below CA1: 0
   Problem rate: 0.0%
 
