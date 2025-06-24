@@ -34,7 +34,7 @@ def load_ibl_api():
 # Paths
 DATA_ROOT = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_v2_final"
 OUTPUT_DIR = "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/Distribution_v2/distributions_for_plotting"
-THETA_FILTER_PATH = "../../Figures_Tables_and_Technical_Validation/Distribution_v2/theta_1500hz_bandpass_filter.npz"
+THETA_FILTER_PATH = "../../Figures_Tables_and_Technical_Validation/technical_validation_lognorm_distributions/theta_1500hz_bandpass_filter.npz"
 
 # Dataset configurations
 DATASET_CONFIGS = {
