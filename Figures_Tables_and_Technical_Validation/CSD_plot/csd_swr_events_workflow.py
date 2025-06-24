@@ -27,7 +27,7 @@ MIN_PARTICIPATING_PROBES = 2  # Minimum number of probes participating in global
 
 # Depth range for plotting (microns from pyramidal layer)
 PLOT_DEPTH_RANGE = 200  # microns, half-width around pyramidal
-CSD_CLIP_RANGE = (-1, 1)  # (min, max) for CSD color scale
+CSD_CLIP_RANGE = (-2, 2)  # (min, max) for CSD color scale
 
 # =============================================================================
 # IMPORTS
@@ -570,7 +570,24 @@ class CSDSWREventsWorkflow:
     
     def plot_csd_event(self, csd_data: np.ndarray, time_axis: np.ndarray, depth_range: float,
                       channel_depths: list, event_info: dict,
-                      recording_info: dict, save_path_base: str) -> None:
+                      recording_info: dict, save_path_base: str,
+                      clip_range: tuple,
+                      smooth_alpha_spatial: float = 0.2, smooth_alpha_temporal: float = 0.2) -> None:
+        """
+        Plot CSD event with optional exponential smoothing in spatial and temporal directions and adjustable clipping.
+
+        Parameters:
+        - csd_data: np.ndarray, CSD data (channels x time)
+        - time_axis: np.ndarray, time points
+        - depth_range: float, range for plotting (microns)
+        - channel_depths: list, depths for each channel
+        - event_info: dict, event metadata
+        - recording_info: dict, probe/channel metadata
+        - save_path_base: str, base path for saving plots
+        - smooth_alpha_spatial: float, exponential smoothing alpha for spatial (channels) direction (0 disables)
+        - smooth_alpha_temporal: float, exponential smoothing alpha for temporal (time) direction (0 disables)
+        - clip_range: tuple, (min, max) for CSD color scale
+        """
         import numpy as np
         import matplotlib.pyplot as plt
         # Ensure dimensions match
@@ -584,19 +601,30 @@ class CSDSWREventsWorkflow:
             min_time = min(csd_data.shape[1], len(time_axis))
             csd_data = csd_data[:, :min_time]
             time_axis = time_axis[:min_time]
-        # Depth relative to pyramidal layer
+        # Correct relative depth: positive = superficial, negative = deep
         ripple_depth = recording_info.get('ripple_channel_depth')
-        rel_channel_depths = np.array(channel_depths) - ripple_depth
+        rel_channel_depths = ripple_depth - np.array(channel_depths)
         # Only plot channels within ±PLOT_DEPTH_RANGE microns of pyramidal layer
         mask = np.abs(rel_channel_depths) <= PLOT_DEPTH_RANGE
         rel_channel_depths_plot = rel_channel_depths[mask]
         csd_data_plot = csd_data[mask, :]
-        # Sort by depth (most negative/superficial at top)
-        sort_idx = np.argsort(rel_channel_depths_plot)
+        channel_ids = np.array(recording_info['channel_ids'])[:csd_data.shape[0]]
+        channel_ids_plot = channel_ids[mask]
+        channel_depths_plot = np.array(channel_depths)[mask]
+        # Sort by rel_channel_depths_plot (most positive/superficial at top)
+        sort_idx = np.argsort(-rel_channel_depths_plot)
         rel_channel_depths_plot = rel_channel_depths_plot[sort_idx]
         csd_data_plot = csd_data_plot[sort_idx, :]
-        # Clip CSD for plotting
-        csd_plot = np.clip(csd_data_plot, *CSD_CLIP_RANGE)
+        channel_ids_plot = channel_ids_plot[sort_idx]
+        channel_depths_plot = channel_depths_plot[sort_idx]
+        # --- Smoothing ---
+        if smooth_alpha_spatial > 0:
+            csd_data_plot = exponential_smoothing_2d(csd_data_plot, smooth_alpha_spatial, axis=0)
+        if smooth_alpha_temporal > 0:
+            csd_data_plot = exponential_smoothing_2d(csd_data_plot, smooth_alpha_temporal, axis=1)
+        # --- Clipping ---
+        csd_plot = np.clip(csd_data_plot, *clip_range)
+        # For the y-axis, use rel_channel_depths_plot (depth relative to pyramidal layer)
         # Center time axis on peak
         peak_time = event_info.get('peak_time', 0)
         time_rel = time_axis - peak_time
@@ -607,13 +635,17 @@ class CSDSWREventsWorkflow:
         cbar.set_label('Current Source Density (μA/mm³)', rotation=270, labelpad=20)
         ax.set_xlabel('Time relative to peak (s)')
         ax.set_ylabel('Depth relative to pyramidal layer (μm)')
+        # Optionally, set y-ticks to show both rel depth and actual depth
+        yticks = rel_channel_depths_plot
+        yticklabels = [f"{int(rd)} ({int(cd)})" for rd, cd in zip(rel_channel_depths_plot, channel_depths_plot)]
+        ax.set_yticks(yticks)
+        ax.set_yticklabels(yticklabels)
         title = f"CSD - Session {event_info.get('session_id', 'Unknown')}, "
         title += f"Probe {event_info.get('probe_id', 'Unknown')}, "
         title += f"Event {event_info.get('event_id', 'Unknown')}\n"
         title += f"Duration: {event_info.get('duration', 0):.3f}s, "
         title += f"Peak Power: {event_info.get('global_peak_power', 0):.2f}"
         ax.set_title(title)
-        ax.invert_yaxis()
         ax.grid(True, alpha=0.3)
         # Mark the peak time (black line at t=0)
         ax.axvline(0, color='black', linestyle='--', alpha=0.7, label='Peak Time')
@@ -623,7 +655,7 @@ class CSDSWREventsWorkflow:
         sw_rel_depth = None
         if sw_channel_id is not None and sw_channel_id in recording_info['channel_ids']:
             sw_idx = recording_info['channel_ids'].index(sw_channel_id)
-            sw_rel_depth = np.array(recording_info['channel_depths'])[sw_idx] - ripple_depth
+            sw_rel_depth = ripple_depth - np.array(recording_info['channel_depths'])[sw_idx]
         x_left = time_rel[0]
         x_right = time_rel[-1]
         y_offset = (rel_channel_depths_plot.max() - rel_channel_depths_plot.min()) * 0.01
@@ -648,6 +680,18 @@ class CSDSWREventsWorkflow:
         plt.savefig(f"{save_path_base}.svg", bbox_inches='tight')
         self.logger.info(f"CSD plots saved to {save_path_base}.png and {save_path_base}.svg")
         plt.close(fig)
+        # Debug list and file
+        channel_depth_debug_list = list(zip(channel_ids_plot, channel_depths_plot, rel_channel_depths_plot))
+        try:
+            debug_file = save_path_base + "_channel_depths_debug.txt"
+            with open(debug_file, 'w') as f:
+                f.write("channel_id\tchannel_depth\trel_depth_to_pyramidal\n")
+                for tup in channel_depth_debug_list:
+                    f.write(f"{tup[0]}\t{tup[1]}\t{tup[2]}\n")
+            self.logger.info(f"Channel depth debug file written: {debug_file}")
+        except Exception as e:
+            self.logger.error(f"Failed to write channel depth debug file {debug_file}: {e}")
+        self.logger.info(f"CSD plot used clip_range: {clip_range}")
     
     def process_session(self, session_id: str, max_events: int = 10) -> list:
         self.logger.info(f"Processing session {session_id}")
@@ -714,7 +758,7 @@ class CSDSWREventsWorkflow:
                     plots_event_folder.mkdir(exist_ok=True)
                     plot_file_base = plots_event_folder / f"probe_{probe_id}_csd_plot"
                     self.plot_csd_event(csd_data, time_axis, PLOT_DEPTH_RANGE, channel_depths, event_info, 
-                                      recording_info, str(plot_file_base))
+                                      recording_info, str(plot_file_base), clip_range=CSD_CLIP_RANGE)
                     processed_events.append({
                         'session_id': session_id,
                         'probe_id': probe_id,
