@@ -1,3 +1,37 @@
+# =============================================================================
+# IMPORTS
+# =============================================================================
+import os
+import json
+import gzip
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from pathlib import Path
+from scipy import signal
+from scipy.signal import butter, filtfilt, hilbert, savgol_filter
+from scipy.stats import zscore
+import yaml
+import logging
+from tqdm import tqdm
+import ast
+from typing import Dict, List, Tuple, Optional
+import tempfile
+import subprocess
+import traceback
+from scipy.ndimage import gaussian_filter1d
+
+# AllenSDK imports
+try:
+    from allensdk.brain_observatory.behavior.behavior_project_cache import (
+        VisualBehaviorNeuropixelsProjectCache,
+    )
+    ALLENSDK_AVAILABLE = True
+except ImportError:
+    ALLENSDK_AVAILABLE = False
+    print("Warning: AllenSDK not available. Some functionality may be limited.")
+
+
 #!/usr/bin/env python3
 """
 CSD SWR Events Workflow for ABI Visual Behaviour Dataset
@@ -21,12 +55,34 @@ CSD_COMPUTE_DEPTH_RANGE = 500  # microns from pyramidal layer for CSD computatio
 # Set as (min, max) tuple for plotting range
 CSD_PLOT_DEPTH_RANGE = (-200, 100)  # microns from pyramidal layer for plotting (min, max)
 
+# Number of top putative events per probe
+MAX_EVENTS_PER_PROBE = 5
+
+SMOOTHING_METHOD = "sav-gol" # "exponential" or "gaussian" or "sav-gol" or "none"
+
 # Smoothing parameters
-CSD_SMOOTHING_ENABLED = True  # Set to True to enable smoothing
+if SMOOTHING_METHOD == "exponential":
+    CSD_SMOOTHING_ENABLED = True  # Set to True to enable smoothing
+else:
+    CSD_SMOOTHING_ENABLED = False
 CSD_SMOOTH_ALPHA_SPATIAL = 0.7  # Exponential smoothing alpha for spatial (channels) direction
 CSD_SMOOTH_ALPHA_TEMPORAL = 0  # Exponential smoothing alpha for temporal (time) direction
 
-MAX_EVENTS_PER_PROBE = 1  # Number of top putative events per probe
+# Gaussian smoothing parameters
+if SMOOTHING_METHOD == "gaussian":
+    CSD_GAUSSIAN_SMOOTHING_ENABLED = True
+else:
+    CSD_GAUSSIAN_SMOOTHING_ENABLED = False
+CSD_GAUSSIAN_SIGMA = 1.0  # in channels
+CSD_GAUSSIAN_TRUNCATE = 3.0
+
+# Savitzky-Golay smoothing parameters
+if SMOOTHING_METHOD == "sav-gol":
+    CSD_SAVGOL_SMOOTHING_ENABLED = True
+else:
+    CSD_SAVGOL_SMOOTHING_ENABLED = False  # Set to True to enable Savitzky-Golay smoothing
+CSD_SAVGOL_WINDOW_LENGTH = 3  # Must be odd and <= number of channels
+CSD_SAVGOL_POLYORDER = 2 
 
 # =============================================================================
 # INPUT/OUTPUT PATHS - MODIFY THESE AS NEEDED
@@ -39,7 +95,7 @@ MAX_SESSIONS_TO_PROCESS = 1  # Number of top sessions to process
 MAX_EVENTS_PER_SESSION = 1  # Number of top events per session to plot
 MIN_PROBE_COUNT = 3  # Minimum number of probes for a session to be considered
 MAX_PROBE_COUNT = 6  # Maximum number of probes for a session to be considered
-MIN_PEAK_POWER = 3.0  # Minimum global peak power for events
+MIN_PEAK_POWER = 5.0  # Minimum global peak power for events
 MAX_PEAK_POWER = 10.0  # Maximum global peak power for events
 MIN_PARTICIPATING_PROBES = 2  # Minimum number of probes participating in global event
 
@@ -51,41 +107,10 @@ CSD_CLIP_RANGE = (-2, 2)  # (min, max) for CSD color scale
 # =============================================================================
 PUTATIVE_MIN_POWER_MAX_ZSCORE = 3.0
 PUTATIVE_MAX_POWER_MAX_ZSCORE = 10.0
-PUTATIVE_MIN_SW_PEAK_POWER = 1.5
+PUTATIVE_MIN_SW_PEAK_POWER = 2.0
 PUTATIVE_SPEED_THRESHOLD = 2.0  # cm/s
 PUTATIVE_SPEED_EXCLUSION_WINDOW = 2.0  # seconds
 
-# =============================================================================
-# IMPORTS
-# =============================================================================
-import os
-import json
-import gzip
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from pathlib import Path
-from scipy import signal
-from scipy.signal import butter, filtfilt, hilbert
-from scipy.stats import zscore
-import yaml
-import logging
-from tqdm import tqdm
-import ast
-from typing import Dict, List, Tuple, Optional
-import tempfile
-import subprocess
-import traceback
-
-# AllenSDK imports
-try:
-    from allensdk.brain_observatory.behavior.behavior_project_cache import (
-        VisualBehaviorNeuropixelsProjectCache,
-    )
-    ALLENSDK_AVAILABLE = True
-except ImportError:
-    ALLENSDK_AVAILABLE = False
-    print("Warning: AllenSDK not available. Some functionality may be limited.")
 
 # =============================================================================
 # CSD FUNCTIONS (from instructions)
@@ -199,6 +224,10 @@ def exponential_smoothing(series, alpha):
         smoothed_series[t] = alpha * series[t] + (1 - alpha) * smoothed_series[t - 1]
 
     return smoothed_series
+
+def gaussian_smoothing_2d(data, sigma, axis, truncate=3.0):
+    """Apply Gaussian smoothing to a 2D array along the specified axis."""
+    return gaussian_filter1d(data, sigma=sigma, axis=axis, truncate=truncate, mode='nearest')
 
 # =============================================================================
 # MAIN WORKFLOW CLASS
@@ -643,7 +672,21 @@ class CSDSWREventsWorkflow:
         channel_ids_plot = channel_ids_plot[sort_idx]
         channel_depths_plot = channel_depths_plot[sort_idx]
         # --- Smoothing ---
-        if CSD_SMOOTHING_ENABLED:
+        if CSD_SAVGOL_SMOOTHING_ENABLED:
+            # Ensure window length is odd and does not exceed number of channels
+            win_len = min(CSD_SAVGOL_WINDOW_LENGTH, csd_data_plot.shape[0] if csd_data_plot.shape[0] % 2 == 1 else csd_data_plot.shape[0] - 1)
+            if win_len < 3:
+                win_len = 3
+            if win_len % 2 == 0:
+                win_len += 1
+            if win_len > csd_data_plot.shape[0]:
+                win_len = csd_data_plot.shape[0] if csd_data_plot.shape[0] % 2 == 1 else csd_data_plot.shape[0] - 1
+            csd_data_plot = savgol_filter(csd_data_plot, window_length=win_len, polyorder=CSD_SAVGOL_POLYORDER, axis=0, mode='interp')
+        elif CSD_GAUSSIAN_SMOOTHING_ENABLED:
+            csd_data_plot = gaussian_smoothing_2d(
+                csd_data_plot, sigma=CSD_GAUSSIAN_SIGMA, axis=0, truncate=CSD_GAUSSIAN_TRUNCATE
+            )
+        elif CSD_SMOOTHING_ENABLED:
             if CSD_SMOOTH_ALPHA_SPATIAL > 0:
                 csd_data_plot = exponential_smoothing_2d(csd_data_plot, CSD_SMOOTH_ALPHA_SPATIAL, axis=0)
             if CSD_SMOOTH_ALPHA_TEMPORAL > 0:
@@ -760,101 +803,115 @@ class CSDSWREventsWorkflow:
         print(f"Number of probes for session {session_id}: {len(recordings)}; probe_ids: {probe_ids}")
         if len(recordings) == 0:
             raise RuntimeError(f"No probe metadata files found for session {session_id}.")
-        processed_events = []
+        # Select the probe with the most putative events
+        max_events = 0
+        best_recording = None
         for recording in recordings:
             probe_id = recording['probe_id']
             metadata = recording['metadata']
             ripple_channel_id = metadata['ripple_band']['selected_channel_id']
-            putative_csv_path = str((self.base_path / self.dataset / f"swrs_session_{session_id}" / f"probe_{probe_id}_channel_{ripple_channel_id}_putative_swr_events.csv.gz"))
             putative_events = self.load_putative_events(session_id, probe_id, ripple_channel_id)
-            print(f"Probe {probe_id}: loaded {len(putative_events)} putative events from CSV: {putative_csv_path}")
-            if putative_events.empty:
-                raise RuntimeError(f"No putative events found for probe {probe_id} in session {session_id} at {putative_csv_path}")
-            # Filter events by power, gamma, and movement overlap
-            before_filter = len(putative_events)
-            putative_events = putative_events[
-                (putative_events['power_max_zscore'] >= 3) &
-                (putative_events['power_max_zscore'] <= 10) &
-                (putative_events['overlaps_with_gamma'] == False) &
-                (putative_events['overlaps_with_movement'] == False)
-            ]
-            print(f"Probe {probe_id}: {len(putative_events)} events after power/gamma/movement filter (was {before_filter})")
-            if putative_events.empty:
-                print(f"No events left after initial filtering for probe {probe_id} in session {session_id}")
-                continue
-            # Load speed data for the session (AllenSDK Visual Behaviour)
-            if not hasattr(self, 'cache') or self.cache is None:
-                raise RuntimeError("AllenSDK cache not initialized for speed data loading.")
-            session_obj = self.cache.get_ecephys_session(ecephys_session_id=int(session_id))
-            wheel_velocity = session_obj.running_speed['speed'].values
-            wheel_time = session_obj.running_speed['timestamps'].values
-            # Interpolate speed to regular time grid (optional, but for now use as is)
-            speed_mask = []
-            for idx, row in putative_events.iterrows():
-                window_mask = (wheel_time >= row['start_time'] - 2) & (wheel_time <= row['end_time'] + 2)
-                if np.any(np.abs(wheel_velocity[window_mask]) > 2.0):
-                    speed_mask.append(False)  # Exclude this event
-                else:
-                    speed_mask.append(True)   # Keep this event
-            n_before_speed = len(putative_events)
-            putative_events = putative_events[speed_mask]
-            print(f"Probe {probe_id}: {len(putative_events)} events after speed mask (was {n_before_speed})")
-            if putative_events.empty:
-                print(f"No events left after speed filtering for probe {probe_id} in session {session_id}")
-                continue
-            if 'power_max_zscore' in putative_events.columns:
-                putative_events = putative_events.sort_values('power_max_zscore', ascending=False)
-            ca1_channel_ids = metadata['ripple_band']['channel_ids']
-            channel_depths = metadata['ripple_band']['depths']
-            ripple_depth = channel_depths[ca1_channel_ids.index(ripple_channel_id)]
-            for i, (_, best_event) in enumerate(putative_events.iterrows()):
-                if i >= MAX_EVENTS_PER_PROBE:
-                    break
-                peak_time = best_event['power_peak_time'] if 'power_peak_time' in best_event else (best_event['start_time'] + best_event['end_time']) / 2
-                duration = best_event['duration']
-                window = 0.25
-                rel_channel_depths = ripple_depth - np.array(channel_depths)
-                csd_mask = np.abs(rel_channel_depths) <= CSD_COMPUTE_DEPTH_RANGE
-                ca1_channel_ids_csd = list(np.array(ca1_channel_ids)[csd_mask])
-                channel_depths_csd = list(np.array(channel_depths)[csd_mask])
-                lfp_data, time_axis, used_channel_ids = self.load_lfp_data_from_allensdk(
-                    session_id, probe_id, peak_time, window, ca1_channel_ids_csd
-                )
-                csd_data = self.compute_csd_for_event(lfp_data)
-                event_info = {
-                    'session_id': session_id,
-                    'probe_id': probe_id,
-                    'event_id': int(best_event.name),
-                    'duration': duration,
-                    'power_max_zscore': best_event.get('power_max_zscore', 0),
-                    'peak_time': peak_time,
-                }
-                event_folder = self.data_dir / f"session_{session_id}_event_{best_event.name}"
-                event_folder.mkdir(exist_ok=True)
-                output_file = event_folder / f"probe_{probe_id}_csd_data.npz"
-                np.savez(output_file, 
-                        csd_data=csd_data,
-                        time_axis=time_axis,
-                        channel_depths=channel_depths_csd,
-                        event_info=event_info,
-                        metadata=metadata)
-                plots_event_folder = self.plots_dir / f"session_{session_id}_event_{best_event.name}"
-                plots_event_folder.mkdir(exist_ok=True)
-                plot_file_base = plots_event_folder / f"probe_{probe_id}_csd_plot"
-                self.plot_csd_event(csd_data, time_axis, CSD_PLOT_DEPTH_RANGE, channel_depths_csd, event_info, 
-                                  metadata, str(plot_file_base), clip_range=CSD_CLIP_RANGE)
-                processed_events.append({
-                    'session_id': session_id,
-                    'probe_id': probe_id,
-                    'event_id': int(best_event.name),
-                    'duration': duration,
-                    'power_max_zscore': best_event.get('power_max_zscore', 0),
-                    'peak_time': peak_time,
-                    'csd_file': str(output_file),
-                    'plot_files': [f"{plot_file_base}.png", f"{plot_file_base}.svg"],
-                    'event_folder': str(event_folder),
-                    'plots_folder': str(plots_event_folder)
-                })
+            if len(putative_events) > max_events:
+                max_events = len(putative_events)
+                best_recording = recording
+        if best_recording is None:
+            raise RuntimeError(f"No probes with putative events found for session {session_id}.")
+        # Only process the best probe
+        processed_events = []
+        probe_id = best_recording['probe_id']
+        metadata = best_recording['metadata']
+        ripple_channel_id = metadata['ripple_band']['selected_channel_id']
+        putative_csv_path = str((self.base_path / self.dataset / f"swrs_session_{session_id}" / f"probe_{probe_id}_channel_{ripple_channel_id}_putative_swr_events.csv.gz"))
+        putative_events = self.load_putative_events(session_id, probe_id, ripple_channel_id)
+        print(f"Probe {probe_id}: loaded {len(putative_events)} putative events from CSV: {putative_csv_path}")
+        if putative_events.empty:
+            raise RuntimeError(f"No putative events found for probe {probe_id} in session {session_id} at {putative_csv_path}")
+        # Filter events by power, gamma, and movement overlap
+        before_filter = len(putative_events)
+        putative_events = putative_events[
+            (putative_events['power_max_zscore'] >= PUTATIVE_MIN_POWER_MAX_ZSCORE) &
+            (putative_events['power_max_zscore'] <= PUTATIVE_MAX_POWER_MAX_ZSCORE) &
+            (putative_events['sw_peak_power'] >= PUTATIVE_MIN_SW_PEAK_POWER) &
+            (putative_events['overlaps_with_gamma'] == False) &
+            (putative_events['overlaps_with_movement'] == False)
+        ]
+        print(f"Probe {probe_id}: {len(putative_events)} events after power/gamma/movement filter (was {before_filter})")
+        if putative_events.empty:
+            print(f"No events left after initial filtering for probe {probe_id} in session {session_id}")
+            return []
+        # Load speed data for the session (AllenSDK Visual Behaviour)
+        if not hasattr(self, 'cache') or self.cache is None:
+            raise RuntimeError("AllenSDK cache not initialized for speed data loading.")
+        session_obj = self.cache.get_ecephys_session(ecephys_session_id=int(session_id))
+        wheel_velocity = session_obj.running_speed['speed'].values
+        wheel_time = session_obj.running_speed['timestamps'].values
+        # Interpolate speed to regular time grid (optional, but for now use as is)
+        speed_mask = []
+        for idx, row in putative_events.iterrows():
+            window_mask = (wheel_time >= row['start_time'] - 2) & (wheel_time <= row['end_time'] + 2)
+            if np.any(np.abs(wheel_velocity[window_mask]) > 2.0):
+                speed_mask.append(False)  # Exclude this event
+            else:
+                speed_mask.append(True)   # Keep this event
+        n_before_speed = len(putative_events)
+        putative_events = putative_events[speed_mask]
+        print(f"Probe {probe_id}: {len(putative_events)} events after speed mask (was {n_before_speed})")
+        if putative_events.empty:
+            print(f"No events left after speed filtering for probe {probe_id} in session {session_id}")
+            return []
+        if 'power_max_zscore' in putative_events.columns:
+            putative_events = putative_events.sort_values('power_max_zscore', ascending=False)
+        ca1_channel_ids = metadata['ripple_band']['channel_ids']
+        channel_depths = metadata['ripple_band']['depths']
+        ripple_depth = channel_depths[ca1_channel_ids.index(ripple_channel_id)]
+        for i, (_, best_event) in enumerate(putative_events.iterrows()):
+            if i >= MAX_EVENTS_PER_PROBE:
+                break
+            peak_time = best_event['power_peak_time'] if 'power_peak_time' in best_event else (best_event['start_time'] + best_event['end_time']) / 2
+            duration = best_event['duration']
+            window = 0.25
+            rel_channel_depths = ripple_depth - np.array(channel_depths)
+            csd_mask = np.abs(rel_channel_depths) <= CSD_COMPUTE_DEPTH_RANGE
+            ca1_channel_ids_csd = list(np.array(ca1_channel_ids)[csd_mask])
+            channel_depths_csd = list(np.array(channel_depths)[csd_mask])
+            lfp_data, time_axis, used_channel_ids = self.load_lfp_data_from_allensdk(
+                session_id, probe_id, peak_time, window, ca1_channel_ids_csd
+            )
+            csd_data = self.compute_csd_for_event(lfp_data)
+            event_info = {
+                'session_id': session_id,
+                'probe_id': probe_id,
+                'event_id': int(best_event.name),
+                'duration': duration,
+                'power_max_zscore': best_event.get('power_max_zscore', 0),
+                'peak_time': peak_time,
+            }
+            event_folder = self.data_dir / f"session_{session_id}_event_{best_event.name}"
+            event_folder.mkdir(exist_ok=True)
+            output_file = event_folder / f"probe_{probe_id}_csd_data.npz"
+            np.savez(output_file, 
+                    csd_data=csd_data,
+                    time_axis=time_axis,
+                    channel_depths=channel_depths_csd,
+                    event_info=event_info,
+                    metadata=metadata)
+            plots_event_folder = self.plots_dir / f"session_{session_id}_event_{best_event.name}"
+            plots_event_folder.mkdir(exist_ok=True)
+            plot_file_base = plots_event_folder / f"probe_{probe_id}_csd_plot"
+            self.plot_csd_event(csd_data, time_axis, CSD_PLOT_DEPTH_RANGE, channel_depths_csd, event_info, 
+                              metadata, str(plot_file_base), clip_range=CSD_CLIP_RANGE)
+            processed_events.append({
+                'session_id': session_id,
+                'probe_id': probe_id,
+                'event_id': int(best_event.name),
+                'duration': duration,
+                'power_max_zscore': best_event.get('power_max_zscore', 0),
+                'peak_time': peak_time,
+                'csd_file': str(output_file),
+                'plot_files': [f"{plot_file_base}.png", f"{plot_file_base}.svg"],
+                'event_folder': str(event_folder),
+                'plots_folder': str(plots_event_folder)
+            })
         return processed_events
     
     def find_best_sessions_and_events(self) -> List[dict]:
