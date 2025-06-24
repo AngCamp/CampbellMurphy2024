@@ -44,7 +44,7 @@ class SWRExplorer:
     4. List available sessions and probes
     """
     
-    def __init__(self, base_path=None, allensdk_cache_dir="/space/scratch/allen_visbehave_data", verbose_debugging=False):
+    def __init__(self, base_path=None, allensdk_cache_dir="yourpath/allen_visbehave_data", verbose_debugging=False):
         """
         Initialize the SWRExplorer.
         

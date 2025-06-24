@@ -72,8 +72,8 @@ def process_all_datasets(base_path):
     return total_stats
 
 # Process the data
-#base_path = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_swr_data"
-base_path = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_v2_final"
+#base_path = "yourpath/SWR_final_pipeline/osf_campbellmurphy2025_swr_data"
+base_path = "yourpath/SWR_final_pipeline/osf_campbellmurphy2025_v2_final"
 stats = process_all_datasets(base_path)
 
 # Format numbers for display

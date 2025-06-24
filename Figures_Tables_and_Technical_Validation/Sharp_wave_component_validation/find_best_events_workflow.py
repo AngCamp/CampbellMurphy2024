@@ -10,7 +10,7 @@ os.environ["PYTHONDONTWRITEBYTECODE"] = "1" # prevent pychace from being written
 
 # Path to sharp wave filter(s)
 # Main filter used for Allen/IBL Neuropixels LFP (1500 Hz):
-filter_path = "/home/acampbell/NeuropixelsLFPOnRamp/SWR_Neuropixels_Detector/Filters/sharpwave_componenet_8to40band_1500hz_band.npz"
+filter_path = "yourpath/NeuropixelsLFPOnRamp/SWR_Neuropixels_Detector/Filters/sharpwave_componenet_8to40band_1500hz_band.npz"
 envelope_mode = 'zscore'  # Options: 'zscore' or 'raw'
 info_on = False
 file_type = 'svg'
@@ -22,7 +22,7 @@ def find_top_events(explorer, min_sw_power=1.5, min_duration=0.08, max_duration=
     Find the top events across all datasets that meet the specified criteria, filtering by speed only for the top events as needed.
     """
     cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(
-        cache_dir="/space/scratch/allen_visbehave_data"
+        cache_dir="yourpath/allen_visbehave_data"
     )
     
     all_candidates = []
@@ -168,7 +168,7 @@ def plot_and_save_events(explorer, events_df, output_dir):
 
 def main():
     # Initialize the explorer with explicit base path
-    base_path = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_swr_data"
+    base_path = "yourpath/SWR_final_pipeline/osf_campbellmurphy2025_swr_data"
     explorer = SWRExplorer(base_path=base_path)
     
     # Find top events

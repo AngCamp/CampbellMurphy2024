@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Simplified Probe Selection Validation Visualization Script
+Probe Selection Validation Visualization Script
 
 This script analyzes channel selection metadata from Neuropixels probes
-and creates simplified visualization plots showing only net ripple power 
-and net sharp wave power as a function of depth relative to selected channels.
+and creates visualization plots showing ripple band and sharp wave features
+as a function of depth relative to selected channels.
 """
 
 import os
@@ -15,12 +15,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib as mpl
 from scipy import stats
 from collections import defaultdict
 import warnings
 warnings.filterwarnings('ignore')
-mpl.rcParams['svg.fonttype'] = 'none' # Ensure SVG text stays as editable text, not paths
+
 # =============================================================================
 # CONFIGURATION CONTROL
 # =============================================================================
@@ -38,11 +37,11 @@ if USE_ENV_VARS:
     RUN_NAME = os.environ.get('RUN_NAME', 'default_run')
 else:
     # Use hardcoded values - EDIT THESE SETTINGS
-    BASE_DIRECTORY = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_v2_final"  # CHANGE THIS
-    RUN_NAME = "channel_selection_plots_figure_5b_and_c"  # CHANGE THIS
+    BASE_DIRECTORY = "yourpath/SWR_final_pipeline/osf_campbellmurphy2025_swr_data_backup"  # CHANGE THIS
+    RUN_NAME = "supplemental_channel_selection_plots"  # CHANGE THIS
 
-# Rest of configuration...
-MIN_PROBE_COUNT = 10  # Require 10 channels minimum
+# Rest of your existing configuration...
+MIN_PROBE_COUNT = 3
 
 DATASETS = [
     'allen_visbehave_swr_murphylab2024',
@@ -50,30 +49,38 @@ DATASETS = [
     'ibl_swr_murphylab2024'
 ]
 
-OUTPUT_FORMATS = ['svg', 'png']  # Include SVG for font size control
+OUTPUT_FORMATS = ['png', 'svg']
 DEPTH_BIN_SIZE = 20
+FIGURE_SIZE = (15, 10)
 DPI = 300
 
 # =============================================================================
-# DEPTH LIMIT CONFIGURATION
+# NEW DEPTH LIMIT CONFIGURATION
 # =============================================================================
 
-# Enable depth limits
+# Enable/disable depth limits
 USE_DEPTH_LIMITS = True
 
-# Depth limits in micrometers (corrected as requested)
-RIPPLE_DEPTH_LIMIT_UP = 500     # Maximum depth above selected channel for ripple
-RIPPLE_DEPTH_LIMIT_DOWN = 500   # Maximum depth below selected channel for ripple
-SHARP_WAVE_DEPTH_LIMIT = 500    # Maximum depth below ripple channel (only negative)
+# Depth limits in micrometers (relative to selected channel)
+# For ripple features: both positive and negative directions from selected channel
+RIPPLE_DEPTH_LIMIT_UP = 1000    # Maximum depth above selected channel (positive values)
+RIPPLE_DEPTH_LIMIT_DOWN = 1000  # Maximum depth below selected channel (negative values, will be checked as absolute value)
 
-# Bar thickness for plots
-BAR_HEIGHT = DEPTH_BIN_SIZE * 0.8
+# For sharp wave features: typically only below the ripple channel (negative values)
+SHARP_WAVE_DEPTH_LIMIT = 800    # Maximum depth below ripple channel (negative values, will be checked as absolute value)
 
-# Plot formatting
-FONT_SIZE = 8
-RIPPLE_Y_AXIS_LIMITS = [-500, 500]  # Ripple plot: full range (both positive/negative)
-SW_Y_AXIS_LIMITS = [-500, -DEPTH_BIN_SIZE]        # Sharp wave plot: only negative values (below ripple)
-Y_TICK_INTERVAL = 250  # Axis ticks every 250 μm
+# Bar thickness for plots (in units of the y-axis, i.e., micrometers)
+BAR_HEIGHT = DEPTH_BIN_SIZE * 0.8  # Make bars slightly smaller than bin size to show gaps
+
+# =============================================================================
+# CHANNEL SMOOTHING CONFIGURATION
+# =============================================================================
+
+# Enable/disable anatomical channel smoothing (applied before z-scoring)
+USE_CHANNEL_SMOOTHING = False
+
+# Smoothing parameter (sigma in micrometers for Gaussian kernel)
+CHANNEL_SMOOTHING_SIGMA = 50.0
 
 # =============================================================================
 # DATA LOADING AND PROCESSING FUNCTIONS
@@ -167,6 +174,7 @@ def process_ripple_data(metadata_files):
             # Find the depth of the selected channel
             channel_ids = ripple_band['channel_ids']
             depths = ripple_band['depths']
+            skewness = ripple_band['skewness']
             net_power = ripple_band['net_power']
             
             if selected_channel_id not in channel_ids:
@@ -178,6 +186,7 @@ def process_ripple_data(metadata_files):
             
             # Calculate relative depths and z-score within probe
             relative_depths = [d - selected_depth for d in depths]
+            z_skewness = stats.zscore(skewness)
             z_net_power = stats.zscore(net_power)
             
             # Apply depth filter if enabled
@@ -186,10 +195,11 @@ def process_ripple_data(metadata_files):
             depth_filtered_count += np.sum(~depth_mask)
             
             # Bin and collect data for channels that pass depth filter
-            for i, (rel_depth, z_power) in enumerate(zip(relative_depths, z_net_power)):
+            for i, (rel_depth, z_skew, z_power) in enumerate(zip(relative_depths, z_skewness, z_net_power)):
                 if depth_mask[i]:  # Only include if passes depth filter
                     binned_depth = bin_depth(rel_depth)
                     ripple_data[binned_depth].append({
+                        'skewness': z_skew,
                         'net_power': z_power,
                         'probe_info': f"{file_info['dataset']}/{file_info['session_id']}/{file_info['probe_id']}"
                     })
@@ -207,7 +217,11 @@ def process_ripple_data(metadata_files):
 def process_sharp_wave_data(metadata_files):
     """Process sharp wave band data from all metadata files."""
     sw_data = defaultdict(list)
-    sw_selections = []  # Track selected channel depths for Net SW Power within 500μm
+    sw_selections = {
+        'net_sw_power': [],
+        'modulation_index': [], 
+        'circular_linear_corr': []
+    }  # Track selected channel depths for each metric
     processed_probes = []
     skipped_probes = []
     depth_filtered_count = 0
@@ -237,16 +251,35 @@ def process_sharp_wave_data(metadata_files):
             
             # Process sharp wave data
             sw_depths = sharp_wave_band['depths']
-            sw_net_power = sharp_wave_band['modulation_index'] #'net_sw_power', 'modulation_index', or 'circular_linear_corr'
+            sw_net_power = sharp_wave_band['net_sw_power']
+            sw_mod_index = sharp_wave_band['modulation_index']
+            sw_corr = sharp_wave_band['circular_linear_corrs']
+            
+            # Get selected sharp wave channel info if available
+            selected_sw_channel_id = sharp_wave_band.get('selected_channel_id', None)
+            selected_sw_depth = None
+            if selected_sw_channel_id is not None:
+                sw_channel_ids = sharp_wave_band.get('channel_ids', [])
+                if selected_sw_channel_id in sw_channel_ids:
+                    selected_idx = sw_channel_ids.index(selected_sw_channel_id)
+                    selected_sw_depth = sw_depths[selected_idx] - ripple_depth  # Relative to ripple
             
             # Calculate relative depths
             relative_depths = [d - ripple_depth for d in sw_depths]
             
-            # Z-score within probe
+            # Apply anatomical smoothing if enabled (before z-scoring)
+            if USE_CHANNEL_SMOOTHING:
+                sw_net_power = anatomical_smooth_values(sw_net_power, sw_depths, CHANNEL_SMOOTHING_SIGMA)
+                sw_mod_index = anatomical_smooth_values(sw_mod_index, sw_depths, CHANNEL_SMOOTHING_SIGMA)
+                sw_corr = anatomical_smooth_values(sw_corr, sw_depths, CHANNEL_SMOOTHING_SIGMA)
+            
+            # Z-score within probe (after smoothing if enabled)
             z_net_power = stats.zscore(sw_net_power)
+            z_mod_index = stats.zscore(sw_mod_index)
+            z_corr = stats.zscore(sw_corr)
             
             # Apply depth filter using absolute values (accept both positive and negative relative depths)
-            for i, (rel_depth, z_power) in enumerate(zip(relative_depths, z_net_power)):
+            for i, (rel_depth, z_power, z_mod, z_cor) in enumerate(zip(relative_depths, z_net_power, z_mod_index, z_corr)):
                 # Apply depth limit filter using absolute value
                 if USE_DEPTH_LIMITS and abs(rel_depth) > SHARP_WAVE_DEPTH_LIMIT:
                     depth_filtered_count += 1
@@ -256,45 +289,54 @@ def process_sharp_wave_data(metadata_files):
                 binned_depth = bin_depth(rel_depth)
                 sw_data[binned_depth].append({
                     'net_sw_power': z_power,
+                    'modulation_index': z_mod,
+                    'circular_linear_corr': z_cor,
                     'probe_info': f"{file_info['dataset']}/{file_info['session_id']}/{file_info['probe_id']}"
                 })
             
-            # Modified selection: find channel with highest net SW power within 500μm of ripple channel
+            # Simulate selections for each metric (find channel with highest z-scored value)
             probe_info = f"{file_info['dataset']}/{file_info['session_id']}/{file_info['probe_id']}"
             
-            # Filter channels within 500μm of ripple channel
-            within_500um_mask = [abs(rel_depth) <= 500 for rel_depth in relative_depths]
-            if any(within_500um_mask):
-                # Get z-scored powers for channels within 500μm
-                filtered_powers = [z_net_power[i] for i, mask in enumerate(within_500um_mask) if mask]
-                filtered_depths = [relative_depths[i] for i, mask in enumerate(within_500um_mask) if mask]
-                
-                # Find the channel with highest power within this subset
-                max_power_idx = np.argmax(filtered_powers)
-                selected_depth = filtered_depths[max_power_idx]
-                
-                sw_selections.append({
-                    'depth': selected_depth,
-                    'probe_info': probe_info
-                })
+            # For net_sw_power: select channel with highest z-scored net SW power
+            max_power_idx = np.argmax(z_net_power)
+            selected_power_depth = relative_depths[max_power_idx]
+            sw_selections['net_sw_power'].append({
+                'depth': selected_power_depth,
+                'probe_info': probe_info
+            })
+            
+            # For modulation_index: select channel with highest z-scored modulation index
+            max_mod_idx = np.argmax(z_mod_index)
+            selected_mod_depth = relative_depths[max_mod_idx]
+            sw_selections['modulation_index'].append({
+                'depth': selected_mod_depth,
+                'probe_info': probe_info
+            })
+            
+            # For circular_linear_corr: select channel with highest z-scored correlation
+            max_corr_idx = np.argmax(z_corr)
+            selected_corr_depth = relative_depths[max_corr_idx]
+            sw_selections['circular_linear_corr'].append({
+                'depth': selected_corr_depth,
+                'probe_info': probe_info
+            })
             
             processed_probes.append(f"{file_info['dataset']}/{file_info['session_id']}/{file_info['probe_id']}")
             
         except Exception as e:
             skipped_probes.append(f"{file_info['dataset']}/{file_info['session_id']}/{file_info['probe_id']} - {str(e)}")
     
+    # Report filtering results
     if USE_DEPTH_LIMITS and depth_filtered_count > 0:
         print(f"Sharp wave data: Filtered out {depth_filtered_count} channels due to depth limits (>{SHARP_WAVE_DEPTH_LIMIT} μm from ripple channel)")
     
-    # Debug: Print some stats about what data we collected
+    # Debug: Show final data summary
     if sw_data:
-        all_depths = list(sw_data.keys())
-        print(f"DEBUG: Sharp wave raw data collected at {len(all_depths)} depth bins")
-        print(f"DEBUG: Depth range: {min(all_depths)} to {max(all_depths)} μm")
-        total_channels = sum(len(values) for values in sw_data.values())
-        print(f"DEBUG: Total channels collected: {total_channels}")
+        all_sw_depths = list(sw_data.keys())
+        print(f"Sharp wave data depth range: {min(all_sw_depths)} to {max(all_sw_depths)} μm")
+        print(f"Total depth bins collected: {len(all_sw_depths)}")
     else:
-        print(f"DEBUG: No sharp wave data collected at all!")
+        print(f"WARNING: No sharp wave data collected!")
     
     return sw_data, sw_selections, processed_probes, skipped_probes
 
@@ -319,195 +361,263 @@ def calculate_mean_values(data_dict):
                     means[depth][key] = np.mean([v[key] for v in values])
     return means
 
+def anatomical_smooth_values(raw_values, channel_depths, sigma=CHANNEL_SMOOTHING_SIGMA):
+    """
+    Apply anatomical smoothing using Gaussian weights based on channel depth distances.
+    
+    Parameters:
+    - raw_values: Array of raw feature values for each channel
+    - channel_depths: Array of depth positions for each channel (in micrometers)
+    - sigma: Standard deviation of Gaussian kernel (in micrometers)
+    
+    Returns:
+    - smoothed_values: Array of smoothed feature values
+    """
+    raw_values = np.array(raw_values)
+    channel_depths = np.array(channel_depths)
+    smoothed_values = np.zeros_like(raw_values)
+    
+    for i in range(len(raw_values)):
+        # Calculate anatomical distances from current channel
+        anatomical_distances = np.abs(channel_depths - channel_depths[i])
+        
+        # Calculate Gaussian weights
+        weights = np.exp(-anatomical_distances**2 / (2 * sigma**2))
+        
+        # Apply weighted averaging
+        smoothed_values[i] = np.sum(weights * raw_values) / np.sum(weights)
+    
+    return smoothed_values
+
 # =============================================================================
 # PLOTTING FUNCTIONS
 # =============================================================================
 
-def plot_ripple_power(ripple_means, output_dir):
-    """Create ripple band power plot."""
-    
-    # Set matplotlib font size globally for SVG output
-    plt.rcParams.update({
-        'font.size': FONT_SIZE,
-        'svg.fonttype': 'none'  # Ensure SVG text stays as editable text, not paths
-    })
-    
-    # Create figure for ripple plot (wider format)
-    fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-    
-    # Plot ripple data if available
-    if ripple_means:
-        # Multiply depths by -1 for anatomical orientation (deeper = more negative)
-        depths = sorted([-d for d in ripple_means.keys()])  # Convert to negative and sort
-        net_power_values = [ripple_means[-d]['net_power'] for d in depths]  # Use original keys
+def plot_ripple_features(ripple_means, output_dir):
+    """Create ripple band feature plots."""
+    if not ripple_means:
+        print("No ripple data to plot")
+        return
         
-        # Create ripple plot with black bars
-        ax.barh(depths, net_power_values, height=BAR_HEIGHT, 
-                color='black', alpha=0.7, edgecolor='black', linewidth=0.5)
-        ax.axhline(y=0, color='red', linestyle='--', alpha=0.7, linewidth=1)
-        ax.set_xlabel('Z-scored Net Power', fontsize=FONT_SIZE)
-        ax.set_ylabel('Depth Relative to Selected Channel (μm)', fontsize=FONT_SIZE)
-        ax.set_title('Ripple Band Power (150-250Hz)', fontsize=FONT_SIZE, fontweight='bold')
-        ax.grid(True, alpha=0.3)
-        ax.invert_yaxis()  # Invert y-axis for anatomical orientation
-        
-        # Set y-axis limits and ticks
-        ax.set_ylim(RIPPLE_Y_AXIS_LIMITS)
-        ax.set_yticks(range(RIPPLE_Y_AXIS_LIMITS[0], RIPPLE_Y_AXIS_LIMITS[1] + 1, Y_TICK_INTERVAL))
-        ax.tick_params(axis='both', labelsize=FONT_SIZE)
-        
-        # Add selected channel reference
-        ax.text(0.02, 0.98, 'Selected Channel', transform=ax.transAxes, 
-                verticalalignment='top', fontsize=FONT_SIZE, color='red')
-    else:
-        ax.text(0.5, 0.5, 'No Ripple Data', transform=ax.transAxes, 
-                ha='center', va='center', fontsize=FONT_SIZE)
-        ax.set_title('Ripple Band Power (150-250Hz)', fontsize=FONT_SIZE, fontweight='bold')
-        ax.set_ylim(RIPPLE_Y_AXIS_LIMITS)
-        ax.set_yticks(range(RIPPLE_Y_AXIS_LIMITS[0], RIPPLE_Y_AXIS_LIMITS[1] + 1, Y_TICK_INTERVAL))
-        ax.tick_params(axis='both', labelsize=FONT_SIZE)
-        ax.set_xlabel('Z-scored Net Power', fontsize=FONT_SIZE)
-        ax.set_ylabel('Depth Relative to Selected Channel (μm)', fontsize=FONT_SIZE)
-        ax.grid(True, alpha=0.3)
+    # Multiply depths by -1 for anatomical orientation (deeper = more negative)
+    depths = sorted([-d for d in ripple_means.keys()])  # Convert to negative and sort
+    skewness_values = [ripple_means[-d]['skewness'] for d in depths]  # Use original keys
+    net_power_values = [ripple_means[-d]['net_power'] for d in depths]  # Use original keys
     
-    # Adjust layout
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=FIGURE_SIZE, sharey=True)
+    
+    # Skewness plot
+    ax1.barh(depths, skewness_values, height=BAR_HEIGHT, color='steelblue', alpha=0.7)
+    ax1.axhline(y=0, color='red', linestyle='--', alpha=0.7, linewidth=1)
+    ax1.set_xlabel('Z-scored Skewness')
+    ax1.set_ylabel('Depth Relative to Selected Channel (μm)')
+    ax1.set_title('Skewness')
+    ax1.grid(True, alpha=0.3)
+    ax1.invert_yaxis()
+    
+    # Net Power plot
+    ax2.barh(depths, net_power_values, height=BAR_HEIGHT, color='coral', alpha=0.7)
+    ax2.axhline(y=0, color='red', linestyle='--', alpha=0.7, linewidth=1)
+    ax2.set_xlabel('Z-scored Net Power')
+    ax2.set_title('Net Ripple Power')
+    ax2.grid(True, alpha=0.3)
+    ax2.invert_yaxis()
+    
+    # Add selected channel line label
+    ax1.text(0.02, 0.98, 'Selected Channel', transform=ax1.transAxes, 
+             verticalalignment='top', fontsize=10, color='red')
+    ax2.text(0.02, 0.98, 'Selected Channel', transform=ax2.transAxes, 
+             verticalalignment='top', fontsize=10, color='red')
+    
+    # Add depth limit info to title if enabled
+    title = 'Mean Z-scored Ripple Features by Depth (Relative to Selected Channel)'
+    if USE_DEPTH_LIMITS:
+        title += f'\nDepth limits: ±{RIPPLE_DEPTH_LIMIT_UP}/{RIPPLE_DEPTH_LIMIT_DOWN} μm'
+    plt.suptitle(title, fontsize=14, y=0.95)
     plt.tight_layout()
     
     # Save in specified formats
     for fmt in OUTPUT_FORMATS:
-        output_file = os.path.join(output_dir, f'ripple_band_power.{fmt}')
+        output_file = os.path.join(output_dir, f'ripple_features_by_depth.{fmt}')
         plt.savefig(output_file, format=fmt, dpi=DPI, bbox_inches='tight')
-        print(f"Saved ripple band power plot: {output_file}")
+        print(f"Saved ripple plot: {output_file}")
     
     plt.show()
-    plt.close()
 
-def plot_sharp_wave_power(sw_means, output_dir):
-    """Create sharp wave power plot."""
+def plot_sharp_wave_features(sw_means, output_dir):
+    """Create sharp wave feature plots."""
+    print(f"Sharp wave plotting: {len(sw_means)} depth bins available")
     
-    # Set matplotlib font size globally for SVG output
-    plt.rcParams.update({
-        'font.size': FONT_SIZE,
-        'svg.fonttype': 'none'  # Ensure SVG text stays as editable text, not paths
-    })
+    if not sw_means:
+        print("No sharp wave data to plot")
+        return
     
-    # Create figure for sharp wave plot (narrower format)
-    fig, ax = plt.subplots(1, 1, figsize=(4, 6))
+    # Multiply depths by -1 for anatomical orientation (deeper = more negative)
+    original_depths = list(sw_means.keys())
+    depths = sorted([-d for d in original_depths])  # Convert to negative and sort
+    print(f"Sharp wave depth range: {min(depths)} to {max(depths)} μm relative to ripple channel")
     
-    # Plot sharp wave data if available
-    if sw_means:
-        # Multiply depths by -1 for anatomical orientation (deeper = more negative)
-        depths = sorted([-d for d in sw_means.keys()])  # Convert to negative and sort
+    try:
         net_power_values = [sw_means[-d]['net_sw_power'] for d in depths]  # Use original keys
+        mod_index_values = [sw_means[-d]['modulation_index'] for d in depths]  # Use original keys  
+        corr_values = [sw_means[-d]['circular_linear_corr'] for d in depths]  # Use original keys
         
-        # Create sharp wave plot with blue bars
-        ax.barh(depths, net_power_values, height=BAR_HEIGHT, 
-                color='blue', alpha=0.7, edgecolor='blue', linewidth=0.5)
-        ax.axhline(y=0, color='red', linestyle='--', alpha=0.7, linewidth=1)
-        ax.set_xlabel('Z-scored Net Power', fontsize=FONT_SIZE)
-        ax.set_ylabel('Depth Relative to Ripple Channel (μm)', fontsize=FONT_SIZE)
-        #ax.set_title('Concurrent SW Band Power (8-40Hz)', fontsize=FONT_SIZE, fontweight='bold')
-        ax.set_title('Modulation Index (SW to Ripple)', fontsize=FONT_SIZE, fontweight='bold')
-        ax.grid(True, alpha=0.3)
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 8), sharey=True)
         
-        # Set y-axis limits and ticks
-        ax.set_ylim(SW_Y_AXIS_LIMITS)
-        ax.set_yticks(range(SW_Y_AXIS_LIMITS[0], SW_Y_AXIS_LIMITS[1] + 1, Y_TICK_INTERVAL))
-        ax.tick_params(axis='both', labelsize=FONT_SIZE)
+        # Net SW Power plot
+        ax1.barh(depths, net_power_values, height=BAR_HEIGHT, color='darkgreen', alpha=0.7)
+        ax1.set_xlabel('Z-scored Net SW Power')
+        ax1.set_ylabel('Depth Relative to Selected Channel (μm)')
+        ax1.set_title('Net SW Power')
+        ax1.grid(True, alpha=0.3)
         
-    else:
-        ax.text(0.5, 0.5, 'No Sharp Wave Data', transform=ax.transAxes, 
-                ha='center', va='center', fontsize=FONT_SIZE)
-        ax.set_title('Concurrent SW Band Power (8-40Hz)', fontsize=FONT_SIZE, fontweight='bold')
-        ax.set_ylim(SW_Y_AXIS_LIMITS)
-        ax.set_yticks(range(SW_Y_AXIS_LIMITS[0], SW_Y_AXIS_LIMITS[1] + 1, Y_TICK_INTERVAL))
-        ax.tick_params(axis='both', labelsize=FONT_SIZE)
-    
-    # Adjust layout
-    plt.tight_layout()
-    
-    # Save in specified formats
-    for fmt in OUTPUT_FORMATS:
-        output_file = os.path.join(output_dir, f'sharp_wave_band_power.{fmt}')
-        plt.savefig(output_file, format=fmt, dpi=DPI, bbox_inches='tight')
-        print(f"Saved sharp wave band power plot: {output_file}")
-    
-    plt.show()
-    plt.close()
+        # Modulation Index plot
+        ax2.barh(depths, mod_index_values, height=BAR_HEIGHT, color='purple', alpha=0.7)
+        ax2.set_xlabel('Z-scored Modulation Index')
+        ax2.set_title('Modulation Index')
+        ax2.grid(True, alpha=0.3)
+        
+        # Circular-Linear Correlation plot
+        ax3.barh(depths, corr_values, height=BAR_HEIGHT, color='orange', alpha=0.7)
+        ax3.set_xlabel('Z-scored Circular-Linear Correlation')
+        ax3.set_title('Circular-Linear Correlation')
+        ax3.grid(True, alpha=0.3)
+        
+        # Add a reference line at y=0 to show the ripple channel
+        for ax in [ax1, ax2, ax3]:
+            ax.axhline(y=0, color='red', linestyle='--', alpha=0.7, linewidth=1)
+        
+        # Add reference line labels
+        ax1.text(0.02, 0.98, 'Ripple Channel (Reference)', transform=ax1.transAxes, 
+                 verticalalignment='top', fontsize=10, color='red')
+        
+        # Add depth limit info to title if enabled
+        title = 'Mean Z-scored Sharp Wave Features by Depth (Relative to Selected Ripple Channel)'
+        if USE_DEPTH_LIMITS:
+            title += f'\nDepth limit: ±{SHARP_WAVE_DEPTH_LIMIT} μm from ripple channel'
+        plt.suptitle(title, fontsize=14, y=0.95)
+        plt.tight_layout()
+        
+        # Save in specified formats
+        for fmt in OUTPUT_FORMATS:
+            output_file = os.path.join(output_dir, f'sharp_wave_features_by_depth.{fmt}')
+            plt.savefig(output_file, format=fmt, dpi=DPI, bbox_inches='tight')
+            print(f"Saved sharp wave plot: {output_file}")
+        
+        plt.show()
+        print(f"Sharp wave plot completed successfully")
+        
+    except Exception as e:
+        print(f"Error during sharp wave plotting: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
 
-def plot_sharp_wave_selection(sw_selections, output_dir):
-    """Create histogram showing selected sharp wave channel depths (modified selection within 500μm)."""
+def plot_sharp_wave_selections(sw_selections, output_dir):
+    """Create histograms showing selected sharp wave channel depths for each metric."""
+    print(f"Sharp wave selection plotting for 3 metrics...")
     
-    # Set matplotlib font size globally for SVG output
-    plt.rcParams.update({
-        'font.size': FONT_SIZE,
-        'svg.fonttype': 'none'  # Ensure SVG text stays as editable text, not paths
-    })
+    if not sw_selections or not any(sw_selections.values()):
+        print("No sharp wave selection data to plot")
+        return
     
-    # Create figure for sharp wave selection plot (half width of ripple plot)
-    fig, ax = plt.subplots(1, 1, figsize=(4, 6))
+    # Define colors and titles for each metric
+    metric_info = {
+        'net_sw_power': {'color': 'darkgreen', 'title': 'Net SW Power'},
+        'modulation_index': {'color': 'purple', 'title': 'Modulation Index'},
+        'circular_linear_corr': {'color': 'orange', 'title': 'Circular-Linear Correlation'}
+    }
     
-    if not sw_selections:
-        ax.text(0.5, 0.5, 'No Sharp Wave Selection Data', transform=ax.transAxes, 
-                ha='center', va='center', fontsize=FONT_SIZE)
-        ax.set_title('Concurrent SW Band Power (8-40Hz)', fontsize=FONT_SIZE, fontweight='bold')
-        ax.set_ylim(SW_Y_AXIS_LIMITS)
-        ax.set_yticks(range(SW_Y_AXIS_LIMITS[0], SW_Y_AXIS_LIMITS[1] + 1, Y_TICK_INTERVAL))
-        ax.tick_params(axis='both', labelsize=FONT_SIZE)
-        ax.set_xlabel('Number of Selected Channels', fontsize=FONT_SIZE)
-        ax.set_ylabel('Depth Relative to Ripple Channel (μm)', fontsize=FONT_SIZE)
-        ax.grid(True, alpha=0.3)
-    else:
+    # Create figure with three subplots
+    fig, axes = plt.subplots(1, 3, figsize=(18, 10), sharey=True)
+    
+    for i, (metric, info) in enumerate(metric_info.items()):
+        ax = axes[i]
+        selections = sw_selections[metric]
+        
+        if not selections:
+            ax.text(0.5, 0.5, 'No Data', transform=ax.transAxes, 
+                   ha='center', va='center', fontsize=16)
+            ax.set_title(info['title'])
+            continue
+        
         # Extract depths and bin them
-        depths = [sel['depth'] for sel in sw_selections]
+        depths = [sel['depth'] for sel in selections]
         binned_depths = [bin_depth(d) for d in depths]
         
         # Count frequency of each binned depth
         from collections import Counter
         depth_counts = Counter(binned_depths)
         
-        if depth_counts:
-            # Convert to sorted lists for plotting (anatomical orientation)
-            original_depths = list(depth_counts.keys())
-            plot_depths = sorted([-d for d in original_depths])  # Convert to negative and sort
-            counts = [depth_counts[-d] for d in plot_depths]  # Use original keys for counts
-            
-            # Create horizontal bar chart
-            ax.barh(plot_depths, counts, height=BAR_HEIGHT, 
-                    color='blue', alpha=0.7, edgecolor='blue', linewidth=0.5)
-            
-            # Add reference line at y=0 to show the ripple channel
-            ax.axhline(y=0, color='red', linestyle='--', alpha=0.7, linewidth=1)
+        if not depth_counts:
+            ax.text(0.5, 0.5, 'No Depth Counts', transform=ax.transAxes, 
+                   ha='center', va='center', fontsize=16)
+            ax.set_title(info['title'])
+            continue
+        
+        # Convert to sorted lists for plotting (anatomical orientation)
+        original_depths = list(depth_counts.keys())
+        plot_depths = sorted([-d for d in original_depths])  # Convert to negative and sort
+        counts = [depth_counts[-d] for d in plot_depths]  # Use original keys for counts
+        
+        # Create horizontal bar chart
+        bars = ax.barh(plot_depths, counts, height=BAR_HEIGHT, 
+                      color=info['color'], alpha=0.7, edgecolor='black', linewidth=0.5)
+        
+        # Add reference line at y=0 to show the ripple channel
+        ax.axhline(y=0, color='red', linestyle='--', alpha=0.7, linewidth=2)
         
         # Formatting
-        ax.set_xlabel('Number of Selected Channels', fontsize=FONT_SIZE)
-        ax.set_ylabel('Depth Relative to Ripple Channel (μm)', fontsize=FONT_SIZE)
-        ax.set_title('Sharp Wave Channel Selection', fontsize=FONT_SIZE, fontweight='bold')
+        ax.set_xlabel('Number of Selected Channels')
+        if i == 0:  # Only add ylabel to leftmost plot
+            ax.set_ylabel('Depth Relative to Ripple Channel (μm)')
+        ax.set_title(info['title'])
         ax.grid(True, alpha=0.3, axis='x')
         
-        # Set y-axis limits and ticks
-        ax.set_ylim(SW_Y_AXIS_LIMITS)
-        ax.set_yticks(range(SW_Y_AXIS_LIMITS[0], SW_Y_AXIS_LIMITS[1] + 1, Y_TICK_INTERVAL))
-        ax.tick_params(axis='both', labelsize=FONT_SIZE)
+        # Add reference line label
+        ax.text(0.02, 0.98, 'Ripple Channel', transform=ax.transAxes, 
+                 verticalalignment='top', fontsize=9, color='red', fontweight='bold')
+        
+        # Add statistics
+        total_selections = len(selections)
+        depth_range = max(plot_depths) - min(plot_depths) if len(plot_depths) > 1 else 0
+        median_depth = np.median(depths)
+        
+        stats_text = f'N: {total_selections}\n'
+        stats_text += f'Range: {depth_range:.0f} μm\n'
+        stats_text += f'Median: {median_depth:.0f} μm'
+        
+        ax.text(0.98, 0.02, stats_text, transform=ax.transAxes, 
+                verticalalignment='bottom', horizontalalignment='right', 
+                fontsize=8, bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.7))
+        
+        print(f"{info['title']}: {len(plot_depths)} depth bins, median = {median_depth:.0f} μm")
     
-    # Adjust layout
+    # Add overall title
+    title = 'Sharp Wave Channel Selection by Metric\n(Channels with Highest Z-scored Values)'
+    if USE_DEPTH_LIMITS:
+        title += f'\nDepth limit: ±{SHARP_WAVE_DEPTH_LIMIT} μm from ripple channel'
+    if USE_CHANNEL_SMOOTHING:
+        title += f' | Smoothing: σ={CHANNEL_SMOOTHING_SIGMA} μm'
+    
+    plt.suptitle(title, fontsize=14, y=0.95)
     plt.tight_layout()
     
     # Save in specified formats
     for fmt in OUTPUT_FORMATS:
-        output_file = os.path.join(output_dir, f'concurrent_sw_band_selection.{fmt}')
+        output_file = os.path.join(output_dir, f'sharp_wave_selection_by_metric.{fmt}')
         plt.savefig(output_file, format=fmt, dpi=DPI, bbox_inches='tight')
-        print(f"Saved concurrent SW band selection plot: {output_file}")
+        print(f"Saved selection by metric plot: {output_file}")
     
     plt.show()
-    plt.close()
+    print(f"Sharp wave selection by metric plots completed successfully")
 
 # =============================================================================
 # MAIN EXECUTION FUNCTION
 # =============================================================================
 
 def main(base_directory, output_directory=None, run_name=None):
-    """Main function to run the simplified analysis."""
+    """Main function to run the analysis."""
     
     if output_directory is None:
         # Create timestamped run folder in current working directory
@@ -525,11 +635,23 @@ def main(base_directory, output_directory=None, run_name=None):
     print(f"Looking for datasets: {DATASETS}")
     print(f"Minimum probe count threshold: {MIN_PROBE_COUNT}")
     print(f"Output formats: {OUTPUT_FORMATS}")
-    print(f"Depth limits: ±{RIPPLE_DEPTH_LIMIT_UP}/{RIPPLE_DEPTH_LIMIT_DOWN} μm (ripple), ±{SHARP_WAVE_DEPTH_LIMIT} μm (sharp wave)")
-    print(f"Ripple Y-axis range: {RIPPLE_Y_AXIS_LIMITS[0]} to {RIPPLE_Y_AXIS_LIMITS[1]} μm")
-    print(f"Sharp wave Y-axis range: {SW_Y_AXIS_LIMITS[0]} to {SW_Y_AXIS_LIMITS[1]} μm")
-    print(f"Y-axis ticks every: {Y_TICK_INTERVAL} μm")
-    print(f"Font size: {FONT_SIZE}")
+    print(f"Depth bin size: {DEPTH_BIN_SIZE} μm")
+    print(f"Bar height: {BAR_HEIGHT} μm")
+    
+    # Print depth limit settings
+    if USE_DEPTH_LIMITS:
+        print(f"Depth limits enabled:")
+        print(f"  Ripple features: ±{RIPPLE_DEPTH_LIMIT_UP}/{RIPPLE_DEPTH_LIMIT_DOWN} μm from selected channel")
+        print(f"  Sharp wave features: {SHARP_WAVE_DEPTH_LIMIT} μm below ripple channel")
+    else:
+        print("Depth limits disabled")
+    
+    # Print channel smoothing settings
+    if USE_CHANNEL_SMOOTHING:
+        print(f"Channel smoothing enabled: σ = {CHANNEL_SMOOTHING_SIGMA} μm")
+    else:
+        print("Channel smoothing disabled")
+    
     print("-" * 60)
     
     # Find all metadata files
@@ -546,16 +668,15 @@ def main(base_directory, output_directory=None, run_name=None):
     
     print(f"Successfully processed {len(ripple_processed)} probes for ripple analysis")
     if ripple_skipped:
-        print(f"Skipped {len(ripple_skipped)} probes")
+        print(f"Skipped {len(ripple_skipped)} probes:")
+        for skipped in ripple_skipped:
+            print(f"  - {skipped}")
     
     # Filter and calculate means for ripple data
     ripple_filtered = filter_by_probe_count(ripple_data)
     ripple_means = calculate_mean_values(ripple_filtered)
     
     print(f"Ripple data: {len(ripple_data)} total depths, {len(ripple_filtered)} after filtering (≥{MIN_PROBE_COUNT} probes)")
-    if ripple_means:
-        ripple_depth_range = f"{min(ripple_means.keys())} to {max(ripple_means.keys())} μm"
-        print(f"Ripple depth range: {ripple_depth_range}")
     
     # Process sharp wave data
     print("\nProcessing sharp wave band data...")
@@ -563,24 +684,27 @@ def main(base_directory, output_directory=None, run_name=None):
     
     print(f"Successfully processed {len(sw_processed)} probes for sharp wave analysis")
     if sw_skipped:
-        print(f"Skipped {len(sw_skipped)} probes")
+        print(f"Skipped {len(sw_skipped)} probes:")
+        for skipped in sw_skipped:
+            print(f"  - {skipped}")
     
     # Filter and calculate means for sharp wave data
     sw_filtered = filter_by_probe_count(sw_data)
     sw_means = calculate_mean_values(sw_filtered)
     
     print(f"Sharp wave data: {len(sw_data)} total depths, {len(sw_filtered)} after filtering (≥{MIN_PROBE_COUNT} probes)")
+    
     if sw_means:
-        sw_depth_range = f"{min(sw_means.keys())} to {max(sw_means.keys())} μm"
-        print(f"Sharp wave depth range: {sw_depth_range}")
+        depth_range = f"{min(sw_means.keys())} to {max(sw_means.keys())} μm"
+        print(f"Sharp wave final data: {len(sw_means)} depth bins, range: {depth_range}")
     
-    # Create separate plots
-    print(f"\nGenerating separate plots in {output_directory}...")
-    plot_ripple_power(ripple_means, output_directory)
-    plot_sharp_wave_power(sw_means, output_directory)
-    plot_sharp_wave_selection(sw_selections, output_directory)
+    # Create plots
+    print(f"\nGenerating plots in {output_directory}...")
+    plot_ripple_features(ripple_means, output_directory)
+    plot_sharp_wave_features(sw_means, output_directory)
+    plot_sharp_wave_selections(sw_selections, output_directory)
     
-    print("\nSimplified analysis complete!")
+    print("\nAnalysis complete!")
 
 if __name__ == "__main__":
     import sys

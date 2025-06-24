@@ -11,13 +11,13 @@ from allensdk.brain_observatory.behavior.behavior_project_cache.\
     import VisualBehaviorNeuropixelsProjectCache
 
 # --- CONFIG ---
-CACHE_DIR = "/space/scratch/allen_visbehave_data"
-SWR_INPUT_DIR = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_v2_final"
+CACHE_DIR = "yourpath/allen_visbehave_data"
+SWR_INPUT_DIR = "yourpath/SWR_final_pipeline/osf_campbellmurphy2025_v2_final"
 DATASET_NAME = "allen_visbehave_swr_murphylab2024"
 SESSION_ID = 1047969464 #1104058216  # Example session
 WINDOW = 0.85  # seconds before and after transition
 MAX_PLOTS = 10
-OUTPUT_DIR = "/home/acampbell/NeuropixelsLFPOnRamp/Figures_and_Technical_Validation/Relating_SWR_to_other_data/swrs_pupils_and_running_results"
+OUTPUT_DIR = "yourpath/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/Relating_SWR_to_other_data/swrs_pupils_and_running_results"
 SWR_COUNT_THRESHOLD = 1  # Minimum number of SWRs in window to plot
 
 # --- Helper: Load and filter SWR events ---

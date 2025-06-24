@@ -27,16 +27,16 @@ from multiprocessing import Manager, Pool
 import glob
 import pickle
 
-output_dir = "/home/acampbell"
+output_dir = "yourpath"
 # os.chdir(output_dir)
 
 abi_ripples_path = (
-    "/space/scratch/allen_visbehave_swr_data/allen_visbehave_swr_murphylab2024"
+    "yourpath/allen_visbehave_swr_data/allen_visbehave_swr_murphylab2024"
 )
 abi_lfp_path = (
-    "/space/scratch/allen_visbehave_swr_data/allen_visbehave_swr_murphylab2024_lfp_data"
+    "yourpath/allen_visbehave_swr_data/allen_visbehave_swr_murphylab2024_lfp_data"
 )
-theta_filter_path = "/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/theta_1500hz_bandpass_filter.npz"
+theta_filter_path = "yourpath/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/theta_1500hz_bandpass_filter.npz"
 theta_filter = np.load(theta_filter_path)
 theta_filter = theta_filter["arr_0"]
 
@@ -67,7 +67,7 @@ def process_speed_and_theta(
         cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(
             cache_dir=output_dir
         )
-        sdk_cache_dir = "/space/scratch/allen_visbehave_data"
+        sdk_cache_dir = "yourpath/allen_visbehave_data"
         # Setting up the ABI Cache (where data is held, what is present or absent)
         manifest_path = os.path.join(sdk_cache_dir, "manifest.json")
 
@@ -211,14 +211,14 @@ def worker_function(
 
 if __name__ == "__main__":
     abi_ripples_path = (
-        "/space/scratch/allen_visbehave_swr_data/allen_visbehave_swr_murphylab2024"
+        "yourpath/allen_visbehave_swr_data/allen_visbehave_swr_murphylab2024"
     )
-    abi_lfp_path = "/space/scratch/allen_visbehave_swr_data/allen_visbehave_swr_murphylab2024_lfp_data"
-    theta_filter_path = "/home/acampbell/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/theta_1500hz_bandpass_filter.npz"
+    abi_lfp_path = "yourpath/allen_visbehave_swr_data/allen_visbehave_swr_murphylab2024_lfp_data"
+    theta_filter_path = "yourpath/NeuropixelsLFPOnRamp/PowerBandFilters/swr_detection_script_filters_1500Hz/theta_1500hz_bandpass_filter.npz"
     theta_filter = np.load(theta_filter_path)
     theta_filter = theta_filter["arr_0"]
 
-    sdk_cache_dir = "/space/scratch/allen_visbehave_data"
+    sdk_cache_dir = "yourpath/allen_visbehave_data"
     # Setting up the ABI Cache (where data is held, what is present or absent)
 
     sessionfolders = [

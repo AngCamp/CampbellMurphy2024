@@ -44,7 +44,7 @@ def count_swr_events_by_dataset(base_path):
 
 if __name__ == "__main__":
     # Use the same base path as the Sankey plot script
-    base_path = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_v2_final"
+    base_path = "yourpath/SWR_final_pipeline/osf_campbellmurphy2025_v2_final"
     
     try:
         dataset_counts = count_swr_events_by_dataset(base_path)

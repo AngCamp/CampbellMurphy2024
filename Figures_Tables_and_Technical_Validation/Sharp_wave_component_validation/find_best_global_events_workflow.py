@@ -10,8 +10,8 @@ from scipy.signal import fftconvolve, butter, filtfilt, hilbert, convolve
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1" # prevent pycache from being written
 
 # Path to sharp wave filter(s)
-filter_path = "/home/acampbell/NeuropixelsLFPOnRamp/SWR_Neuropixels_Detector/Filters/sharpwave_componenet_8to40band_1500hz_band.npz"
-output_dir = "/home/acampbell/NeuropixelsLFPOnRamp/Figures_and_Technical_Validation/Sharp_wave_component_validation/global_test"
+filter_path = "yourpath/NeuropixelsLFPOnRamp/SWR_Neuropixels_Detector/Filters/sharpwave_componenet_8to40band_1500hz_band.npz"
+output_dir = "yourpath/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/Sharp_wave_component_validation/global_test"
 file_exts = ['png', 'svg']  # List of file extensions to save
 window = 0.15  # seconds around middle-most peak
 
@@ -248,7 +248,7 @@ def plot_and_save_global_events(explorer, events_df, output_dir, file_exts=['png
 
 def main():
     # Initialize the explorer with explicit base path
-    base_path = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_v2_final"
+    base_path = "yourpath/SWR_final_pipeline/osf_campbellmurphy2025_v2_final"
     explorer = SWRExplorer(base_path=base_path)
     
     if collect_directional_stats:

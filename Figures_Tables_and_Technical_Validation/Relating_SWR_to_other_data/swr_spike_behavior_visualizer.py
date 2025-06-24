@@ -23,9 +23,9 @@ sys.path.append(parent_dir)
 from Sharp_wave_component_validation.SWRExplorer import SWRExplorer
 
 # Configuration Parameters
-CACHE_DIR = "/space/scratch/allen_visbehave_data"
-OUTPUT_DIR = "/home/acampbell/NeuropixelsLFPOnRamp/Figures_and_Technical_Validation/Relating_SWR_to_other_data/Results"
-SWR_INPUT_DIR = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_v2_final"
+CACHE_DIR = "yourpath/allen_visbehave_data"
+OUTPUT_DIR = "yourpath/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/Relating_SWR_to_other_data/Results"
+SWR_INPUT_DIR = "yourpath/SWR_final_pipeline/osf_campbellmurphy2025_v2_final"
 DATASET_NAME = "allen_visbehave_swr_murphylab2024"
 TARGET_REGIONS = ['CA1', 'DG', 'SUB']
 PER_REGION_UNIT_LIMITS_LIST = [30, 25, 10]  # Number of units per region, in the same order as TARGET_REGIONS

@@ -66,7 +66,7 @@ The code outputs the following set of files for each session.
 
 Contains the filters and a readme displaying the code used to create the filters for the SWR detection pipelines.  Uses environment for [mne package with core dependencies](https://mne.tools/stable/install/manual_install.html#installing-mne-python-with-core-dependencies).
 
-### Figures_and_Technical_Validation
+### Figures_Tables_and_Technical_Validation
 
 Contains scripts and workflows for generating publication figures and technical validation analyses. The subfolders contain automated pipelines that generate multiple visualizations for selection:
 

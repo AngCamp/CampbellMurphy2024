@@ -15,7 +15,7 @@ probe_id = "1094073091"    # Replace with your probe ID
 event_id = 829         # Index in the probe's event CSV (not global)
 image_type = 'svg'
 filter_path = os.path.join(
-    os.sep, "home", "acampbell", "NeuropixelsLFPOnRamp", "SWR_Neuropixels_Detector", "Filters", "sharpwave_componenet_8to40band_1500hz_band.npz"
+    os.sep, "home", "yourpath", "NeuropixelsLFPOnRamp", "SWR_Neuropixels_Detector", "Filters", "sharpwave_componenet_8to40band_1500hz_band.npz"
 )
 envelope_mode = 'zscore'  # Options: 'zscore' or 'raw'
 
@@ -29,12 +29,12 @@ make_one_plot = True # make one plot instead of one for each panel
 
 # Output path for SVG
 output_dir = os.path.join(
-    os.sep, "home", "acampbell", "NeuropixelsLFPOnRamp", "Figures_and_Technical_Validation", "Sharp_wave_component_validation"
+    os.sep, "yourpath", "NeuropixelsLFPOnRamp", "Figures_Tables_and_Technical_Validation", "Sharp_wave_component_validation"
 )
 
 # --- Main logic ---
 explorer = SWRExplorer(base_path=os.path.join(
-    os.sep, "space", "scratch", "SWR_final_pipeline", "osf_campbellmurphy2025_swr_data"
+    os.sep, "yourpath", "osf_campbellmurphy2025_swr_data"
 ))
 
 # Fetch the event (by CSV index)

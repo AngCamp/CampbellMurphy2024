@@ -33,7 +33,7 @@ VIOLATION_METRIC = 'modulation_index'
 # VIOLATION_METRIC = 'circular_linear_corr'
 
 # Data configuration (update these paths as needed)
-BASE_DIRECTORY = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_swr_data_backup"
+BASE_DIRECTORY = "yourpath/SWR_final_pipeline/osf_campbellmurphy2025_swr_data_backup"
 OUTPUT_DIR = "depth_threshold_analysis4"
 
 DATASETS = [

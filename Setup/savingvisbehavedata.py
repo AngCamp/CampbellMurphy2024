@@ -18,7 +18,7 @@ from allensdk.brain_observatory.behavior.behavior_project_cache import (
 from multiprocessing import Manager
 
 # Set cache directory to your existing cache
-SDK_CACHE_DIR = '/space/scratch/allen_visbehave_data'
+SDK_CACHE_DIR = 'yourpath/allen_visbehave_data'
 pool_size = 10
 
 # Configure longer timeouts for boto3
