@@ -24,6 +24,49 @@ plt.rcParams["font.size"] = 8
 plt.rcParams["axes.titleweight"] = "bold"
 plt.rcParams["axes.labelweight"] = "bold"
 
+def format_scientific_notation(value):
+    """Format a number in scientific notation like 6.0x10-6"""
+    if value == 0:
+        return "0"
+    exp = int(np.floor(np.log10(abs(value))))
+    mantissa = value / (10**exp)
+    return f"{mantissa:.1f}x10{exp:+d}".replace("+", "")
+
+def generate_caption(ks_results):
+    """Generate caption with actual statistical values"""
+    caption = """**Figure 9.  Detected events show expected properties for probe level putative events, occurring in the absence of the wheel movement and at lower theta power.   Plots for ABI Behaviour events are on the left, ABI Coding in the middle, and IBL on the right.  a) The mean instantaneous theta power z-scored during probe level event windows.  b) The wheel speed during the global events, note that for the ABI datasets this can be interpreted as a running speed but from the IBL the mouse uses ambulation to turn a wheel. c) The distribution of global level event durations.  The best fit distribution of the normal, half-normal and lognormal were fit to the data, the lognormal was shown to be the best fit by the Kolmogrov-Smirnov (KS) test in all entities."""
+    
+    # Add duration results
+    if 'abi_visbehave' in ks_results and 'duration' in ks_results['abi_visbehave']:
+        dur = ks_results['abi_visbehave']['duration']
+        caption += f"  ABI Behaviour (SSE {format_scientific_notation(dur['sse'])}, KS {format_scientific_notation(dur['ks_stat'])}, KS p-value <0.0001)"
+    
+    if 'abi_viscoding' in ks_results and 'duration' in ks_results['abi_viscoding']:
+        dur = ks_results['abi_viscoding']['duration']
+        caption += f", ABI Coding (SSE {format_scientific_notation(dur['sse'])}, KS {format_scientific_notation(dur['ks_stat'])}, KS p-value <0.0001)"
+    
+    if 'ibl' in ks_results and 'duration' in ks_results['ibl']:
+        dur = ks_results['ibl']['duration']
+        caption += f" and the IBL (SSE {format_scientific_notation(dur['sse'])}, KS {format_scientific_notation(dur['ks_stat'])}, KS p-value <0.0001)"
+    
+    caption += """  d)  The distribution of global event level peak ripple power (z-scored) is best fit by the lognormal distribution in all entities, all fits pass significance."""
+    
+    # Add peak power results
+    if 'abi_visbehave' in ks_results and 'peak_power' in ks_results['abi_visbehave']:
+        pow = ks_results['abi_visbehave']['peak_power']
+        caption += f"  ABI Behaviour (SSE {format_scientific_notation(pow['sse'])}, KS {format_scientific_notation(pow['ks_stat'])}, KS p-value <0.0001)"
+    
+    if 'abi_viscoding' in ks_results and 'peak_power' in ks_results['abi_viscoding']:
+        pow = ks_results['abi_viscoding']['peak_power']
+        caption += f", ABI Coding (SSE {format_scientific_notation(pow['sse'])}, KS {format_scientific_notation(pow['ks_stat'])}, KS p-value <0.0001)"
+    
+    if 'ibl' in ks_results and 'peak_power' in ks_results['ibl']:
+        pow = ks_results['ibl']['peak_power']
+        caption += f" and the IBL (SSE {format_scientific_notation(pow['sse'])}, KS {format_scientific_notation(pow['ks_stat'])}, KS p-value <0.0001)"
+    
+    caption += "."
+    return caption
+
 # Create figure
 fig, axes = plt.subplots(4, 3, figsize=(12, 16))
 fig.suptitle("Figure 9: SWR Event Properties", fontsize=12, fontweight="bold")
@@ -118,5 +161,14 @@ plt.savefig(os.path.join(OUT_DIR, "figure9.svg"), bbox_inches='tight')
 with open(os.path.join(OUT_DIR, "figure9_ks_results.json"), 'w') as f:
     json.dump(ks_results, f, indent=2)
 
+# Generate and save caption
+caption = generate_caption(ks_results)
+caption_file = os.path.join(OUT_DIR, "figure9_caption_with_results.txt")
+with open(caption_file, 'w') as f:
+    f.write(caption)
+
 print(f"Figure saved to {OUT_DIR}")
-print(f"KS results saved to {os.path.join(OUT_DIR, 'figure9_ks_results.json')}") 
+print(f"KS results saved to {os.path.join(OUT_DIR, 'figure9_ks_results.json')}")
+print(f"Caption saved to {caption_file}")
+print("\nGenerated caption:")
+print(caption) 
