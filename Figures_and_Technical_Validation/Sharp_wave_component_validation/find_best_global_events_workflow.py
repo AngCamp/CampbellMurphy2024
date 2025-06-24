@@ -11,8 +11,8 @@ os.environ["PYTHONDONTWRITEBYTECODE"] = "1" # prevent pycache from being written
 
 # Path to sharp wave filter(s)
 filter_path = "/home/acampbell/NeuropixelsLFPOnRamp/SWR_Neuropixels_Detector/Filters/sharpwave_componenet_8to40band_1500hz_band.npz"
-output_dir = "/home/acampbell/NeuropixelsLFPOnRamp/Figures_and_Technical_Validation/Sharp_wave_component_validation/top_global_swr_events"
-file_ext = 'png'  # User can set this to 'svg', 'pdf', etc.
+output_dir = "/home/acampbell/NeuropixelsLFPOnRamp/Figures_and_Technical_Validation/Sharp_wave_component_validation/global_test"
+file_exts = ['png', 'svg']  # List of file extensions to save
 window = 0.15  # seconds around middle-most peak
 
 # Set this to True to display AP coordinate in y-labels of plots
@@ -43,8 +43,8 @@ top_n_events = 10
 # Only include sessions with a number of probes in this range (inclusive)
 min_probes = 3
 max_probes = 4
-min_global_peak_power = 5
-max_global_peak_power = 10
+min_global_peak_power = 4
+max_global_peak_power = 6
 speed_threshold = 2.0
 
 # Minimum delay (in seconds) between event peaks for directionality
@@ -205,7 +205,7 @@ def find_top_global_events(explorer, dataset="allen_visbehave_swr_murphylab2024"
     # Only keep the top N
     return sorted_events.head(target_count)
 
-def plot_and_save_global_events(explorer, events_df, output_dir, file_ext='png'):
+def plot_and_save_global_events(explorer, events_df, output_dir, file_exts=['png', 'svg']):
     os.makedirs(output_dir, exist_ok=True)
     for idx, (event_id, event) in enumerate(events_df.iterrows()):
         fig = explorer.plot_global_swr_event(
@@ -215,13 +215,19 @@ def plot_and_save_global_events(explorer, events_df, output_dir, file_ext='png')
             filter_path=filter_path,
             window=window,
             output_dir=output_dir,
-            file_ext=file_ext,
+            file_ext=file_exts[0],  # Use first extension for the main plot
             show_ap_in_ylabel=show_ap_in_ylabel,
             additional_value=additional_value,
             relative_time=relative_time
         )
         if fig is not None:
+            # Save in all requested formats
+            base_filename = f"global_event_{idx+1}_session_{event['session_id']}_id_{event_id}"
+            for ext in file_exts:
+                save_path = os.path.join(output_dir, f"{base_filename}.{ext}")
+                fig.savefig(save_path, format=ext, bbox_inches='tight')
             plt.close(fig)
+        
         # Only plot CSD if enabled
         if plot_csd_slices:
             csd_event_dir = os.path.join(
@@ -229,19 +235,20 @@ def plot_and_save_global_events(explorer, events_df, output_dir, file_ext='png')
                 f"csd_slice_global_event_{idx+1}_session_{event['session_id']}_id_{event_id}"
             )
             os.makedirs(csd_event_dir, exist_ok=True)
-            explorer.plot_global_event_CSD_slice(
-                dataset=event['dataset'],
-                session_id=event['session_id'],
-                global_event_idx=event_id,
-                filter_path=filter_path,
-                window=window,
-                save_path=csd_event_dir,  # Pass the event-specific CSD folder
-                file_ext=file_ext
-            )
+            for ext in file_exts:
+                explorer.plot_global_event_CSD_slice(
+                    dataset=event['dataset'],
+                    session_id=event['session_id'],
+                    global_event_idx=event_id,
+                    filter_path=filter_path,
+                    window=window,
+                    save_path=csd_event_dir,
+                    file_ext=ext
+                )
 
 def main():
     # Initialize the explorer with explicit base path
-    base_path = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_swr_data"
+    base_path = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_v2_final"
     explorer = SWRExplorer(base_path=base_path)
     
     if collect_directional_stats:
@@ -353,7 +360,7 @@ def main():
         explorer=explorer,
         events_df=top_global_events,
         output_dir=output_dir,
-        file_ext=file_ext
+        file_exts=file_exts
     )
 
 if __name__ == "__main__":

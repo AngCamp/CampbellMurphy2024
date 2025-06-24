@@ -1,9 +1,9 @@
 # Mouse Hippocampal Sharp Wave Ripple Dataset Curated From Public Neuropixels Datasets
 
-![](Images/figure_one_revised.png)
+![](RepoImages/figure_one_revised.png)
 *Overview figure showing the dataset structure and probe placements across the three datasets (ABI Visual Behavior, ABI Visual Coding, and IBL), with a pictoral explanation of the detector pipeline showing how the values in the Events CSV relates to source data of the anatomy and electrophysiology.*
 
-![](Images/SupplementalSWRDetectorWorkflow.png)
+![](RepoImages/SupplementalSWRDetectorWorkflow.png)
 *Detailed workflow diagram showing the SWR detection pipeline steps and data flow, including preprocessing, detection, filtering, and output generation stages.*
 
 ## Description
@@ -59,7 +59,7 @@ Note:  We have also created scripts for running the pipelines on slurm for share
 #### SWR session folder structure
 
 The code outputs the following set of files for each session.
-![](Images/figure_3_SWR_Dataset_v3.png)
+![](RepoImages/figure_3_SWR_Dataset_v3.png)
 *Schematic showing the output file structure for each SWR session, including event files, metadata, and channel selection information organized by probe and session.*
 
 #### Filters
@@ -82,7 +82,7 @@ Contains scripts and workflows for generating publication figures and technical 
 
 
 
-### Images
+### RepoImages
 
 Images for the repo.
 
@@ -93,11 +93,11 @@ Contains conda environment files and setup scripts for the different datasets.
 
 
 
-![](Images/Figure4_version2_global_event_4_session_1086410738_id_2250.png)
+![](RepoImages/Figure4_version2_global_event_4_session_1086410738_id_2250.png)
 *Example of a global SWR event visualization showing the event across multiple probes, with LFP traces, power (z-scored), and event timing displayed for comprehensive analysis.*
 
-![](Images/Figure_5_MI_selection.png)
+![](RepoImages/Figure_5_MI_selection.png)
 *Visualization of net ripple power based channel selection for pyramidal layer identification for ripple detection and modulation index-based channel selection for mid striatum radiatum layer identification for sharp wave detection, showing how different channels are evaluated and selected based on their modulation index values.*
 
-![](Images/v2_real_data_filtering_sankey.png)
+![](RepoImages/v2_real_data_filtering_sankey.png)
 *Sankey diagram showing the filtering pipeline and event classification flow, illustrating how SWR events are processed through various thresholds and categorized based on their properties.*

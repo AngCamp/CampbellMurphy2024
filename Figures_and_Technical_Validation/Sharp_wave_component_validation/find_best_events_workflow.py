@@ -101,34 +101,70 @@ def plot_and_save_events(explorer, events_df, output_dir):
     Plot and save the specified events.
     """
     os.makedirs(output_dir, exist_ok=True)
+    successful_plots = 0
+    failed_plots = 0
+    
     for idx, (event_id, event) in enumerate(events_df.iterrows()):
-        session_events = explorer.find_best_events(
-            dataset=event['dataset'],
-            session_id=event['session_id'],
-            probe_id=event['probe_id'],
-            min_sw_power=0,
-            min_duration=0,
-            max_duration=float('inf'),
-            min_clcorr=0
-        )
-        # Do not extract or pass channel IDs; let SWRExplorer handle file selection
-        explorer.plot_swr_event(
-            events_df=session_events,
-            event_idx=event_id,
-            filter_path=filter_path,
-            envelope_mode=envelope_mode,
-            panels_to_plot=[
-                'raw_pyramidal_lfp',
-                'raw_s_radiatum_lfp',
-                'bandpass_signals',
-                'envelope',
-                'power',
-            ],
-            show_info_title=info_on,
-            show_peak_dots=True
-        )
-        plt.savefig(f"{output_dir}/event_{idx+1}_{event.index+1}_session_{event['session_id']}_probe_{event['probe_id']}.{file_type}")
-        plt.close()
+        try:
+            print(f"Plotting event {idx+1}/{len(events_df)}: Event ID {event_id}, Session {event['session_id']}, Probe {event['probe_id']}")
+            
+            # Get all session events without filtering to ensure we have the event
+            session_events = explorer.find_best_events(
+                dataset=event['dataset'],
+                session_id=event['session_id'],
+                probe_id=event['probe_id'],
+                min_sw_power=0,
+                min_duration=0,
+                max_duration=float('inf'),
+                min_clcorr=0
+            )
+            
+            # Check if the event exists in the session events
+            if event_id not in session_events.index:
+                print(f"  WARNING: Event ID {event_id} not found in session events. Available indices: {list(session_events.index[:5])}...")
+                # Try to find the event by matching key properties
+                matching_events = session_events[
+                    (abs(session_events['start_time'] - event['start_time']) < 0.001) &
+                    (abs(session_events['duration'] - event['duration']) < 0.001)
+                ]
+                if len(matching_events) > 0:
+                    event_id = matching_events.index[0]
+                    print(f"  Found matching event with ID {event_id}")
+                else:
+                    print(f"  ERROR: Could not find matching event, skipping...")
+                    failed_plots += 1
+                    continue
+            
+            # Do not extract or pass channel IDs; let SWRExplorer handle file selection
+            explorer.plot_swr_event(
+                events_df=session_events,
+                event_idx=event_id,
+                filter_path=filter_path,
+                envelope_mode=envelope_mode,
+                panels_to_plot=[
+                    'raw_pyramidal_lfp',
+                    'raw_s_radiatum_lfp',
+                    'bandpass_signals',
+                    'envelope',
+                    'power',
+                ],
+                show_info_title=info_on,
+                show_peak_dots=True
+            )
+            
+            output_file = f"{output_dir}/event_{idx+1}_original_id_{event_id}_session_{event['session_id']}_probe_{event['probe_id']}.{file_type}"
+            plt.savefig(output_file)
+            plt.close()
+            print(f"  Successfully saved: {output_file}")
+            successful_plots += 1
+            
+        except Exception as e:
+            print(f"  ERROR plotting event {idx+1} (ID {event_id}): {e}")
+            failed_plots += 1
+            plt.close()  # Make sure to close any partially created plots
+            continue
+    
+    print(f"\nPlotting summary: {successful_plots} successful, {failed_plots} failed")
 
 def main():
     # Initialize the explorer with explicit base path

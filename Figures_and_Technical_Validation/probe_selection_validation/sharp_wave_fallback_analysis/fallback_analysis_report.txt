@@ -1,0 +1,2238 @@
+Sharp Wave Channel Selection Fallback Analysis
+=============================================
+
+Overall Statistics:
+Total probes analyzed: 782
+Probes that should use fallback: 159
+Overall fallback rate: 20.3%
+
+Per-Dataset Statistics:
+----------------------
+
+allen_visbehave_swr_murphylab2024:
+  Total probes: 394
+  Should use fallback: 0
+  Fallback rate: 0.0%
+
+allen_viscoding_swr_murphylab2024:
+  Total probes: 205
+  Should use fallback: 159
+  Fallback rate: 77.6%
+
+ibl_swr_murphylab2024:
+  Total probes: 183
+  Should use fallback: 0
+  Fallback rate: 0.0%
+
+
+Detailed Analysis of Probes Needing Fallback:
+--------------------------------------------
+
+allen_viscoding_swr_murphylab2024/swrs_session_719161530/729445648:
+  Ripple channel depth: 2400.0 μm
+  Minimum distance to any channel below: 1020.0 μm
+  All channel depths relative to ripple:
+    Channel 850252947: +1020.0 μm
+    Channel 850252951: +1040.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_719161530/729445654:
+  Ripple channel depth: 1440.0 μm
+  Minimum distance to any channel below: 1800.0 μm
+  All channel depths relative to ripple:
+    Channel 850254117: +1800.0 μm
+    Channel 850254121: +1820.0 μm
+    Channel 850254125: +1840.0 μm
+    Channel 850254127: +1840.0 μm
+    Channel 850254131: +1860.0 μm
+    Channel 850254135: +1880.0 μm
+    Channel 850254137: +1900.0 μm
+    Channel 850254141: +1920.0 μm
+    Channel 850254149: +1960.0 μm
+    Channel 850254151: +1960.0 μm
+    Channel 850254155: +1980.0 μm
+    Channel 850254159: +2000.0 μm
+    Channel 850254161: +2020.0 μm
+    Channel 850254165: +2040.0 μm
+    Channel 850254169: +2060.0 μm
+    Channel 850254173: +2080.0 μm
+    Channel 850254175: +2080.0 μm
+    Channel 850254179: +2100.0 μm
+    Channel 850254183: +2120.0 μm
+    Channel 850254185: +2140.0 μm
+    Channel 850254189: +2160.0 μm
+    Channel 850254193: +2180.0 μm
+    Channel 850254197: +2200.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_721123822/760213147:
+  Ripple channel depth: 1480.0 μm
+  Minimum distance to any channel below: 1560.0 μm
+  All channel depths relative to ripple:
+    Channel 850246889: +1560.0 μm
+    Channel 850246893: +1580.0 μm
+    Channel 850246897: +1600.0 μm
+    Channel 850246899: +1600.0 μm
+    Channel 850246903: +1620.0 μm
+    Channel 850246907: +1640.0 μm
+    Channel 850246909: +1660.0 μm
+    Channel 850246913: +1680.0 μm
+    Channel 850246917: +1700.0 μm
+    Channel 850246921: +1720.0 μm
+    Channel 850246923: +1720.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_743475441/769325777:
+  Ripple channel depth: 1280.0 μm
+  Minimum distance to any channel below: 1500.0 μm
+  All channel depths relative to ripple:
+    Channel 849756152: +1500.0 μm
+    Channel 849756156: +1520.0 μm
+    Channel 849756162: +1560.0 μm
+    Channel 849756166: +1580.0 μm
+    Channel 849756170: +1600.0 μm
+    Channel 849756172: +1600.0 μm
+    Channel 849756176: +1620.0 μm
+    Channel 849756180: +1640.0 μm
+    Channel 849756184: +1660.0 μm
+    Channel 849756188: +1680.0 μm
+    Channel 849756190: +1700.0 μm
+    Channel 849756194: +1720.0 μm
+    Channel 849756198: +1740.0 μm
+    Channel 849756202: +1760.0 μm
+    Channel 849756206: +1780.0 μm
+    Channel 849756208: +1780.0 μm
+    Channel 849756212: +1800.0 μm
+    Channel 849756216: +1820.0 μm
+    Channel 849756220: +1840.0 μm
+    Channel 849756222: +1860.0 μm
+    Channel 849756226: +1880.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_743475441/769325781:
+  Ripple channel depth: 1400.0 μm
+  Minimum distance to any channel below: 1640.0 μm
+  All channel depths relative to ripple:
+    Channel 849755048: +1640.0 μm
+    Channel 849755052: +1660.0 μm
+    Channel 849755056: +1680.0 μm
+    Channel 849755058: +1680.0 μm
+    Channel 849755062: +1700.0 μm
+    Channel 849755066: +1720.0 μm
+    Channel 849755070: +1740.0 μm
+    Channel 849755074: +1760.0 μm
+    Channel 849755076: +1780.0 μm
+    Channel 849755080: +1800.0 μm
+    Channel 849755084: +1820.0 μm
+    Channel 849755088: +1840.0 μm
+    Channel 849755092: +1860.0 μm
+    Channel 849755094: +1860.0 μm
+    Channel 849755098: +1880.0 μm
+    Channel 849755102: +1900.0 μm
+    Channel 849755106: +1920.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_743475441/769326325:
+  Ripple channel depth: 1520.0 μm
+  Minimum distance to any channel below: 620.0 μm
+  All channel depths relative to ripple:
+    Channel 849752294: +620.0 μm
+    Channel 849752298: +640.0 μm
+    Channel 849752302: +660.0 μm
+    Channel 849752304: +660.0 μm
+    Channel 849752308: +680.0 μm
+    Channel 849752312: +700.0 μm
+    Channel 849752316: +720.0 μm
+    Channel 849752320: +740.0 μm
+    Channel 849752322: +760.0 μm
+    Channel 849752326: +780.0 μm
+    Channel 849752330: +800.0 μm
+    Channel 849752334: +820.0 μm
+    Channel 849752338: +840.0 μm
+    Channel 849752340: +840.0 μm
+    Channel 849752344: +860.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_743475441/769326329:
+  Ripple channel depth: 1560.0 μm
+  Minimum distance to any channel below: 1480.0 μm
+  All channel depths relative to ripple:
+    Channel 849751338: +1480.0 μm
+    Channel 849751342: +1500.0 μm
+    Channel 849751346: +1520.0 μm
+    Channel 849751348: +1520.0 μm
+    Channel 849751352: +1540.0 μm
+    Channel 849751356: +1560.0 μm
+    Channel 849751360: +1580.0 μm
+    Channel 849751364: +1600.0 μm
+    Channel 849751366: +1620.0 μm
+    Channel 849751370: +1640.0 μm
+    Channel 849751378: +1680.0 μm
+    Channel 849751382: +1700.0 μm
+    Channel 849751386: +1720.0 μm
+    Channel 849751388: +1720.0 μm
+    Channel 849751392: +1740.0 μm
+    Channel 849751396: +1760.0 μm
+    Channel 849751400: +1780.0 μm
+    Channel 849751404: +1800.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_743475441/769326332:
+  Ripple channel depth: 1640.0 μm
+  Minimum distance to any channel below: 1400.0 μm
+  All channel depths relative to ripple:
+    Channel 849750232: +1400.0 μm
+    Channel 849750236: +1420.0 μm
+    Channel 849750240: +1440.0 μm
+    Channel 849750242: +1440.0 μm
+    Channel 849750246: +1460.0 μm
+    Channel 849750250: +1480.0 μm
+    Channel 849750254: +1500.0 μm
+    Channel 849750258: +1520.0 μm
+    Channel 849750260: +1540.0 μm
+    Channel 849750264: +1560.0 μm
+    Channel 849750268: +1580.0 μm
+    Channel 849750272: +1600.0 μm
+    Channel 849750276: +1620.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_744228101/757904508:
+  Ripple channel depth: 1840.0 μm
+  Minimum distance to any channel below: 900.0 μm
+  All channel depths relative to ripple:
+    Channel 849743562: +900.0 μm
+    Channel 849743566: +920.0 μm
+    Channel 849743570: +940.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_744228101/757904510:
+  Ripple channel depth: 2080.0 μm
+  Minimum distance to any channel below: 1360.0 μm
+  All channel depths relative to ripple:
+    Channel 849742376: +1360.0 μm
+    Channel 849742380: +1380.0 μm
+    Channel 849742384: +1400.0 μm
+    Channel 849742386: +1400.0 μm
+    Channel 849742390: +1420.0 μm
+    Channel 849742394: +1440.0 μm
+    Channel 849742398: +1460.0 μm
+    Channel 849742402: +1480.0 μm
+    Channel 849742404: +1500.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_744228101/757904516:
+  Ripple channel depth: 1440.0 μm
+  Minimum distance to any channel below: 1700.0 μm
+  All channel depths relative to ripple:
+    Channel 849747546: +1700.0 μm
+    Channel 849747550: +1720.0 μm
+    Channel 849747554: +1740.0 μm
+    Channel 849747556: +1740.0 μm
+    Channel 849747560: +1760.0 μm
+    Channel 849747564: +1780.0 μm
+    Channel 849747568: +1800.0 μm
+    Channel 849747572: +1820.0 μm
+    Channel 849747574: +1840.0 μm
+    Channel 849747578: +1860.0 μm
+    Channel 849747582: +1880.0 μm
+    Channel 849747586: +1900.0 μm
+    Channel 849747590: +1920.0 μm
+    Channel 849747592: +1920.0 μm
+    Channel 849747596: +1940.0 μm
+    Channel 849747600: +1960.0 μm
+    Channel 849747604: +1980.0 μm
+    Channel 849747606: +2000.0 μm
+    Channel 849747610: +2020.0 μm
+    Channel 849747614: +2040.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_744228101/757904520:
+  Ripple channel depth: 1680.0 μm
+  Minimum distance to any channel below: 1660.0 μm
+  All channel depths relative to ripple:
+    Channel 849746406: +1660.0 μm
+    Channel 849746410: +1680.0 μm
+    Channel 849746414: +1700.0 μm
+    Channel 849746416: +1700.0 μm
+    Channel 849746420: +1720.0 μm
+    Channel 849746424: +1740.0 μm
+    Channel 849746428: +1760.0 μm
+    Channel 849746432: +1780.0 μm
+    Channel 849746434: +1800.0 μm
+    Channel 849746438: +1820.0 μm
+    Channel 849746442: +1840.0 μm
+    Channel 849746446: +1860.0 μm
+    Channel 849746450: +1880.0 μm
+    Channel 849746452: +1880.0 μm
+    Channel 849746456: +1900.0 μm
+    Channel 849746460: +1920.0 μm
+    Channel 849746466: +1960.0 μm
+    Channel 849746470: +1980.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_744228101/757904522:
+  Ripple channel depth: 2280.0 μm
+  Minimum distance to any channel below: 860.0 μm
+  All channel depths relative to ripple:
+    Channel 849744936: +860.0 μm
+    Channel 849744940: +880.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_746083955/760647913:
+  Ripple channel depth: 1720.0 μm
+  Minimum distance to any channel below: 1320.0 μm
+  All channel depths relative to ripple:
+    Channel 849735292: +1320.0 μm
+    Channel 849735296: +1340.0 μm
+    Channel 849735300: +1360.0 μm
+    Channel 849735302: +1360.0 μm
+    Channel 849735306: +1380.0 μm
+    Channel 849735310: +1400.0 μm
+    Channel 849735314: +1420.0 μm
+    Channel 849735318: +1440.0 μm
+    Channel 849735320: +1460.0 μm
+    Channel 849735324: +1480.0 μm
+    Channel 849735328: +1500.0 μm
+    Channel 849735332: +1520.0 μm
+    Channel 849735336: +1540.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_750749662/769322804:
+  Ripple channel depth: 2040.0 μm
+  Minimum distance to any channel below: 1200.0 μm
+  All channel depths relative to ripple:
+    Channel 850169748: +1200.0 μm
+    Channel 850169752: +1220.0 μm
+    Channel 850169756: +1240.0 μm
+    Channel 850169758: +1240.0 μm
+    Channel 850169762: +1260.0 μm
+    Channel 850169766: +1280.0 μm
+    Channel 850169768: +1300.0 μm
+    Channel 850169772: +1320.0 μm
+    Channel 850169780: +1360.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_751348571/757984813:
+  Ripple channel depth: 2320.0 μm
+  Minimum distance to any channel below: 900.0 μm
+  All channel depths relative to ripple:
+    Channel 850163168: +900.0 μm
+    Channel 850163172: +920.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_751348571/757984818:
+  Ripple channel depth: 2280.0 μm
+  Minimum distance to any channel below: 840.0 μm
+  All channel depths relative to ripple:
+    Channel 850161888: +840.0 μm
+    Channel 850161890: +860.0 μm
+    Channel 850161894: +880.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_751348571/757984826:
+  Ripple channel depth: 1840.0 μm
+  Minimum distance to any channel below: 1580.0 μm
+  All channel depths relative to ripple:
+    Channel 850159228: +1580.0 μm
+    Channel 850159232: +1600.0 μm
+    Channel 850159234: +1620.0 μm
+    Channel 850159238: +1640.0 μm
+    Channel 850159242: +1660.0 μm
+    Channel 850159246: +1680.0 μm
+    Channel 850159248: +1680.0 μm
+    Channel 850159252: +1700.0 μm
+    Channel 850159256: +1720.0 μm
+    Channel 850159258: +1740.0 μm
+    Channel 850159262: +1760.0 μm
+    Channel 850159266: +1780.0 μm
+    Channel 850159270: +1800.0 μm
+    Channel 850159272: +1800.0 μm
+    Channel 850159276: +1820.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_751348571/757984830:
+  Ripple channel depth: 2160.0 μm
+  Minimum distance to any channel below: 980.0 μm
+  All channel depths relative to ripple:
+    Channel 850157746: +980.0 μm
+    Channel 850157750: +1000.0 μm
+    Channel 850157752: +1000.0 μm
+    Channel 850157756: +1020.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_754312389/756781553:
+  Ripple channel depth: 1560.0 μm
+  Minimum distance to any channel below: 880.0 μm
+  All channel depths relative to ripple:
+    Channel 850142258: +880.0 μm
+    Channel 850142262: +900.0 μm
+    Channel 850142266: +920.0 μm
+    Channel 850142268: +920.0 μm
+    Channel 850142272: +940.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_754312389/756781555:
+  Ripple channel depth: 1640.0 μm
+  Minimum distance to any channel below: 980.0 μm
+  All channel depths relative to ripple:
+    Channel 850143420: +980.0 μm
+    Channel 850143424: +1000.0 μm
+    Channel 850143430: +1040.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_754312389/756781557:
+  Ripple channel depth: 1440.0 μm
+  Minimum distance to any channel below: 1200.0 μm
+  All channel depths relative to ripple:
+    Channel 850144538: +1200.0 μm
+    Channel 850144546: +1240.0 μm
+    Channel 850144548: +1240.0 μm
+    Channel 850144552: +1260.0 μm
+    Channel 850144556: +1280.0 μm
+    Channel 850144558: +1300.0 μm
+    Channel 850144562: +1320.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_754312389/756781559:
+  Ripple channel depth: 760.0 μm
+  Minimum distance to any channel below: 1360.0 μm
+  All channel depths relative to ripple:
+    Channel 850145850: +1360.0 μm
+    Channel 850145852: +1380.0 μm
+    Channel 850145856: +1400.0 μm
+    Channel 850145860: +1420.0 μm
+    Channel 850145864: +1440.0 μm
+    Channel 850145866: +1440.0 μm
+    Channel 850145870: +1460.0 μm
+    Channel 850145874: +1480.0 μm
+    Channel 850145876: +1500.0 μm
+    Channel 850145880: +1520.0 μm
+    Channel 850145884: +1540.0 μm
+    Channel 850145888: +1560.0 μm
+    Channel 850145890: +1560.0 μm
+    Channel 850145894: +1580.0 μm
+    Channel 850145898: +1600.0 μm
+    Channel 850145900: +1620.0 μm
+    Channel 850145904: +1640.0 μm
+    Channel 850145908: +1660.0 μm
+    Channel 850145912: +1680.0 μm
+    Channel 850145914: +1680.0 μm
+    Channel 850145918: +1700.0 μm
+    Channel 850145922: +1720.0 μm
+    Channel 850145924: +1740.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_754312389/756781561:
+  Ripple channel depth: 1960.0 μm
+  Minimum distance to any channel below: 860.0 μm
+  All channel depths relative to ripple:
+    Channel 850147132: +860.0 μm
+    Channel 850147136: +880.0 μm
+    Channel 850147138: +900.0 μm
+    Channel 850147142: +920.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_754829445/760640033:
+  Ripple channel depth: 2560.0 μm
+  Minimum distance to any channel below: 860.0 μm
+  All channel depths relative to ripple:
+    Channel 850141170: +860.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_754829445/760640037:
+  Ripple channel depth: 2480.0 μm
+  Minimum distance to any channel below: 940.0 μm
+  All channel depths relative to ripple:
+    Channel 850139844: +940.0 μm
+    Channel 850139848: +960.0 μm
+    Channel 850139850: +980.0 μm
+    Channel 850139854: +1000.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_754829445/760640039:
+  Ripple channel depth: 1720.0 μm
+  Minimum distance to any channel below: 1600.0 μm
+  All channel depths relative to ripple:
+    Channel 850138354: +1600.0 μm
+    Channel 850138356: +1620.0 μm
+    Channel 850138360: +1640.0 μm
+    Channel 850138364: +1660.0 μm
+    Channel 850138368: +1680.0 μm
+    Channel 850138370: +1680.0 μm
+    Channel 850138374: +1700.0 μm
+    Channel 850138378: +1720.0 μm
+    Channel 850138380: +1740.0 μm
+    Channel 850138384: +1760.0 μm
+    Channel 850138388: +1780.0 μm
+    Channel 850138392: +1800.0 μm
+    Channel 850138394: +1800.0 μm
+    Channel 850138398: +1820.0 μm
+    Channel 850138402: +1840.0 μm
+    Channel 850138404: +1860.0 μm
+    Channel 850138408: +1880.0 μm
+    Channel 850138412: +1900.0 μm
+    Channel 850138416: +1920.0 μm
+    Channel 850138418: +1920.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_754829445/760640043:
+  Ripple channel depth: 2280.0 μm
+  Minimum distance to any channel below: 1140.0 μm
+  All channel depths relative to ripple:
+    Channel 850136978: +1140.0 μm
+    Channel 850136982: +1160.0 μm
+    Channel 850136984: +1180.0 μm
+    Channel 850136988: +1200.0 μm
+    Channel 850136992: +1220.0 μm
+    Channel 850136996: +1240.0 μm
+    Channel 850136998: +1240.0 μm
+    Channel 850137002: +1260.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_755434585/760642621:
+  Ripple channel depth: 2000.0 μm
+  Minimum distance to any channel below: 1020.0 μm
+  All channel depths relative to ripple:
+    Channel 850134430: +1020.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_755434585/760642624:
+  Ripple channel depth: 1560.0 μm
+  Minimum distance to any channel below: 1480.0 μm
+  All channel depths relative to ripple:
+    Channel 850131810: +1480.0 μm
+    Channel 850131816: +1500.0 μm
+    Channel 850131820: +1520.0 μm
+    Channel 850131822: +1540.0 μm
+    Channel 850131826: +1560.0 μm
+    Channel 850131830: +1580.0 μm
+    Channel 850131834: +1600.0 μm
+    Channel 850131836: +1600.0 μm
+    Channel 850131840: +1620.0 μm
+    Channel 850131844: +1640.0 μm
+    Channel 850131846: +1660.0 μm
+    Channel 850131850: +1680.0 μm
+    Channel 850131854: +1700.0 μm
+    Channel 850131858: +1720.0 μm
+    Channel 850131860: +1720.0 μm
+    Channel 850131864: +1740.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_755434585/760642631:
+  Ripple channel depth: 1200.0 μm
+  Minimum distance to any channel below: 1840.0 μm
+  All channel depths relative to ripple:
+    Channel 850130580: +1840.0 μm
+    Channel 850130586: +1860.0 μm
+    Channel 850130590: +1880.0 μm
+    Channel 850130592: +1900.0 μm
+    Channel 850130596: +1920.0 μm
+    Channel 850130600: +1940.0 μm
+    Channel 850130604: +1960.0 μm
+    Channel 850130606: +1960.0 μm
+    Channel 850130610: +1980.0 μm
+    Channel 850130614: +2000.0 μm
+    Channel 850130616: +2020.0 μm
+    Channel 850130620: +2040.0 μm
+    Channel 850130624: +2060.0 μm
+    Channel 850130628: +2080.0 μm
+    Channel 850130630: +2080.0 μm
+    Channel 850130634: +2100.0 μm
+    Channel 850130638: +2120.0 μm
+    Channel 850130640: +2140.0 μm
+    Channel 850130644: +2160.0 μm
+    Channel 850130648: +2180.0 μm
+    Channel 850130652: +2200.0 μm
+    Channel 850130654: +2200.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_757216464/769322745:
+  Ripple channel depth: 2400.0 μm
+  Minimum distance to any channel below: 1120.0 μm
+  All channel depths relative to ripple:
+    Channel 850119326: +1120.0 μm
+    Channel 850119330: +1140.0 μm
+    Channel 850119334: +1160.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_757216464/769322751:
+  Ripple channel depth: 1560.0 μm
+  Minimum distance to any channel below: 1760.0 μm
+  All channel depths relative to ripple:
+    Channel 850115164: +1760.0 μm
+    Channel 850115166: +1780.0 μm
+    Channel 850115170: +1800.0 μm
+    Channel 850115174: +1820.0 μm
+    Channel 850115178: +1840.0 μm
+    Channel 850115180: +1840.0 μm
+    Channel 850115184: +1860.0 μm
+    Channel 850115188: +1880.0 μm
+    Channel 850115190: +1900.0 μm
+    Channel 850115194: +1920.0 μm
+    Channel 850115198: +1940.0 μm
+    Channel 850115202: +1960.0 μm
+    Channel 850115204: +1960.0 μm
+    Channel 850115208: +1980.0 μm
+    Channel 850115212: +2000.0 μm
+    Channel 850115214: +2020.0 μm
+    Channel 850115218: +2040.0 μm
+    Channel 850115222: +2060.0 μm
+    Channel 850115226: +2080.0 μm
+    Channel 850115228: +2080.0 μm
+    Channel 850115232: +2100.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_757216464/769322753:
+  Ripple channel depth: 2440.0 μm
+  Minimum distance to any channel below: 1080.0 μm
+  All channel depths relative to ripple:
+    Channel 850113794: +1080.0 μm
+    Channel 850113796: +1100.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_757216464/769322755:
+  Ripple channel depth: 960.0 μm
+  Minimum distance to any channel below: 1560.0 μm
+  All channel depths relative to ripple:
+    Channel 850112504: +1560.0 μm
+    Channel 850112508: +1580.0 μm
+    Channel 850112512: +1600.0 μm
+    Channel 850112514: +1620.0 μm
+    Channel 850112518: +1640.0 μm
+    Channel 850112522: +1660.0 μm
+    Channel 850112526: +1680.0 μm
+    Channel 850112528: +1680.0 μm
+    Channel 850112532: +1700.0 μm
+    Channel 850112536: +1720.0 μm
+    Channel 850112538: +1740.0 μm
+    Channel 850112542: +1760.0 μm
+    Channel 850112546: +1780.0 μm
+    Channel 850112550: +1800.0 μm
+    Channel 850112552: +1800.0 μm
+    Channel 850112556: +1820.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_757970808/769322852:
+  Ripple channel depth: 2080.0 μm
+  Minimum distance to any channel below: 1160.0 μm
+  All channel depths relative to ripple:
+    Channel 850111136: +1160.0 μm
+    Channel 850111140: +1180.0 μm
+    Channel 850111144: +1200.0 μm
+    Channel 850111146: +1200.0 μm
+    Channel 850111150: +1220.0 μm
+    Channel 850111154: +1240.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_757970808/769322858:
+  Ripple channel depth: 1560.0 μm
+  Minimum distance to any channel below: 1260.0 μm
+  All channel depths relative to ripple:
+    Channel 850104488: +1260.0 μm
+    Channel 850104492: +1280.0 μm
+    Channel 850104494: +1300.0 μm
+    Channel 850104498: +1320.0 μm
+    Channel 850104502: +1340.0 μm
+    Channel 850104506: +1360.0 μm
+    Channel 850104508: +1360.0 μm
+    Channel 850104512: +1380.0 μm
+    Channel 850104516: +1400.0 μm
+    Channel 850104518: +1420.0 μm
+    Channel 850104522: +1440.0 μm
+    Channel 850104526: +1460.0 μm
+    Channel 850104530: +1480.0 μm
+    Channel 850104536: +1500.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_757970808/769322862:
+  Ripple channel depth: 1720.0 μm
+  Minimum distance to any channel below: 920.0 μm
+  All channel depths relative to ripple:
+    Channel 850108314: +920.0 μm
+    Channel 850108316: +920.0 μm
+    Channel 850108320: +940.0 μm
+    Channel 850108324: +960.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_758798717/770930067:
+  Ripple channel depth: 1600.0 μm
+  Minimum distance to any channel below: 1040.0 μm
+  All channel depths relative to ripple:
+    Channel 850103144: +1040.0 μm
+    Channel 850103152: +1080.0 μm
+    Channel 850103154: +1080.0 μm
+    Channel 850103158: +1100.0 μm
+    Channel 850103162: +1120.0 μm
+    Channel 850103164: +1140.0 μm
+    Channel 850103168: +1160.0 μm
+    Channel 850103172: +1180.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_759883607/769322785:
+  Ripple channel depth: 1600.0 μm
+  Minimum distance to any channel below: 1240.0 μm
+  All channel depths relative to ripple:
+    Channel 849722284: +1240.0 μm
+    Channel 849722288: +1260.0 μm
+    Channel 849722292: +1280.0 μm
+    Channel 849722294: +1280.0 μm
+    Channel 849722298: +1300.0 μm
+    Channel 849722302: +1320.0 μm
+    Channel 849722306: +1340.0 μm
+    Channel 849722310: +1360.0 μm
+    Channel 849722312: +1380.0 μm
+    Channel 849722316: +1400.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_759883607/769322789:
+  Ripple channel depth: 1720.0 μm
+  Minimum distance to any channel below: 1160.0 μm
+  All channel depths relative to ripple:
+    Channel 849727598: +1160.0 μm
+    Channel 849727602: +1180.0 μm
+    Channel 849727606: +1200.0 μm
+    Channel 849727608: +1220.0 μm
+    Channel 849727612: +1240.0 μm
+    Channel 849727616: +1260.0 μm
+    Channel 849727620: +1280.0 μm
+    Channel 849727624: +1300.0 μm
+    Channel 849727626: +1300.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_759883607/769322797:
+  Ripple channel depth: 1720.0 μm
+  Minimum distance to any channel below: 1720.0 μm
+  All channel depths relative to ripple:
+    Channel 849723710: +1720.0 μm
+    Channel 849723714: +1740.0 μm
+    Channel 849723718: +1760.0 μm
+    Channel 849723720: +1760.0 μm
+    Channel 849723724: +1780.0 μm
+    Channel 849723728: +1800.0 μm
+    Channel 849723732: +1820.0 μm
+    Channel 849723736: +1840.0 μm
+    Channel 849723738: +1860.0 μm
+    Channel 849723742: +1880.0 μm
+    Channel 849723746: +1900.0 μm
+    Channel 849723750: +1920.0 μm
+    Channel 849723754: +1940.0 μm
+    Channel 849723756: +1940.0 μm
+    Channel 849723760: +1960.0 μm
+    Channel 849723764: +1980.0 μm
+    Channel 849723768: +2000.0 μm
+    Channel 849723770: +2020.0 μm
+    Channel 849723774: +2040.0 μm
+    Channel 849723778: +2060.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_760345702/810753195:
+  Ripple channel depth: 1360.0 μm
+  Minimum distance to any channel below: 1480.0 μm
+  All channel depths relative to ripple:
+    Channel 850097374: +1480.0 μm
+    Channel 850097376: +1480.0 μm
+    Channel 850097380: +1500.0 μm
+    Channel 850097384: +1520.0 μm
+    Channel 850097386: +1540.0 μm
+    Channel 850097390: +1560.0 μm
+    Channel 850097394: +1580.0 μm
+    Channel 850097398: +1600.0 μm
+    Channel 850097400: +1600.0 μm
+    Channel 850097404: +1620.0 μm
+    Channel 850097408: +1640.0 μm
+    Channel 850097410: +1660.0 μm
+    Channel 850097414: +1680.0 μm
+    Channel 850097418: +1700.0 μm
+    Channel 850097422: +1720.0 μm
+    Channel 850097424: +1720.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_760345702/810753199:
+  Ripple channel depth: 1280.0 μm
+  Minimum distance to any channel below: 1540.0 μm
+  All channel depths relative to ripple:
+    Channel 850094840: +1540.0 μm
+    Channel 850094844: +1560.0 μm
+    Channel 850094846: +1580.0 μm
+    Channel 850094850: +1600.0 μm
+    Channel 850094854: +1620.0 μm
+    Channel 850094858: +1640.0 μm
+    Channel 850094860: +1640.0 μm
+    Channel 850094864: +1660.0 μm
+    Channel 850094868: +1680.0 μm
+    Channel 850094870: +1700.0 μm
+    Channel 850094874: +1720.0 μm
+    Channel 850094878: +1740.0 μm
+    Channel 850094882: +1760.0 μm
+    Channel 850094888: +1780.0 μm
+    Channel 850094892: +1800.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_760345702/810753201:
+  Ripple channel depth: 1280.0 μm
+  Minimum distance to any channel below: 1760.0 μm
+  All channel depths relative to ripple:
+    Channel 850093722: +1760.0 μm
+    Channel 850093728: +1780.0 μm
+    Channel 850093732: +1800.0 μm
+    Channel 850093734: +1820.0 μm
+    Channel 850093738: +1840.0 μm
+    Channel 850093742: +1860.0 μm
+    Channel 850093746: +1880.0 μm
+    Channel 850093748: +1880.0 μm
+    Channel 850093752: +1900.0 μm
+    Channel 850093756: +1920.0 μm
+    Channel 850093758: +1940.0 μm
+    Channel 850093762: +1960.0 μm
+    Channel 850093766: +1980.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_760345702/810753203:
+  Ripple channel depth: 2120.0 μm
+  Minimum distance to any channel below: 1120.0 μm
+  All channel depths relative to ripple:
+    Channel 850092384: +1120.0 μm
+    Channel 850092386: +1120.0 μm
+    Channel 850092390: +1140.0 μm
+    Channel 850092394: +1160.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_761418226/768908579:
+  Ripple channel depth: 1800.0 μm
+  Minimum distance to any channel below: 1020.0 μm
+  All channel depths relative to ripple:
+    Channel 850080968: +1020.0 μm
+    Channel 850080972: +1040.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_761418226/768908582:
+  Ripple channel depth: 1880.0 μm
+  Minimum distance to any channel below: 940.0 μm
+  All channel depths relative to ripple:
+    Channel 850079756: +940.0 μm
+    Channel 850079760: +960.0 μm
+    Channel 850079762: +980.0 μm
+    Channel 850079766: +1000.0 μm
+    Channel 850079770: +1020.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_761418226/768908587:
+  Ripple channel depth: 1200.0 μm
+  Minimum distance to any channel below: 1420.0 μm
+  All channel depths relative to ripple:
+    Channel 850077254: +1420.0 μm
+    Channel 850077258: +1440.0 μm
+    Channel 850077264: +1480.0 μm
+    Channel 850077268: +1500.0 μm
+    Channel 850077272: +1520.0 μm
+    Channel 850077274: +1520.0 μm
+    Channel 850077278: +1540.0 μm
+    Channel 850077282: +1560.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_761418226/768908589:
+  Ripple channel depth: 2240.0 μm
+  Minimum distance to any channel below: 1000.0 μm
+  All channel depths relative to ripple:
+    Channel 850083466: +1000.0 μm
+    Channel 850083470: +1020.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_761418226/768908591:
+  Ripple channel depth: 1880.0 μm
+  Minimum distance to any channel below: 1440.0 μm
+  All channel depths relative to ripple:
+    Channel 850082244: +1440.0 μm
+    Channel 850082246: +1460.0 μm
+    Channel 850082250: +1480.0 μm
+    Channel 850082254: +1500.0 μm
+    Channel 850082258: +1520.0 μm
+    Channel 850082260: +1520.0 μm
+    Channel 850082264: +1540.0 μm
+    Channel 850082268: +1560.0 μm
+    Channel 850082270: +1580.0 μm
+    Channel 850082274: +1600.0 μm
+    Channel 850082278: +1620.0 μm
+    Channel 850082282: +1640.0 μm
+    Channel 850082284: +1640.0 μm
+    Channel 850082288: +1660.0 μm
+    Channel 850082292: +1680.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_762602078/768909178:
+  Ripple channel depth: 1880.0 μm
+  Minimum distance to any channel below: 1160.0 μm
+  All channel depths relative to ripple:
+    Channel 850059930: +1160.0 μm
+    Channel 850059936: +1180.0 μm
+    Channel 850059940: +1200.0 μm
+    Channel 850059942: +1220.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_762602078/768909180:
+  Ripple channel depth: 1720.0 μm
+  Minimum distance to any channel below: 1320.0 μm
+  All channel depths relative to ripple:
+    Channel 850065714: +1320.0 μm
+    Channel 850065720: +1340.0 μm
+    Channel 850065724: +1360.0 μm
+    Channel 850065726: +1380.0 μm
+    Channel 850065730: +1400.0 μm
+    Channel 850065734: +1420.0 μm
+    Channel 850065738: +1440.0 μm
+    Channel 850065740: +1440.0 μm
+    Channel 850065744: +1460.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_762602078/768909186:
+  Ripple channel depth: 2120.0 μm
+  Minimum distance to any channel below: 920.0 μm
+  All channel depths relative to ripple:
+    Channel 850062128: +920.0 μm
+    Channel 850062134: +940.0 μm
+    Channel 850062138: +960.0 μm
+    Channel 850062140: +980.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_762602078/768909188:
+  Ripple channel depth: 240.0 μm
+  Minimum distance to any channel below: 840.0 μm
+  All channel depths relative to ripple:
+    Channel 850060682: +840.0 μm
+    Channel 850060684: +840.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_763673393/773463013:
+  Ripple channel depth: 2040.0 μm
+  Minimum distance to any channel below: 1000.0 μm
+  All channel depths relative to ripple:
+    Channel 850053534: +1000.0 μm
+    Channel 850053540: +1020.0 μm
+    Channel 850053544: +1040.0 μm
+    Channel 850053546: +1060.0 μm
+    Channel 850053550: +1080.0 μm
+    Channel 850053554: +1100.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_763673393/773463015:
+  Ripple channel depth: 2040.0 μm
+  Minimum distance to any channel below: 1180.0 μm
+  All channel depths relative to ripple:
+    Channel 850054814: +1180.0 μm
+    Channel 850054818: +1200.0 μm
+    Channel 850054820: +1220.0 μm
+    Channel 850054824: +1240.0 μm
+    Channel 850054830: +1260.0 μm
+    Channel 850054834: +1280.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_763673393/773463017:
+  Ripple channel depth: 1360.0 μm
+  Minimum distance to any channel below: 1680.0 μm
+  All channel depths relative to ripple:
+    Channel 850055856: +1680.0 μm
+    Channel 850055860: +1700.0 μm
+    Channel 850055864: +1720.0 μm
+    Channel 850055866: +1720.0 μm
+    Channel 850055870: +1740.0 μm
+    Channel 850055874: +1760.0 μm
+    Channel 850055876: +1780.0 μm
+    Channel 850055880: +1800.0 μm
+    Channel 850055884: +1820.0 μm
+    Channel 850055888: +1840.0 μm
+    Channel 850055890: +1840.0 μm
+    Channel 850055894: +1860.0 μm
+    Channel 850055898: +1880.0 μm
+    Channel 850055900: +1900.0 μm
+    Channel 850055904: +1920.0 μm
+    Channel 850055908: +1940.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_763673393/773463019:
+  Ripple channel depth: 1680.0 μm
+  Minimum distance to any channel below: 940.0 μm
+  All channel depths relative to ripple:
+    Channel 850052310: +940.0 μm
+    Channel 850052314: +960.0 μm
+    Channel 850052320: +1000.0 μm
+    Channel 850052324: +1020.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_766640955/773592315:
+  Ripple channel depth: 2080.0 μm
+  Minimum distance to any channel below: 1160.0 μm
+  All channel depths relative to ripple:
+    Channel 850022902: +1160.0 μm
+    Channel 850022906: +1180.0 μm
+    Channel 850022910: +1200.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_766640955/773592318:
+  Ripple channel depth: 2040.0 μm
+  Minimum distance to any channel below: 1200.0 μm
+  All channel depths relative to ripple:
+    Channel 850024194: +1200.0 μm
+    Channel 850024198: +1220.0 μm
+    Channel 850024202: +1240.0 μm
+    Channel 850024204: +1240.0 μm
+    Channel 850024208: +1260.0 μm
+    Channel 850024212: +1280.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_766640955/773592324:
+  Ripple channel depth: 1560.0 μm
+  Minimum distance to any channel below: 1080.0 μm
+  All channel depths relative to ripple:
+    Channel 850026856: +1080.0 μm
+    Channel 850026864: +1120.0 μm
+    Channel 850026866: +1120.0 μm
+    Channel 850026870: +1140.0 μm
+    Channel 850026874: +1160.0 μm
+    Channel 850026878: +1180.0 μm
+    Channel 850026882: +1200.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_766640955/773592328:
+  Ripple channel depth: 2120.0 μm
+  Minimum distance to any channel below: 1120.0 μm
+  All channel depths relative to ripple:
+    Channel 850028154: +1120.0 μm
+    Channel 850028158: +1140.0 μm
+    Channel 850028162: +1160.0 μm
+    Channel 850028164: +1160.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_766640955/773592330:
+  Ripple channel depth: 2520.0 μm
+  Minimum distance to any channel below: 1020.0 μm
+  All channel depths relative to ripple:
+    Channel 850029796: +1020.0 μm
+    Channel 850029800: +1040.0 μm
+    Channel 850029802: +1040.0 μm
+    Channel 850029806: +1060.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_767871931/773462985:
+  Ripple channel depth: 2120.0 μm
+  Minimum distance to any channel below: 920.0 μm
+  All channel depths relative to ripple:
+    Channel 850008562: +920.0 μm
+    Channel 850008566: +940.0 μm
+    Channel 850008570: +960.0 μm
+    Channel 850008572: +960.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_767871931/773462990:
+  Ripple channel depth: 1520.0 μm
+  Minimum distance to any channel below: 1720.0 μm
+  All channel depths relative to ripple:
+    Channel 850009796: +1720.0 μm
+    Channel 850009800: +1740.0 μm
+    Channel 850009804: +1760.0 μm
+    Channel 850009806: +1760.0 μm
+    Channel 850009810: +1780.0 μm
+    Channel 850009814: +1800.0 μm
+    Channel 850009818: +1820.0 μm
+    Channel 850009822: +1840.0 μm
+    Channel 850009824: +1860.0 μm
+    Channel 850009828: +1880.0 μm
+    Channel 850009836: +1920.0 μm
+    Channel 850009840: +1940.0 μm
+    Channel 850009842: +1940.0 μm
+    Channel 850009846: +1960.0 μm
+    Channel 850009850: +1980.0 μm
+    Channel 850009854: +2000.0 μm
+    Channel 850009856: +2020.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_767871931/773462995:
+  Ripple channel depth: 1680.0 μm
+  Minimum distance to any channel below: 1060.0 μm
+  All channel depths relative to ripple:
+    Channel 850012424: +1060.0 μm
+    Channel 850012428: +1080.0 μm
+    Channel 850012432: +1100.0 μm
+    Channel 850012434: +1100.0 μm
+    Channel 850012438: +1120.0 μm
+    Channel 850012442: +1140.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_767871931/773462997:
+  Ripple channel depth: 2320.0 μm
+  Minimum distance to any channel below: 1120.0 μm
+  All channel depths relative to ripple:
+    Channel 850013826: +1120.0 μm
+    Channel 850013830: +1140.0 μm
+    Channel 850013834: +1160.0 μm
+    Channel 850013836: +1160.0 μm
+    Channel 850013840: +1180.0 μm
+    Channel 850013844: +1200.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_768515987/773549842:
+  Ripple channel depth: 1880.0 μm
+  Minimum distance to any channel below: 1160.0 μm
+  All channel depths relative to ripple:
+    Channel 849999412: +1160.0 μm
+    Channel 849999416: +1180.0 μm
+    Channel 849999420: +1200.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_768515987/773549846:
+  Ripple channel depth: 2040.0 μm
+  Minimum distance to any channel below: 1200.0 μm
+  All channel depths relative to ripple:
+    Channel 850000690: +1200.0 μm
+    Channel 850000694: +1220.0 μm
+    Channel 850000698: +1240.0 μm
+    Channel 850000700: +1240.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_768515987/773549852:
+  Ripple channel depth: 2000.0 μm
+  Minimum distance to any channel below: 1240.0 μm
+  All channel depths relative to ripple:
+    Channel 850004464: +1240.0 μm
+    Channel 850004468: +1260.0 μm
+    Channel 850004472: +1280.0 μm
+    Channel 850004474: +1280.0 μm
+    Channel 850004478: +1300.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_771160300/773621937:
+  Ripple channel depth: 1200.0 μm
+  Minimum distance to any channel below: 1440.0 μm
+  All channel depths relative to ripple:
+    Channel 849991178: +1440.0 μm
+    Channel 849991186: +1480.0 μm
+    Channel 849991188: +1480.0 μm
+    Channel 849991192: +1500.0 μm
+    Channel 849991196: +1520.0 μm
+    Channel 849991200: +1540.0 μm
+    Channel 849991204: +1560.0 μm
+    Channel 849991206: +1580.0 μm
+    Channel 849991210: +1600.0 μm
+    Channel 849991214: +1620.0 μm
+    Channel 849991218: +1640.0 μm
+    Channel 849991222: +1660.0 μm
+    Channel 849991224: +1660.0 μm
+    Channel 849991228: +1680.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_771160300/773621939:
+  Ripple channel depth: 1200.0 μm
+  Minimum distance to any channel below: 1340.0 μm
+  All channel depths relative to ripple:
+    Channel 849992480: +1340.0 μm
+    Channel 849992484: +1360.0 μm
+    Channel 849992488: +1380.0 μm
+    Channel 849992490: +1380.0 μm
+    Channel 849992494: +1400.0 μm
+    Channel 849992498: +1420.0 μm
+    Channel 849992502: +1440.0 μm
+    Channel 849992506: +1460.0 μm
+    Channel 849992508: +1480.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_771160300/773621942:
+  Ripple channel depth: 1000.0 μm
+  Minimum distance to any channel below: 1640.0 μm
+  All channel depths relative to ripple:
+    Channel 849993684: +1640.0 μm
+    Channel 849993692: +1680.0 μm
+    Channel 849993696: +1700.0 μm
+    Channel 849993700: +1720.0 μm
+    Channel 849993702: +1720.0 μm
+    Channel 849993706: +1740.0 μm
+    Channel 849993710: +1760.0 μm
+    Channel 849993714: +1780.0 μm
+    Channel 849993718: +1800.0 μm
+    Channel 849993720: +1820.0 μm
+    Channel 849993724: +1840.0 μm
+    Channel 849993728: +1860.0 μm
+    Channel 849993732: +1880.0 μm
+    Channel 849993736: +1900.0 μm
+    Channel 849993738: +1900.0 μm
+    Channel 849993742: +1920.0 μm
+    Channel 849993746: +1940.0 μm
+    Channel 849993750: +1960.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_771160300/773621945:
+  Ripple channel depth: 1200.0 μm
+  Minimum distance to any channel below: 1440.0 μm
+  All channel depths relative to ripple:
+    Channel 849995124: +1440.0 μm
+    Channel 849995132: +1480.0 μm
+    Channel 849995134: +1480.0 μm
+    Channel 849995138: +1500.0 μm
+    Channel 849995142: +1520.0 μm
+    Channel 849995146: +1540.0 μm
+    Channel 849995150: +1560.0 μm
+    Channel 849995152: +1580.0 μm
+    Channel 849995156: +1600.0 μm
+    Channel 849995160: +1620.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_771160300/773621948:
+  Ripple channel depth: 2120.0 μm
+  Minimum distance to any channel below: 1320.0 μm
+  All channel depths relative to ripple:
+    Channel 849996596: +1320.0 μm
+    Channel 849996600: +1340.0 μm
+    Channel 849996604: +1360.0 μm
+    Channel 849996606: +1360.0 μm
+    Channel 849996610: +1380.0 μm
+    Channel 849996614: +1400.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_771160300/773621950:
+  Ripple channel depth: 1760.0 μm
+  Minimum distance to any channel below: 1080.0 μm
+  All channel depths relative to ripple:
+    Channel 849998102: +1080.0 μm
+    Channel 849998106: +1100.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_771990200/773654723:
+  Ripple channel depth: 1440.0 μm
+  Minimum distance to any channel below: 1600.0 μm
+  All channel depths relative to ripple:
+    Channel 849983830: +1600.0 μm
+    Channel 849983834: +1620.0 μm
+    Channel 849983838: +1640.0 μm
+    Channel 849983840: +1640.0 μm
+    Channel 849983844: +1660.0 μm
+    Channel 849983848: +1680.0 μm
+    Channel 849983852: +1700.0 μm
+    Channel 849983856: +1720.0 μm
+    Channel 849983858: +1740.0 μm
+    Channel 849983862: +1760.0 μm
+    Channel 849983866: +1780.0 μm
+    Channel 849983870: +1800.0 μm
+    Channel 849983874: +1820.0 μm
+    Channel 849983876: +1820.0 μm
+    Channel 849983880: +1840.0 μm
+    Channel 849983884: +1860.0 μm
+    Channel 849983888: +1880.0 μm
+    Channel 849983890: +1900.0 μm
+    Channel 849983894: +1920.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_771990200/773654726:
+  Ripple channel depth: 1440.0 μm
+  Minimum distance to any channel below: 1600.0 μm
+  All channel depths relative to ripple:
+    Channel 849984936: +1600.0 μm
+    Channel 849984940: +1620.0 μm
+    Channel 849984944: +1640.0 μm
+    Channel 849984946: +1640.0 μm
+    Channel 849984950: +1660.0 μm
+    Channel 849984954: +1680.0 μm
+    Channel 849984958: +1700.0 μm
+    Channel 849984962: +1720.0 μm
+    Channel 849984964: +1740.0 μm
+    Channel 849984968: +1760.0 μm
+    Channel 849984972: +1780.0 μm
+    Channel 849984976: +1800.0 μm
+    Channel 849984980: +1820.0 μm
+    Channel 849984982: +1820.0 μm
+    Channel 849984986: +1840.0 μm
+    Channel 849984990: +1860.0 μm
+    Channel 849984994: +1880.0 μm
+    Channel 849984996: +1900.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_771990200/773654732:
+  Ripple channel depth: 2200.0 μm
+  Minimum distance to any channel below: 820.0 μm
+  All channel depths relative to ripple:
+    Channel 849988742: +820.0 μm
+    Channel 849988746: +840.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_771990200/773654734:
+  Ripple channel depth: 2600.0 μm
+  Minimum distance to any channel below: 840.0 μm
+  All channel depths relative to ripple:
+    Channel 849990176: +840.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_773418906/792676154:
+  Ripple channel depth: 1160.0 μm
+  Minimum distance to any channel below: 1380.0 μm
+  All channel depths relative to ripple:
+    Channel 849976746: +1380.0 μm
+    Channel 849976750: +1400.0 μm
+    Channel 849976754: +1420.0 μm
+    Channel 849976756: +1420.0 μm
+    Channel 849976760: +1440.0 μm
+    Channel 849976764: +1460.0 μm
+    Channel 849976768: +1480.0 μm
+    Channel 849976772: +1500.0 μm
+    Channel 849976774: +1520.0 μm
+    Channel 849976778: +1540.0 μm
+    Channel 849976782: +1560.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_773418906/792676156:
+  Ripple channel depth: 1200.0 μm
+  Minimum distance to any channel below: 1840.0 μm
+  All channel depths relative to ripple:
+    Channel 849977768: +1840.0 μm
+    Channel 849977772: +1860.0 μm
+    Channel 849977776: +1880.0 μm
+    Channel 849977778: +1880.0 μm
+    Channel 849977782: +1900.0 μm
+    Channel 849977786: +1920.0 μm
+    Channel 849977790: +1940.0 μm
+    Channel 849977794: +1960.0 μm
+    Channel 849977796: +1980.0 μm
+    Channel 849977800: +2000.0 μm
+    Channel 849977804: +2020.0 μm
+    Channel 849977808: +2040.0 μm
+    Channel 849977812: +2060.0 μm
+    Channel 849977814: +2060.0 μm
+    Channel 849977818: +2080.0 μm
+    Channel 849977822: +2100.0 μm
+    Channel 849977826: +2120.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_773418906/792676160:
+  Ripple channel depth: 1320.0 μm
+  Minimum distance to any channel below: 1220.0 μm
+  All channel depths relative to ripple:
+    Channel 849979850: +1220.0 μm
+    Channel 849979854: +1240.0 μm
+    Channel 849979858: +1260.0 μm
+    Channel 849979860: +1260.0 μm
+    Channel 849979864: +1280.0 μm
+    Channel 849979868: +1300.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_773418906/792676162:
+  Ripple channel depth: 2120.0 μm
+  Minimum distance to any channel below: 1100.0 μm
+  All channel depths relative to ripple:
+    Channel 849981264: +1100.0 μm
+    Channel 849981268: +1120.0 μm
+    Channel 849981270: +1120.0 μm
+    Channel 849981274: +1140.0 μm
+    Channel 849981278: +1160.0 μm
+    Channel 849981282: +1180.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_773418906/792676164:
+  Ripple channel depth: 2240.0 μm
+  Minimum distance to any channel below: 1000.0 μm
+  All channel depths relative to ripple:
+    Channel 849982810: +1000.0 μm
+    Channel 849982814: +1020.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_774875821/792602650:
+  Ripple channel depth: 1080.0 μm
+  Minimum distance to any channel below: 1440.0 μm
+  All channel depths relative to ripple:
+    Channel 849975508: +1440.0 μm
+    Channel 849975510: +1440.0 μm
+    Channel 849975514: +1460.0 μm
+    Channel 849975518: +1480.0 μm
+    Channel 849975522: +1500.0 μm
+    Channel 849975524: +1520.0 μm
+    Channel 849975528: +1540.0 μm
+    Channel 849975532: +1560.0 μm
+    Channel 849975540: +1600.0 μm
+    Channel 849975542: +1600.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_774875821/792602652:
+  Ripple channel depth: 1360.0 μm
+  Minimum distance to any channel below: 1180.0 μm
+  All channel depths relative to ripple:
+    Channel 849974316: +1180.0 μm
+    Channel 849974320: +1200.0 μm
+    Channel 849974324: +1220.0 μm
+    Channel 849974326: +1220.0 μm
+    Channel 849974330: +1240.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_774875821/792602654:
+  Ripple channel depth: 1160.0 μm
+  Minimum distance to any channel below: 1180.0 μm
+  All channel depths relative to ripple:
+    Channel 849972962: +1180.0 μm
+    Channel 849972966: +1200.0 μm
+    Channel 849972970: +1220.0 μm
+    Channel 849972972: +1220.0 μm
+    Channel 849972976: +1240.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_774875821/792602658:
+  Ripple channel depth: 1720.0 μm
+  Minimum distance to any channel below: 920.0 μm
+  All channel depths relative to ripple:
+    Channel 849970428: +920.0 μm
+    Channel 849970436: +960.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_774875821/792602660:
+  Ripple channel depth: 2000.0 μm
+  Minimum distance to any channel below: 1040.0 μm
+  All channel depths relative to ripple:
+    Channel 849969294: +1040.0 μm
+    Channel 849969298: +1060.0 μm
+    Channel 849969302: +1080.0 μm
+    Channel 849969304: +1080.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_778240327/792607545:
+  Ripple channel depth: 1400.0 μm
+  Minimum distance to any channel below: 1140.0 μm
+  All channel depths relative to ripple:
+    Channel 849961184: +1140.0 μm
+    Channel 849961188: +1160.0 μm
+    Channel 849961192: +1180.0 μm
+    Channel 849961194: +1180.0 μm
+    Channel 849961198: +1200.0 μm
+    Channel 849961202: +1220.0 μm
+    Channel 849961206: +1240.0 μm
+    Channel 849961210: +1260.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_778240327/792607547:
+  Ripple channel depth: 1560.0 μm
+  Minimum distance to any channel below: 1080.0 μm
+  All channel depths relative to ripple:
+    Channel 849959910: +1080.0 μm
+    Channel 849959918: +1120.0 μm
+    Channel 849959920: +1120.0 μm
+    Channel 849959924: +1140.0 μm
+    Channel 849959928: +1160.0 μm
+    Channel 849959930: +1180.0 μm
+    Channel 849959932: +1180.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_778240327/792607549:
+  Ripple channel depth: 1680.0 μm
+  Minimum distance to any channel below: 1160.0 μm
+  All channel depths relative to ripple:
+    Channel 849958576: +1160.0 μm
+    Channel 849958580: +1180.0 μm
+    Channel 849958584: +1200.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_778240327/792607553:
+  Ripple channel depth: 880.0 μm
+  Minimum distance to any channel below: 1860.0 μm
+  All channel depths relative to ripple:
+    Channel 849957290: +1860.0 μm
+    Channel 849957294: +1880.0 μm
+    Channel 849957298: +1900.0 μm
+    Channel 849957300: +1900.0 μm
+    Channel 849957304: +1920.0 μm
+    Channel 849957308: +1940.0 μm
+    Channel 849957312: +1960.0 μm
+    Channel 849957316: +1980.0 μm
+    Channel 849957318: +2000.0 μm
+    Channel 849957322: +2020.0 μm
+    Channel 849957326: +2040.0 μm
+    Channel 849957330: +2060.0 μm
+    Channel 849957334: +2080.0 μm
+    Channel 849957336: +2080.0 μm
+    Channel 849957340: +2100.0 μm
+    Channel 849957344: +2120.0 μm
+    Channel 849957348: +2140.0 μm
+    Channel 849957350: +2160.0 μm
+    Channel 849957354: +2180.0 μm
+    Channel 849957358: +2200.0 μm
+    Channel 849957362: +2220.0 μm
+    Channel 849957366: +2240.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_778240327/792607557:
+  Ripple channel depth: 1440.0 μm
+  Minimum distance to any channel below: 1580.0 μm
+  All channel depths relative to ripple:
+    Channel 849956014: +1580.0 μm
+    Channel 849956018: +1600.0 μm
+    Channel 849956022: +1620.0 μm
+    Channel 849956026: +1640.0 μm
+    Channel 849956028: +1640.0 μm
+    Channel 849956032: +1660.0 μm
+    Channel 849956036: +1680.0 μm
+    Channel 849956040: +1700.0 μm
+    Channel 849956044: +1720.0 μm
+    Channel 849956046: +1740.0 μm
+    Channel 849956050: +1760.0 μm
+    Channel 849956054: +1780.0 μm
+    Channel 849956058: +1800.0 μm
+    Channel 849956062: +1820.0 μm
+    Channel 849956064: +1820.0 μm
+    Channel 849956068: +1840.0 μm
+    Channel 849956072: +1860.0 μm
+    Channel 849956076: +1880.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_778240327/792607559:
+  Ripple channel depth: 1600.0 μm
+  Minimum distance to any channel below: 1420.0 μm
+  All channel depths relative to ripple:
+    Channel 849954816: +1420.0 μm
+    Channel 849954818: +1440.0 μm
+    Channel 849954822: +1460.0 μm
+    Channel 849954826: +1480.0 μm
+    Channel 849954830: +1500.0 μm
+    Channel 849954834: +1520.0 μm
+    Channel 849954836: +1520.0 μm
+    Channel 849954842: +1560.0 μm
+    Channel 849954846: +1580.0 μm
+    Channel 849954850: +1600.0 μm
+    Channel 849954852: +1600.0 μm
+    Channel 849954856: +1620.0 μm
+    Channel 849954860: +1640.0 μm
+    Channel 849954864: +1660.0 μm
+    Channel 849954868: +1680.0 μm
+    Channel 849954870: +1700.0 μm
+    Channel 849954874: +1720.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_778998620/792626841:
+  Ripple channel depth: 1880.0 μm
+  Minimum distance to any channel below: 960.0 μm
+  All channel depths relative to ripple:
+    Channel 849721054: +960.0 μm
+    Channel 849721058: +980.0 μm
+    Channel 849721062: +1000.0 μm
+    Channel 849721064: +1000.0 μm
+    Channel 849721070: +1040.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_778998620/792626844:
+  Ripple channel depth: 2000.0 μm
+  Minimum distance to any channel below: 1040.0 μm
+  All channel depths relative to ripple:
+    Channel 849719904: +1040.0 μm
+    Channel 849719908: +1060.0 μm
+    Channel 849719912: +1080.0 μm
+    Channel 849719914: +1080.0 μm
+    Channel 849719918: +1100.0 μm
+    Channel 849719922: +1120.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_778998620/792626853:
+  Ripple channel depth: 2400.0 μm
+  Minimum distance to any channel below: 1040.0 μm
+  All channel depths relative to ripple:
+    Channel 849715790: +1040.0 μm
+    Channel 849715794: +1060.0 μm
+    Channel 849715798: +1080.0 μm
+    Channel 849715800: +1080.0 μm
+    Channel 849715804: +1100.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_778998620/792626855:
+  Ripple channel depth: 2440.0 μm
+  Minimum distance to any channel below: 1100.0 μm
+  All channel depths relative to ripple:
+    Channel 849714452: +1100.0 μm
+    Channel 849714456: +1120.0 μm
+    Channel 849714460: +1140.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_779839471/792645490:
+  Ripple channel depth: 1640.0 μm
+  Minimum distance to any channel below: 1400.0 μm
+  All channel depths relative to ripple:
+    Channel 849713106: +1400.0 μm
+    Channel 849713110: +1420.0 μm
+    Channel 849713114: +1440.0 μm
+    Channel 849713116: +1440.0 μm
+    Channel 849713120: +1460.0 μm
+    Channel 849713124: +1480.0 μm
+    Channel 849713128: +1500.0 μm
+    Channel 849713132: +1520.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_779839471/792645493:
+  Ripple channel depth: 1800.0 μm
+  Minimum distance to any channel below: 1240.0 μm
+  All channel depths relative to ripple:
+    Channel 849711734: +1240.0 μm
+    Channel 849711738: +1260.0 μm
+    Channel 849711742: +1280.0 μm
+    Channel 849711744: +1280.0 μm
+    Channel 849711748: +1300.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_779839471/792645497:
+  Ripple channel depth: 1000.0 μm
+  Minimum distance to any channel below: 1640.0 μm
+  All channel depths relative to ripple:
+    Channel 849710190: +1640.0 μm
+    Channel 849710198: +1680.0 μm
+    Channel 849710200: +1680.0 μm
+    Channel 849710204: +1700.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_779839471/792645499:
+  Ripple channel depth: 1360.0 μm
+  Minimum distance to any channel below: 1180.0 μm
+  All channel depths relative to ripple:
+    Channel 849708814: +1180.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_779839471/792645501:
+  Ripple channel depth: 2000.0 μm
+  Minimum distance to any channel below: 1040.0 μm
+  All channel depths relative to ripple:
+    Channel 849707398: +1040.0 μm
+    Channel 849707402: +1060.0 μm
+    Channel 849707406: +1080.0 μm
+    Channel 849707408: +1080.0 μm
+    Channel 849707412: +1100.0 μm
+    Channel 849707416: +1120.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_779839471/792645504:
+  Ripple channel depth: 2320.0 μm
+  Minimum distance to any channel below: 960.0 μm
+  All channel depths relative to ripple:
+    Channel 849706210: +960.0 μm
+    Channel 849706214: +980.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_781842082/792586876:
+  Ripple channel depth: 1800.0 μm
+  Minimum distance to any channel below: 1020.0 μm
+  All channel depths relative to ripple:
+    Channel 849953552: +1020.0 μm
+    Channel 849953556: +1040.0 μm
+    Channel 849953558: +1060.0 μm
+    Channel 849953562: +1080.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_781842082/792586879:
+  Ripple channel depth: 1360.0 μm
+  Minimum distance to any channel below: 1680.0 μm
+  All channel depths relative to ripple:
+    Channel 849952364: +1680.0 μm
+    Channel 849952368: +1700.0 μm
+    Channel 849952372: +1720.0 μm
+    Channel 849952374: +1720.0 μm
+    Channel 849952378: +1740.0 μm
+    Channel 849952382: +1760.0 μm
+    Channel 849952386: +1780.0 μm
+    Channel 849952390: +1800.0 μm
+    Channel 849952392: +1820.0 μm
+    Channel 849952396: +1840.0 μm
+    Channel 849952400: +1860.0 μm
+    Channel 849952404: +1880.0 μm
+    Channel 849952408: +1900.0 μm
+    Channel 849952410: +1900.0 μm
+    Channel 849952414: +1920.0 μm
+    Channel 849952418: +1940.0 μm
+    Channel 849952422: +1960.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_781842082/792586883:
+  Ripple channel depth: 1360.0 μm
+  Minimum distance to any channel below: 1680.0 μm
+  All channel depths relative to ripple:
+    Channel 849949622: +1680.0 μm
+    Channel 849949626: +1700.0 μm
+    Channel 849949630: +1720.0 μm
+    Channel 849949632: +1720.0 μm
+    Channel 849949636: +1740.0 μm
+    Channel 849949640: +1760.0 μm
+    Channel 849949644: +1780.0 μm
+    Channel 849949648: +1800.0 μm
+    Channel 849949650: +1820.0 μm
+    Channel 849949654: +1840.0 μm
+    Channel 849949658: +1860.0 μm
+    Channel 849949662: +1880.0 μm
+    Channel 849949666: +1900.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_781842082/792586887:
+  Ripple channel depth: 2120.0 μm
+  Minimum distance to any channel below: 1220.0 μm
+  All channel depths relative to ripple:
+    Channel 849948198: +1220.0 μm
+    Channel 849948202: +1240.0 μm
+    Channel 849948206: +1260.0 μm
+    Channel 849948208: +1260.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_781842082/792586891:
+  Ripple channel depth: 2320.0 μm
+  Minimum distance to any channel below: 1220.0 μm
+  All channel depths relative to ripple:
+    Channel 849946938: +1220.0 μm
+    Channel 849946942: +1240.0 μm
+    Channel 849946946: +1260.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_786091066/792623916:
+  Ripple channel depth: 1480.0 μm
+  Minimum distance to any channel below: 1160.0 μm
+  All channel depths relative to ripple:
+    Channel 849938410: +1160.0 μm
+    Channel 849938418: +1200.0 μm
+    Channel 849938420: +1200.0 μm
+    Channel 849938424: +1220.0 μm
+    Channel 849938428: +1240.0 μm
+    Channel 849938434: +1280.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_786091066/792623925:
+  Ripple channel depth: 520.0 μm
+  Minimum distance to any channel below: 1920.0 μm
+  All channel depths relative to ripple:
+    Channel 849934816: +1920.0 μm
+    Channel 849934820: +1940.0 μm
+    Channel 849934824: +1960.0 μm
+    Channel 849934826: +1960.0 μm
+    Channel 849934830: +1980.0 μm
+    Channel 849934834: +2000.0 μm
+    Channel 849934838: +2020.0 μm
+    Channel 849934842: +2040.0 μm
+    Channel 849934844: +2060.0 μm
+    Channel 849934848: +2080.0 μm
+    Channel 849934852: +2100.0 μm
+    Channel 849934856: +2120.0 μm
+    Channel 849934862: +2140.0 μm
+    Channel 849934866: +2160.0 μm
+    Channel 849934870: +2180.0 μm
+    Channel 849934874: +2200.0 μm
+    Channel 849934876: +2220.0 μm
+    Channel 849934880: +2240.0 μm
+    Channel 849934884: +2260.0 μm
+    Channel 849934888: +2280.0 μm
+    Channel 849934892: +2300.0 μm
+    Channel 849934894: +2300.0 μm
+    Channel 849934898: +2320.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_786091066/792623928:
+  Ripple channel depth: 1320.0 μm
+  Minimum distance to any channel below: 1720.0 μm
+  All channel depths relative to ripple:
+    Channel 849933518: +1720.0 μm
+    Channel 849933522: +1740.0 μm
+    Channel 849933526: +1760.0 μm
+    Channel 849933528: +1760.0 μm
+    Channel 849933532: +1780.0 μm
+    Channel 849933536: +1800.0 μm
+    Channel 849933542: +1840.0 μm
+    Channel 849933546: +1860.0 μm
+    Channel 849933550: +1880.0 μm
+    Channel 849933552: +1880.0 μm
+    Channel 849933556: +1900.0 μm
+    Channel 849933560: +1920.0 μm
+    Channel 849933564: +1940.0 μm
+    Channel 849933568: +1960.0 μm
+    Channel 849933570: +1980.0 μm
+    Channel 849933574: +2000.0 μm
+    Channel 849933578: +2020.0 μm
+    Channel 849933582: +2040.0 μm
+    Channel 849933586: +2060.0 μm
+    Channel 849933588: +2060.0 μm
+    Channel 849933592: +2080.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_786091066/792623931:
+  Ripple channel depth: 1760.0 μm
+  Minimum distance to any channel below: 1480.0 μm
+  All channel depths relative to ripple:
+    Channel 849932420: +1480.0 μm
+    Channel 849932424: +1500.0 μm
+    Channel 849932428: +1520.0 μm
+    Channel 849932430: +1520.0 μm
+    Channel 849932434: +1540.0 μm
+    Channel 849932438: +1560.0 μm
+    Channel 849932442: +1580.0 μm
+    Channel 849932446: +1600.0 μm
+    Channel 849932448: +1620.0 μm
+    Channel 849932452: +1640.0 μm
+    Channel 849932460: +1680.0 μm
+    Channel 849932464: +1700.0 μm
+    Channel 849932466: +1700.0 μm
+    Channel 849932470: +1720.0 μm
+    Channel 849932474: +1740.0 μm
+    Channel 849932478: +1760.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_787025148/792586836:
+  Ripple channel depth: 1680.0 μm
+  Minimum distance to any channel below: 1360.0 μm
+  All channel depths relative to ripple:
+    Channel 849924724: +1360.0 μm
+    Channel 849924728: +1380.0 μm
+    Channel 849924732: +1400.0 μm
+    Channel 849924734: +1400.0 μm
+    Channel 849924738: +1420.0 μm
+    Channel 849924742: +1440.0 μm
+    Channel 849924746: +1460.0 μm
+    Channel 849924750: +1480.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_787025148/792586845:
+  Ripple channel depth: 1640.0 μm
+  Minimum distance to any channel below: 1400.0 μm
+  All channel depths relative to ripple:
+    Channel 849928630: +1400.0 μm
+    Channel 849928634: +1420.0 μm
+    Channel 849928638: +1440.0 μm
+    Channel 849928640: +1440.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_787025148/792586848:
+  Ripple channel depth: 2240.0 μm
+  Minimum distance to any channel below: 1080.0 μm
+  All channel depths relative to ripple:
+    Channel 849927280: +1080.0 μm
+    Channel 849927284: +1100.0 μm
+    Channel 849927288: +1120.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_787025148/792586852:
+  Ripple channel depth: 1880.0 μm
+  Minimum distance to any channel below: 1240.0 μm
+  All channel depths relative to ripple:
+    Channel 849926082: +1240.0 μm
+    Channel 849926086: +1260.0 μm
+    Channel 849926088: +1280.0 μm
+    Channel 849926092: +1300.0 μm
+    Channel 849926096: +1320.0 μm
+    Channel 849926100: +1340.0 μm
+    Channel 849926104: +1360.0 μm
+    Channel 849926106: +1360.0 μm
+    Channel 849926110: +1380.0 μm
+    Channel 849926114: +1400.0 μm
+    Channel 849926118: +1420.0 μm
+    Channel 849926120: +1440.0 μm
+    Channel 849926124: +1460.0 μm
+    Channel 849926128: +1480.0 μm
+    Channel 849926132: +1500.0 μm
+    Channel 849926136: +1520.0 μm
+    Channel 849926138: +1520.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_789848216/805002027:
+  Ripple channel depth: 1440.0 μm
+  Minimum distance to any channel below: 1600.0 μm
+  All channel depths relative to ripple:
+    Channel 849912120: +1600.0 μm
+    Channel 849912124: +1620.0 μm
+    Channel 849912128: +1640.0 μm
+    Channel 849912130: +1640.0 μm
+    Channel 849912134: +1660.0 μm
+    Channel 849912138: +1680.0 μm
+    Channel 849912144: +1720.0 μm
+    Channel 849912148: +1740.0 μm
+    Channel 849912152: +1760.0 μm
+    Channel 849912154: +1760.0 μm
+    Channel 849912158: +1780.0 μm
+    Channel 849912162: +1800.0 μm
+    Channel 849912166: +1820.0 μm
+    Channel 849912170: +1840.0 μm
+    Channel 849912172: +1860.0 μm
+    Channel 849912176: +1880.0 μm
+    Channel 849912180: +1900.0 μm
+    Channel 849912184: +1920.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_789848216/805002029:
+  Ripple channel depth: 1280.0 μm
+  Minimum distance to any channel below: 1760.0 μm
+  All channel depths relative to ripple:
+    Channel 849913306: +1760.0 μm
+    Channel 849913310: +1780.0 μm
+    Channel 849913314: +1800.0 μm
+    Channel 849913316: +1800.0 μm
+    Channel 849913320: +1820.0 μm
+    Channel 849913324: +1840.0 μm
+    Channel 849913328: +1860.0 μm
+    Channel 849913332: +1880.0 μm
+    Channel 849913334: +1900.0 μm
+    Channel 849913338: +1920.0 μm
+    Channel 849913342: +1940.0 μm
+    Channel 849913346: +1960.0 μm
+    Channel 849913350: +1980.0 μm
+    Channel 849913352: +1980.0 μm
+    Channel 849913356: +2000.0 μm
+    Channel 849913360: +2020.0 μm
+    Channel 849913364: +2040.0 μm
+    Channel 849913366: +2060.0 μm
+    Channel 849913370: +2080.0 μm
+    Channel 849913378: +2120.0 μm
+    Channel 849913386: +2160.0 μm
+    Channel 849913388: +2160.0 μm
+    Channel 849913392: +2180.0 μm
+    Channel 849913396: +2200.0 μm
+    Channel 849913400: +2220.0 μm
+    Channel 849913404: +2240.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_789848216/805002031:
+  Ripple channel depth: 1120.0 μm
+  Minimum distance to any channel below: 1900.0 μm
+  All channel depths relative to ripple:
+    Channel 849914406: +1900.0 μm
+    Channel 849914414: +1940.0 μm
+    Channel 849914416: +1960.0 μm
+    Channel 849914420: +1980.0 μm
+    Channel 849914424: +2000.0 μm
+    Channel 849914428: +2020.0 μm
+    Channel 849914432: +2040.0 μm
+    Channel 849914434: +2040.0 μm
+    Channel 849914438: +2060.0 μm
+    Channel 849914442: +2080.0 μm
+    Channel 849914446: +2100.0 μm
+    Channel 849914450: +2120.0 μm
+    Channel 849914452: +2140.0 μm
+    Channel 849914456: +2160.0 μm
+    Channel 849914460: +2180.0 μm
+    Channel 849914464: +2200.0 μm
+    Channel 849914466: +2200.0 μm
+    Channel 849914470: +2220.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_789848216/805002035:
+  Ripple channel depth: 1720.0 μm
+  Minimum distance to any channel below: 1820.0 μm
+  All channel depths relative to ripple:
+    Channel 849909970: +1820.0 μm
+    Channel 849909974: +1840.0 μm
+    Channel 849909978: +1860.0 μm
+    Channel 849909980: +1860.0 μm
+    Channel 849909984: +1880.0 μm
+    Channel 849909988: +1900.0 μm
+    Channel 849909992: +1920.0 μm
+    Channel 849909996: +1940.0 μm
+    Channel 849909998: +1960.0 μm
+    Channel 849910002: +1980.0 μm
+    Channel 849910006: +2000.0 μm
+    Channel 849910010: +2020.0 μm
+    Channel 849910014: +2040.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_789848216/805002037:
+  Ripple channel depth: 1840.0 μm
+  Minimum distance to any channel below: 1700.0 μm
+  All channel depths relative to ripple:
+    Channel 849911072: +1700.0 μm
+    Channel 849911076: +1720.0 μm
+    Channel 849911080: +1740.0 μm
+    Channel 849911082: +1740.0 μm
+    Channel 849911086: +1760.0 μm
+    Channel 849911090: +1780.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_791319847/805008600:
+  Ripple channel depth: 1000.0 μm
+  Minimum distance to any channel below: 1740.0 μm
+  All channel depths relative to ripple:
+    Channel 849902556: +1740.0 μm
+    Channel 849902560: +1760.0 μm
+    Channel 849902564: +1780.0 μm
+    Channel 849902566: +1780.0 μm
+    Channel 849902570: +1800.0 μm
+    Channel 849902574: +1820.0 μm
+    Channel 849902578: +1840.0 μm
+    Channel 849902582: +1860.0 μm
+    Channel 849902584: +1880.0 μm
+    Channel 849902588: +1900.0 μm
+    Channel 849902592: +1920.0 μm
+    Channel 849902596: +1940.0 μm
+    Channel 849902600: +1960.0 μm
+    Channel 849902602: +1960.0 μm
+    Channel 849902606: +1980.0 μm
+    Channel 849902610: +2000.0 μm
+    Channel 849902614: +2020.0 μm
+    Channel 849902616: +2040.0 μm
+    Channel 849902620: +2060.0 μm
+    Channel 849902624: +2080.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_791319847/805008602:
+  Ripple channel depth: 1560.0 μm
+  Minimum distance to any channel below: 1080.0 μm
+  All channel depths relative to ripple:
+    Channel 849903564: +1080.0 μm
+    Channel 849903572: +1120.0 μm
+    Channel 849903574: +1120.0 μm
+    Channel 849903578: +1140.0 μm
+    Channel 849903582: +1160.0 μm
+    Channel 849903586: +1180.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_791319847/805008606:
+  Ripple channel depth: 1240.0 μm
+  Minimum distance to any channel below: 1500.0 μm
+  All channel depths relative to ripple:
+    Channel 849905834: +1500.0 μm
+    Channel 849905838: +1520.0 μm
+    Channel 849905842: +1540.0 μm
+    Channel 849905844: +1540.0 μm
+    Channel 849905848: +1560.0 μm
+    Channel 849905852: +1580.0 μm
+    Channel 849905856: +1600.0 μm
+    Channel 849905860: +1620.0 μm
+    Channel 849905862: +1640.0 μm
+    Channel 849905866: +1660.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_791319847/805008608:
+  Ripple channel depth: 2120.0 μm
+  Minimum distance to any channel below: 1220.0 μm
+  All channel depths relative to ripple:
+    Channel 849908606: +1220.0 μm
+    Channel 849908610: +1240.0 μm
+    Channel 849908614: +1260.0 μm
+    Channel 849908616: +1260.0 μm
+    Channel 849908620: +1280.0 μm
+    Channel 849908624: +1300.0 μm
+    Channel 849908628: +1320.0 μm
+    Channel 849908632: +1340.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_791319847/805008610:
+  Ripple channel depth: 1840.0 μm
+  Minimum distance to any channel below: 1700.0 μm
+  All channel depths relative to ripple:
+    Channel 849904746: +1700.0 μm
+    Channel 849904750: +1720.0 μm
+    Channel 849904754: +1740.0 μm
+    Channel 849904756: +1740.0 μm
+    Channel 849904760: +1760.0 μm
+    Channel 849904764: +1780.0 μm
+    Channel 849904768: +1800.0 μm
+    Channel 849904772: +1820.0 μm
+    Channel 849904774: +1840.0 μm
+    Channel 849904778: +1860.0 μm
+    Channel 849904782: +1880.0 μm
+    Channel 849904786: +1900.0 μm
+    Channel 849904790: +1920.0 μm
+    Channel 849904792: +1920.0 μm
+    Channel 849904796: +1940.0 μm
+    Channel 849904804: +1980.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_793224716/805124802:
+  Ripple channel depth: 1880.0 μm
+  Minimum distance to any channel below: 660.0 μm
+  All channel depths relative to ripple:
+    Channel 849887030: +660.0 μm
+    Channel 849887034: +680.0 μm
+    Channel 849887038: +700.0 μm
+    Channel 849887040: +700.0 μm
+    Channel 849887044: +720.0 μm
+    Channel 849887048: +740.0 μm
+    Channel 849887052: +760.0 μm
+    Channel 849887056: +780.0 μm
+    Channel 849887058: +800.0 μm
+    Channel 849887062: +820.0 μm
+    Channel 849887066: +840.0 μm
+    Channel 849887070: +860.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_793224716/805124804:
+  Ripple channel depth: 1960.0 μm
+  Minimum distance to any channel below: 1080.0 μm
+  All channel depths relative to ripple:
+    Channel 849888276: +1080.0 μm
+    Channel 849888280: +1100.0 μm
+    Channel 849888284: +1120.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_793224716/805124809:
+  Ripple channel depth: 1200.0 μm
+  Minimum distance to any channel below: 1340.0 μm
+  All channel depths relative to ripple:
+    Channel 849890782: +1340.0 μm
+    Channel 849890786: +1360.0 μm
+    Channel 849890790: +1380.0 μm
+    Channel 849890792: +1380.0 μm
+    Channel 849890796: +1400.0 μm
+    Channel 849890800: +1420.0 μm
+    Channel 849890804: +1440.0 μm
+    Channel 849890808: +1460.0 μm
+    Channel 849890810: +1480.0 μm
+    Channel 849890814: +1500.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_793224716/805124812:
+  Ripple channel depth: 1560.0 μm
+  Minimum distance to any channel below: 1480.0 μm
+  All channel depths relative to ripple:
+    Channel 849892232: +1480.0 μm
+    Channel 849892236: +1500.0 μm
+    Channel 849892240: +1520.0 μm
+    Channel 849892242: +1520.0 μm
+    Channel 849892246: +1540.0 μm
+    Channel 849892250: +1560.0 μm
+    Channel 849892254: +1580.0 μm
+    Channel 849892258: +1600.0 μm
+    Channel 849892260: +1620.0 μm
+    Channel 849892264: +1640.0 μm
+    Channel 849892268: +1660.0 μm
+    Channel 849892272: +1680.0 μm
+    Channel 849892276: +1700.0 μm
+    Channel 849892278: +1700.0 μm
+    Channel 849892282: +1720.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_793224716/805124815:
+  Ripple channel depth: 2440.0 μm
+  Minimum distance to any channel below: 800.0 μm
+  All channel depths relative to ripple:
+    Channel 849893656: +800.0 μm
+    Channel 849893660: +820.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_794812542/810758777:
+  Ripple channel depth: 1400.0 μm
+  Minimum distance to any channel below: 1340.0 μm
+  All channel depths relative to ripple:
+    Channel 849877020: +1340.0 μm
+    Channel 849877026: +1360.0 μm
+    Channel 849877028: +1380.0 μm
+    Channel 849877030: +1380.0 μm
+    Channel 849877034: +1400.0 μm
+    Channel 849877038: +1420.0 μm
+    Channel 849877042: +1440.0 μm
+    Channel 849877046: +1460.0 μm
+    Channel 849877048: +1480.0 μm
+    Channel 849877052: +1500.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_794812542/810758783:
+  Ripple channel depth: 1360.0 μm
+  Minimum distance to any channel below: 1180.0 μm
+  All channel depths relative to ripple:
+    Channel 849874286: +1180.0 μm
+    Channel 849874290: +1200.0 μm
+    Channel 849874294: +1220.0 μm
+    Channel 849874296: +1220.0 μm
+    Channel 849874300: +1240.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_794812542/810758785:
+  Ripple channel depth: 2040.0 μm
+  Minimum distance to any channel below: 1000.0 μm
+  All channel depths relative to ripple:
+    Channel 849872992: +1000.0 μm
+    Channel 849872996: +1020.0 μm
+    Channel 849873000: +1040.0 μm
+    Channel 849873002: +1040.0 μm
+    Channel 849873006: +1060.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_794812542/810758787:
+  Ripple channel depth: 1800.0 μm
+  Minimum distance to any channel below: 1540.0 μm
+  All channel depths relative to ripple:
+    Channel 849871726: +1540.0 μm
+    Channel 849871730: +1560.0 μm
+    Channel 849871734: +1580.0 μm
+    Channel 849871736: +1580.0 μm
+    Channel 849871740: +1600.0 μm
+    Channel 849871744: +1620.0 μm
+    Channel 849871748: +1640.0 μm
+    Channel 849871752: +1660.0 μm
+    Channel 849871754: +1680.0 μm
+    Channel 849871758: +1700.0 μm
+    Channel 849871762: +1720.0 μm
+    Channel 849871766: +1740.0 μm
+    Channel 849871770: +1760.0 μm
+    Channel 849871772: +1760.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_797828357/805579734:
+  Ripple channel depth: 2120.0 μm
+  Minimum distance to any channel below: 1320.0 μm
+  All channel depths relative to ripple:
+    Channel 849857440: +1320.0 μm
+    Channel 849857448: +1360.0 μm
+    Channel 849857452: +1380.0 μm
+    Channel 849857456: +1400.0 μm
+    Channel 849857458: +1400.0 μm
+    Channel 849857462: +1420.0 μm
+    Channel 849857466: +1440.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_797828357/805579745:
+  Ripple channel depth: 880.0 μm
+  Minimum distance to any channel below: 2060.0 μm
+  All channel depths relative to ripple:
+    Channel 849860874: +2060.0 μm
+    Channel 849860878: +2080.0 μm
+    Channel 849860882: +2100.0 μm
+    Channel 849860884: +2100.0 μm
+    Channel 849860888: +2120.0 μm
+    Channel 849860892: +2140.0 μm
+    Channel 849860900: +2180.0 μm
+    Channel 849860902: +2200.0 μm
+    Channel 849860906: +2220.0 μm
+    Channel 849860910: +2240.0 μm
+    Channel 849860914: +2260.0 μm
+    Channel 849860918: +2280.0 μm
+    Channel 849860920: +2280.0 μm
+    Channel 849860924: +2300.0 μm
+    Channel 849860928: +2320.0 μm
+    Channel 849860932: +2340.0 μm
+    Channel 849860934: +2360.0 μm
+    Channel 849860938: +2380.0 μm
+    Channel 849860942: +2400.0 μm
+    Channel 849860946: +2420.0 μm
+    Channel 849860950: +2440.0 μm
+    Channel 849860952: +2440.0 μm
+    Channel 849860956: +2460.0 μm
+    Channel 849860960: +2480.0 μm
+    Channel 849860964: +2500.0 μm
+    Channel 849860968: +2520.0 μm
+    Channel 849860974: +2560.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_799864342/805579698:
+  Ripple channel depth: 520.0 μm
+  Minimum distance to any channel below: 1020.0 μm
+  All channel depths relative to ripple:
+    Channel 849848012: +1020.0 μm
+    Channel 849848016: +1040.0 μm
+    Channel 849848020: +1060.0 μm
+    Channel 849848022: +1060.0 μm
+    Channel 849848026: +1080.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_799864342/805579700:
+  Ripple channel depth: 2000.0 μm
+  Minimum distance to any channel below: 1040.0 μm
+  All channel depths relative to ripple:
+    Channel 849847094: +1040.0 μm
+    Channel 849847098: +1060.0 μm
+    Channel 849847102: +1080.0 μm
+    Channel 849847104: +1080.0 μm
+    Channel 849847108: +1100.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_799864342/805579706:
+  Ripple channel depth: 1000.0 μm
+  Minimum distance to any channel below: 1340.0 μm
+  All channel depths relative to ripple:
+    Channel 849844440: +1340.0 μm
+    Channel 849844444: +1360.0 μm
+    Channel 849844448: +1380.0 μm
+    Channel 849844450: +1380.0 μm
+    Channel 849844454: +1400.0 μm
+    Channel 849844460: +1440.0 μm
+    Channel 849844464: +1460.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_799864342/805579710:
+  Ripple channel depth: 2040.0 μm
+  Minimum distance to any channel below: 1000.0 μm
+  All channel depths relative to ripple:
+    Channel 849843258: +1000.0 μm
+    Channel 849843262: +1020.0 μm
+    Channel 849843266: +1040.0 μm
+    Channel 849843268: +1040.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_799864342/805579713:
+  Ripple channel depth: 2640.0 μm
+  Minimum distance to any channel below: 900.0 μm
+  All channel depths relative to ripple:
+    Channel 849842068: +900.0 μm
+    Channel 849842072: +920.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_819186360/820311760:
+  Ripple channel depth: 1920.0 μm
+  Minimum distance to any channel below: 1120.0 μm
+  All channel depths relative to ripple:
+    Channel 849799786: +1120.0 μm
+    Channel 849799790: +1140.0 μm
+    Channel 849799794: +1160.0 μm
+    Channel 849799796: +1160.0 μm
+    Channel 849799800: +1180.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_819186360/820311762:
+  Ripple channel depth: 2160.0 μm
+  Minimum distance to any channel below: 1380.0 μm
+  All channel depths relative to ripple:
+    Channel 849801224: +1380.0 μm
+    Channel 849801228: +1400.0 μm
+    Channel 849801232: +1420.0 μm
+    Channel 849801234: +1420.0 μm
+    Channel 849801238: +1440.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_819186360/820311764:
+  Ripple channel depth: 2440.0 μm
+  Minimum distance to any channel below: 1100.0 μm
+  All channel depths relative to ripple:
+    Channel 849802592: +1100.0 μm
+    Channel 849802596: +1120.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_821695405/822645895:
+  Ripple channel depth: 1640.0 μm
+  Minimum distance to any channel below: 1100.0 μm
+  All channel depths relative to ripple:
+    Channel 849793050: +1100.0 μm
+    Channel 849793054: +1120.0 μm
+    Channel 849793058: +1140.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_821695405/822645899:
+  Ripple channel depth: 1560.0 μm
+  Minimum distance to any channel below: 920.0 μm
+  All channel depths relative to ripple:
+    Channel 849790392: +920.0 μm
+    Channel 849790396: +940.0 μm
+    Channel 849790400: +960.0 μm
+    Channel 849790402: +980.0 μm
+    Channel 849790406: +1000.0 μm
+    Channel 849790410: +1020.0 μm
+    Channel 849790414: +1040.0 μm
+    Channel 849790418: +1060.0 μm
+    Channel 849790420: +1060.0 μm
+    Channel 849790424: +1080.0 μm
+    Channel 849790428: +1100.0 μm
+    Channel 849790432: +1120.0 μm
+    Channel 849790436: +1140.0 μm
+    Channel 849790438: +1160.0 μm
+    Channel 849790442: +1180.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_821695405/822645901:
+  Ripple channel depth: 1520.0 μm
+  Minimum distance to any channel below: 1020.0 μm
+  All channel depths relative to ripple:
+    Channel 849795326: +1020.0 μm
+    Channel 849795330: +1040.0 μm
+    Channel 849795338: +1080.0 μm
+    Channel 849795342: +1100.0 μm
+    Channel 849795346: +1120.0 μm
+    Channel 849795348: +1120.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_829720705/832129149:
+  Ripple channel depth: 200.0 μm
+  Minimum distance to any channel below: 960.0 μm
+  All channel depths relative to ripple:
+    Channel 849781148: +960.0 μm
+    Channel 849781152: +980.0 μm
+    Channel 849781154: +980.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_829720705/832129157:
+  Ripple channel depth: 1480.0 μm
+  Minimum distance to any channel below: 1160.0 μm
+  All channel depths relative to ripple:
+    Channel 849782532: +1160.0 μm
+    Channel 849782540: +1200.0 μm
+    Channel 849782544: +1220.0 μm
+    Channel 849782548: +1240.0 μm
+    Channel 849782550: +1240.0 μm
+    Channel 849782554: +1260.0 μm
+    Channel 849782558: +1280.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_829720705/832129159:
+  Ripple channel depth: 1160.0 μm
+  Minimum distance to any channel below: 1180.0 μm
+  All channel depths relative to ripple:
+    Channel 849783840: +1180.0 μm
+    Channel 849783844: +1200.0 μm
+    Channel 849783848: +1220.0 μm
+    Channel 849783850: +1220.0 μm
+    Channel 849783854: +1240.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_829720705/832129161:
+  Ripple channel depth: 1480.0 μm
+  Minimum distance to any channel below: 1060.0 μm
+  All channel depths relative to ripple:
+    Channel 849785036: +1060.0 μm
+    Channel 849785040: +1080.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_831882777/832810573:
+  Ripple channel depth: 1960.0 μm
+  Minimum distance to any channel below: 1080.0 μm
+  All channel depths relative to ripple:
+    Channel 849777722: +1080.0 μm
+    Channel 849777730: +1120.0 μm
+    Channel 849777734: +1140.0 μm
+    Channel 849777738: +1160.0 μm
+    Channel 849777740: +1160.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_831882777/832810576:
+  Ripple channel depth: 1760.0 μm
+  Minimum distance to any channel below: 1280.0 μm
+  All channel depths relative to ripple:
+    Channel 849776482: +1280.0 μm
+    Channel 849776486: +1300.0 μm
+    Channel 849776490: +1320.0 μm
+    Channel 849776492: +1320.0 μm
+    Channel 849776496: +1340.0 μm
+
+allen_viscoding_swr_murphylab2024/swrs_session_831882777/832810582:
+  Ripple channel depth: 120.0 μm
+  Minimum distance to any channel below: 1040.0 μm
+  All channel depths relative to ripple:
+    Channel 849772710: +1040.0 μm
+    Channel 849772714: +1060.0 μm
+    Channel 849772716: +1060.0 μm
+    Channel 849772720: +1080.0 μm
+    Channel 849772724: +1100.0 μm
+    Channel 849772728: +1120.0 μm

@@ -1,0 +1,289 @@
+Sharp Wave Channel Depth Threshold Analysis (Modulation Index Only)
+Threshold: 500 μm (relative to ripple channel)
+============================================================
+
+SUMMARY VIOLATION INFORMATION:
+Total violated probes: 167 of 781 probes (21.4%)
+Total violated sessions: 48 of 305 sessions (15.7%)
+
+ALLEN_VISBEHAVE_SWR_MURPHYLAB2024: All 394 probes passed, all 100 sessions passed
+ALLEN_VISCODING_SWR_MURPHYLAB2024: 160 of 204 probes (78.4%), 41 of 47 sessions (87.2%)
+IBL_SWR_MURPHYLAB2024: 7 of 183 probes (3.8%), 7 of 158 sessions (4.4%)
+
+SESSION LISTS FOR PIPELINE RE-RUNNING:
+
+ABI Viscoding Sessions: [719161530, 721123822, 743475441, 744228101, 746083955, 750749662, 751348571, 754312389, 754829445, 755434585, 757216464, 757970808, 758798717, 759883607, 760345702, 761418226, 762602078, 763673393, 766640955, 767871931, 768515987, 771160300, 771990200, 773418906, 774875821, 778240327, 778998620, 779839471, 781842082, 786091066, 787025148, 789848216, 791319847, 793224716, 794812542, 797828357, 799864342, 819186360, 821695405, 829720705, 831882777]
+
+IBL Sessions: ['280ee768-f7b8-4c6c-9ea0-48ca75d6b6f3', '5b49aca6-a6f4-4075-931a-617ad64c219c', '642c97ea-fe89-4ec9-8629-5e492ea4019d', '64977c74-9c04-437a-9ea1-50386c4996db', '6c6983ef-7383-4989-9183-32b1a300d17a', 'c7248e09-8c0d-40f2-9eb4-700a8973d8c8', 'd901aff5-2250-467a-b4a1-0cb9729df9e2']
+
+------------------------------------------------------------
+
+DETAILED VIOLATION INFORMATION:
+
+ALLEN_VISCODING_SWR_MURPHYLAB2024
+Session: 719161530
+  Probes: 729445648, Net SW Power: 1040.0μm, Modulation Index: 1020.0μm, Circular-Linear Corr: 1020.0μm
+
+Session: 721123822
+  Probes: 760213147, Net SW Power: 1560.0μm, Modulation Index: 1560.0μm, Circular-Linear Corr: 1560.0μm
+
+Session: 743475441
+  Probes: 769325777, Net SW Power: 1500.0μm, Modulation Index: 1880.0μm, Circular-Linear Corr: 1820.0μm
+  Probes: 769325781, Net SW Power: 1640.0μm, Modulation Index: 1900.0μm, Circular-Linear Corr: 1900.0μm
+  Probes: 769326325, Net SW Power: 620.0μm, Modulation Index: 720.0μm, Circular-Linear Corr: 720.0μm
+  Probes: 769326329, Net SW Power: 1620.0μm, Modulation Index: 1480.0μm, Circular-Linear Corr: 1480.0μm
+  Probes: 769326332, Net SW Power: 1620.0μm, Modulation Index: 1500.0μm, Circular-Linear Corr: 1400.0μm
+
+Session: 744228101
+  Probes: 757904508, Net SW Power: 900.0μm, Modulation Index: 940.0μm, Circular-Linear Corr: 940.0μm
+  Probes: 757904510, Net SW Power: 1480.0μm, Modulation Index: 1360.0μm, Circular-Linear Corr: 1360.0μm
+  Probes: 757904516, Net SW Power: 1700.0μm, Modulation Index: 2040.0μm, Circular-Linear Corr: 1780.0μm
+  Probes: 757904520, Net SW Power: 1660.0μm, Modulation Index: 1980.0μm, Circular-Linear Corr: 1660.0μm
+  Probes: 757904522, Net SW Power: 880.0μm, Modulation Index: 880.0μm, Circular-Linear Corr: 880.0μm
+
+Session: 746083955
+  Probes: 760647913, Net SW Power: 1380.0μm, Modulation Index: 1540.0μm, Circular-Linear Corr: 1540.0μm
+
+Session: 750749662
+  Probes: 769322804, Net SW Power: 1320.0μm, Modulation Index: 1240.0μm, Circular-Linear Corr: 1200.0μm
+  Probes: 769322808, Net SW Power: 40.0μm, Modulation Index: 540.0μm, Circular-Linear Corr: 540.0μm
+  Probes: 769322810, Net SW Power: 1500.0μm, Modulation Index: 1500.0μm, Circular-Linear Corr: 1500.0μm
+
+Session: 751348571
+  Probes: 757984813, Net SW Power: 900.0μm, Modulation Index: 900.0μm, Circular-Linear Corr: 900.0μm
+  Probes: 757984818, Net SW Power: 880.0μm, Modulation Index: 840.0μm, Circular-Linear Corr: 840.0μm
+  Probes: 757984826, Net SW Power: 1580.0μm, Modulation Index: 1680.0μm, Circular-Linear Corr: 1680.0μm
+  Probes: 757984830, Net SW Power: 980.0μm, Modulation Index: 1020.0μm, Circular-Linear Corr: 1020.0μm
+
+Session: 754312389
+  Probes: 756781553, Net SW Power: 880.0μm, Modulation Index: 940.0μm, Circular-Linear Corr: 880.0μm
+  Probes: 756781555, Net SW Power: 980.0μm, Modulation Index: 1040.0μm, Circular-Linear Corr: 1040.0μm
+  Probes: 756781557, Net SW Power: 1200.0μm, Modulation Index: 1200.0μm, Circular-Linear Corr: 1200.0μm
+  Probes: 756781559, Net SW Power: 1540.0μm, Modulation Index: 1740.0μm, Circular-Linear Corr: 1520.0μm
+  Probes: 756781561, Net SW Power: 920.0μm, Modulation Index: 920.0μm, Circular-Linear Corr: 920.0μm
+
+Session: 754829445
+  Probes: 760640033, Net SW Power: 860.0μm, Modulation Index: 860.0μm, Circular-Linear Corr: 860.0μm
+  Probes: 760640037, Net SW Power: 1000.0μm, Modulation Index: 1000.0μm, Circular-Linear Corr: 1000.0μm
+  Probes: 760640039, Net SW Power: 1600.0μm, Modulation Index: 1840.0μm, Circular-Linear Corr: 1920.0μm
+  Probes: 760640043, Net SW Power: 1260.0μm, Modulation Index: 1180.0μm, Circular-Linear Corr: 1220.0μm
+
+Session: 755434585
+  Probes: 760642621, Net SW Power: 1020.0μm, Modulation Index: 1020.0μm, Circular-Linear Corr: 1020.0μm
+  Probes: 760642624, Net SW Power: 1480.0μm, Modulation Index: 1480.0μm, Circular-Linear Corr: 1740.0μm
+  Probes: 760642631, Net SW Power: 1840.0μm, Modulation Index: 1840.0μm, Circular-Linear Corr: 1840.0μm
+
+Session: 757216464
+  Probes: 769322745, Net SW Power: 1160.0μm, Modulation Index: 1120.0μm, Circular-Linear Corr: 1120.0μm
+  Probes: 769322751, Net SW Power: 1760.0μm, Modulation Index: 2060.0μm, Circular-Linear Corr: 2000.0μm
+  Probes: 769322753, Net SW Power: 1080.0μm, Modulation Index: 1100.0μm, Circular-Linear Corr: 1100.0μm
+  Probes: 769322755, Net SW Power: 1680.0μm, Modulation Index: 1760.0μm, Circular-Linear Corr: 1760.0μm
+
+Session: 757970808
+  Probes: 769322852, Net SW Power: 1180.0μm, Modulation Index: 1160.0μm, Circular-Linear Corr: 1240.0μm
+  Probes: 769322858, Net SW Power: 1260.0μm, Modulation Index: 1260.0μm, Circular-Linear Corr: 1260.0μm
+  Probes: 769322862, Net SW Power: 920.0μm, Modulation Index: 960.0μm, Circular-Linear Corr: 960.0μm
+
+Session: 758798717
+  Probes: 770930067, Net SW Power: 1180.0μm, Modulation Index: 1180.0μm, Circular-Linear Corr: 1180.0μm
+
+Session: 759883607
+  Probes: 769322785, Net SW Power: 1400.0μm, Modulation Index: 1360.0μm, Circular-Linear Corr: 1380.0μm
+  Probes: 769322789, Net SW Power: 1180.0μm, Modulation Index: 1160.0μm, Circular-Linear Corr: 1160.0μm
+  Probes: 769322797, Net SW Power: 1740.0μm, Modulation Index: 2060.0μm, Circular-Linear Corr: 2060.0μm
+
+Session: 760345702
+  Probes: 810753195, Net SW Power: 1480.0μm, Modulation Index: 1480.0μm, Circular-Linear Corr: 1480.0μm
+  Probes: 810753199, Net SW Power: 1540.0μm, Modulation Index: 1540.0μm, Circular-Linear Corr: 1540.0μm
+  Probes: 810753201, Net SW Power: 1860.0μm, Modulation Index: 1980.0μm, Circular-Linear Corr: 1980.0μm
+  Probes: 810753203, Net SW Power: 1120.0μm, Modulation Index: 1160.0μm, Circular-Linear Corr: 1120.0μm
+
+Session: 761418226
+  Probes: 768908579, Net SW Power: 1020.0μm, Modulation Index: 1040.0μm, Circular-Linear Corr: 1040.0μm
+  Probes: 768908582, Net SW Power: 1020.0μm, Modulation Index: 940.0μm, Circular-Linear Corr: 940.0μm
+  Probes: 768908587, Net SW Power: 1440.0μm, Modulation Index: 1560.0μm, Circular-Linear Corr: 1560.0μm
+  Probes: 768908589, Net SW Power: 1000.0μm, Modulation Index: 1020.0μm, Circular-Linear Corr: 1020.0μm
+  Probes: 768908591, Net SW Power: 1440.0μm, Modulation Index: 1680.0μm, Circular-Linear Corr: 1680.0μm
+
+Session: 762602078
+  Probes: 768909178, Net SW Power: 1220.0μm, Modulation Index: 1220.0μm, Circular-Linear Corr: 1220.0μm
+  Probes: 768909180, Net SW Power: 1360.0μm, Modulation Index: 1320.0μm, Circular-Linear Corr: 1320.0μm
+  Probes: 768909186, Net SW Power: 920.0μm, Modulation Index: 920.0μm, Circular-Linear Corr: 920.0μm
+  Probes: 768909188, Net SW Power: 840.0μm, Modulation Index: 840.0μm, Circular-Linear Corr: 840.0μm
+
+Session: 763673393
+  Probes: 773463013, Net SW Power: 1000.0μm, Modulation Index: 1000.0μm, Circular-Linear Corr: 1000.0μm
+  Probes: 773463015, Net SW Power: 1180.0μm, Modulation Index: 1280.0μm, Circular-Linear Corr: 1280.0μm
+  Probes: 773463017, Net SW Power: 1780.0μm, Modulation Index: 1800.0μm, Circular-Linear Corr: 1800.0μm
+  Probes: 773463019, Net SW Power: 1020.0μm, Modulation Index: 1020.0μm, Circular-Linear Corr: 1020.0μm
+
+Session: 766640955
+  Probes: 773592315, Net SW Power: 1200.0μm, Modulation Index: 1200.0μm, Circular-Linear Corr: 1160.0μm
+  Probes: 773592318, Net SW Power: 1260.0μm, Modulation Index: 1200.0μm, Circular-Linear Corr: 1200.0μm
+  Probes: 773592324, Net SW Power: 1080.0μm, Modulation Index: 1080.0μm, Circular-Linear Corr: 1160.0μm
+  Probes: 773592328, Net SW Power: 1120.0μm, Modulation Index: 1160.0μm, Circular-Linear Corr: 1160.0μm
+  Probes: 773592330, Net SW Power: 1060.0μm, Modulation Index: 1020.0μm, Circular-Linear Corr: 1020.0μm
+
+Session: 767871931
+  Probes: 773462985, Net SW Power: 960.0μm, Modulation Index: 960.0μm, Circular-Linear Corr: 960.0μm
+  Probes: 773462990, Net SW Power: 1720.0μm, Modulation Index: 1860.0μm, Circular-Linear Corr: 1860.0μm
+  Probes: 773462995, Net SW Power: 1060.0μm, Modulation Index: 1060.0μm, Circular-Linear Corr: 1060.0μm
+  Probes: 773462997, Net SW Power: 1120.0μm, Modulation Index: 1200.0μm, Circular-Linear Corr: 1160.0μm
+
+Session: 768515987
+  Probes: 773549842, Net SW Power: 1200.0μm, Modulation Index: 1200.0μm, Circular-Linear Corr: 1200.0μm
+  Probes: 773549846, Net SW Power: 1200.0μm, Modulation Index: 1200.0μm, Circular-Linear Corr: 1200.0μm
+  Probes: 773549852, Net SW Power: 1240.0μm, Modulation Index: 1240.0μm, Circular-Linear Corr: 1240.0μm
+
+Session: 771160300
+  Probes: 773621937, Net SW Power: 1520.0μm, Modulation Index: 1640.0μm, Circular-Linear Corr: 1500.0μm
+  Probes: 773621939, Net SW Power: 1340.0μm, Modulation Index: 1440.0μm, Circular-Linear Corr: 1480.0μm
+  Probes: 773621942, Net SW Power: 1640.0μm, Modulation Index: 1640.0μm, Circular-Linear Corr: 1640.0μm
+  Probes: 773621945, Net SW Power: 1440.0μm, Modulation Index: 1620.0μm, Circular-Linear Corr: 1440.0μm
+  Probes: 773621948, Net SW Power: 1320.0μm, Modulation Index: 1400.0μm, Circular-Linear Corr: 1400.0μm
+  Probes: 773621950, Net SW Power: 1100.0μm, Modulation Index: 1100.0μm, Circular-Linear Corr: 1100.0μm
+
+Session: 771990200
+  Probes: 773654723, Net SW Power: 1600.0μm, Modulation Index: 1900.0μm, Circular-Linear Corr: 1900.0μm
+  Probes: 773654726, Net SW Power: 1700.0μm, Modulation Index: 1680.0μm, Circular-Linear Corr: 1600.0μm
+  Probes: 773654732, Net SW Power: 840.0μm, Modulation Index: 820.0μm, Circular-Linear Corr: 820.0μm
+  Probes: 773654734, Net SW Power: 840.0μm, Modulation Index: 840.0μm, Circular-Linear Corr: 840.0μm
+
+Session: 773418906
+  Probes: 792676154, Net SW Power: 1380.0μm, Modulation Index: 1480.0μm, Circular-Linear Corr: 1480.0μm
+  Probes: 792676156, Net SW Power: 2120.0μm, Modulation Index: 1960.0μm, Circular-Linear Corr: 2000.0μm
+  Probes: 792676160, Net SW Power: 1220.0μm, Modulation Index: 1300.0μm, Circular-Linear Corr: 1300.0μm
+  Probes: 792676162, Net SW Power: 1100.0μm, Modulation Index: 1180.0μm, Circular-Linear Corr: 1180.0μm
+  Probes: 792676164, Net SW Power: 1000.0μm, Modulation Index: 1000.0μm, Circular-Linear Corr: 1000.0μm
+
+Session: 774875821
+  Probes: 792602650, Net SW Power: 1440.0μm, Modulation Index: 1440.0μm, Circular-Linear Corr: 1440.0μm
+  Probes: 792602652, Net SW Power: 1180.0μm, Modulation Index: 1180.0μm, Circular-Linear Corr: 1180.0μm
+  Probes: 792602654, Net SW Power: 1180.0μm, Modulation Index: 1180.0μm, Circular-Linear Corr: 1180.0μm
+  Probes: 792602658, Net SW Power: 920.0μm, Modulation Index: 960.0μm, Circular-Linear Corr: 960.0μm
+  Probes: 792602660, Net SW Power: 1080.0μm, Modulation Index: 1040.0μm, Circular-Linear Corr: 1040.0μm
+
+Session: 778240327
+  Probes: 792607545, Net SW Power: 1260.0μm, Modulation Index: 1140.0μm, Circular-Linear Corr: 1140.0μm
+  Probes: 792607547, Net SW Power: 1080.0μm, Modulation Index: 1080.0μm, Circular-Linear Corr: 1080.0μm
+  Probes: 792607549, Net SW Power: 1200.0μm, Modulation Index: 1200.0μm, Circular-Linear Corr: 1200.0μm
+  Probes: 792607553, Net SW Power: 2000.0μm, Modulation Index: 2080.0μm, Circular-Linear Corr: 2100.0μm
+  Probes: 792607557, Net SW Power: 1580.0μm, Modulation Index: 1600.0μm, Circular-Linear Corr: 1640.0μm
+  Probes: 792607559, Net SW Power: 1560.0μm, Modulation Index: 1420.0μm, Circular-Linear Corr: 1420.0μm
+
+Session: 778998620
+  Probes: 792626841, Net SW Power: 960.0μm, Modulation Index: 1040.0μm, Circular-Linear Corr: 1040.0μm
+  Probes: 792626844, Net SW Power: 1100.0μm, Modulation Index: 1040.0μm, Circular-Linear Corr: 1120.0μm
+  Probes: 792626853, Net SW Power: 1040.0μm, Modulation Index: 1100.0μm, Circular-Linear Corr: 1100.0μm
+  Probes: 792626855, Net SW Power: 1120.0μm, Modulation Index: 1140.0μm, Circular-Linear Corr: 1140.0μm
+
+Session: 779839471
+  Probes: 792645490, Net SW Power: 1520.0μm, Modulation Index: 1520.0μm, Circular-Linear Corr: 1520.0μm
+  Probes: 792645493, Net SW Power: 1240.0μm, Modulation Index: 1280.0μm, Circular-Linear Corr: 1300.0μm
+  Probes: 792645497, Net SW Power: 1640.0μm, Modulation Index: 1640.0μm, Circular-Linear Corr: 1640.0μm
+  Probes: 792645499, Net SW Power: 1180.0μm, Modulation Index: 1180.0μm, Circular-Linear Corr: 1180.0μm
+  Probes: 792645501, Net SW Power: 1040.0μm, Modulation Index: 1060.0μm, Circular-Linear Corr: 1040.0μm
+  Probes: 792645504, Net SW Power: 960.0μm, Modulation Index: 980.0μm, Circular-Linear Corr: 980.0μm
+
+Session: 781842082
+  Probes: 792586876, Net SW Power: 1080.0μm, Modulation Index: 1080.0μm, Circular-Linear Corr: 1080.0μm
+  Probes: 792586879, Net SW Power: 1800.0μm, Modulation Index: 1680.0μm, Circular-Linear Corr: 1680.0μm
+  Probes: 792586883, Net SW Power: 1800.0μm, Modulation Index: 1760.0μm, Circular-Linear Corr: 1780.0μm
+  Probes: 792586887, Net SW Power: 1220.0μm, Modulation Index: 1220.0μm, Circular-Linear Corr: 1220.0μm
+  Probes: 792586891, Net SW Power: 1220.0μm, Modulation Index: 1220.0μm, Circular-Linear Corr: 1220.0μm
+
+Session: 786091066
+  Probes: 792623916, Net SW Power: 1280.0μm, Modulation Index: 1160.0μm, Circular-Linear Corr: 1160.0μm
+  Probes: 792623925, Net SW Power: 1920.0μm, Modulation Index: 2100.0μm, Circular-Linear Corr: 2080.0μm
+  Probes: 792623928, Net SW Power: 1900.0μm, Modulation Index: 1900.0μm, Circular-Linear Corr: 1920.0μm
+  Probes: 792623931, Net SW Power: 1620.0μm, Modulation Index: 1480.0μm, Circular-Linear Corr: 1740.0μm
+
+Session: 787025148
+  Probes: 792586836, Net SW Power: 1480.0μm, Modulation Index: 1440.0μm, Circular-Linear Corr: 1480.0μm
+  Probes: 792586845, Net SW Power: 1400.0μm, Modulation Index: 1440.0μm, Circular-Linear Corr: 1400.0μm
+  Probes: 792586848, Net SW Power: 1080.0μm, Modulation Index: 1120.0μm, Circular-Linear Corr: 1080.0μm
+  Probes: 792586852, Net SW Power: 1240.0μm, Modulation Index: 1240.0μm, Circular-Linear Corr: 1240.0μm
+
+Session: 789848216
+  Probes: 805002027, Net SW Power: 1600.0μm, Modulation Index: 1740.0μm, Circular-Linear Corr: 1680.0μm
+  Probes: 805002029, Net SW Power: 2000.0μm, Modulation Index: 2240.0μm, Circular-Linear Corr: 2240.0μm
+  Probes: 805002031, Net SW Power: 2100.0μm, Modulation Index: 2060.0μm, Circular-Linear Corr: 2080.0μm
+  Probes: 805002035, Net SW Power: 1820.0μm, Modulation Index: 1820.0μm, Circular-Linear Corr: 1820.0μm
+  Probes: 805002037, Net SW Power: 1700.0μm, Modulation Index: 1720.0μm, Circular-Linear Corr: 1700.0μm
+
+Session: 791319847
+  Probes: 805008600, Net SW Power: 1920.0μm, Modulation Index: 1740.0μm, Circular-Linear Corr: 1740.0μm
+  Probes: 805008602, Net SW Power: 1180.0μm, Modulation Index: 1080.0μm, Circular-Linear Corr: 1080.0μm
+  Probes: 805008606, Net SW Power: 1500.0μm, Modulation Index: 1660.0μm, Circular-Linear Corr: 1540.0μm
+  Probes: 805008608, Net SW Power: 1220.0μm, Modulation Index: 1340.0μm, Circular-Linear Corr: 1340.0μm
+  Probes: 805008610, Net SW Power: 1820.0μm, Modulation Index: 1980.0μm, Circular-Linear Corr: 1800.0μm
+
+Session: 793224716
+  Probes: 805124802, Net SW Power: 660.0μm, Modulation Index: 660.0μm, Circular-Linear Corr: 660.0μm
+  Probes: 805124804, Net SW Power: 1120.0μm, Modulation Index: 1120.0μm, Circular-Linear Corr: 1120.0μm
+  Probes: 805124809, Net SW Power: 1340.0μm, Modulation Index: 1500.0μm, Circular-Linear Corr: 1500.0μm
+  Probes: 805124812, Net SW Power: 1480.0μm, Modulation Index: 1480.0μm, Circular-Linear Corr: 1480.0μm
+  Probes: 805124815, Net SW Power: 800.0μm, Modulation Index: 800.0μm, Circular-Linear Corr: 800.0μm
+
+Session: 794812542
+  Probes: 810758777, Net SW Power: 1500.0μm, Modulation Index: 1500.0μm, Circular-Linear Corr: 1500.0μm
+  Probes: 810758783, Net SW Power: 1180.0μm, Modulation Index: 1180.0μm, Circular-Linear Corr: 1180.0μm
+  Probes: 810758785, Net SW Power: 1000.0μm, Modulation Index: 1060.0μm, Circular-Linear Corr: 1060.0μm
+  Probes: 810758787, Net SW Power: 1540.0μm, Modulation Index: 1540.0μm, Circular-Linear Corr: 1540.0μm
+
+Session: 797828357
+  Probes: 805579734, Net SW Power: 1320.0μm, Modulation Index: 1440.0μm, Circular-Linear Corr: 1320.0μm
+  Probes: 805579745, Net SW Power: 2060.0μm, Modulation Index: 2060.0μm, Circular-Linear Corr: 2060.0μm
+
+Session: 799864342
+  Probes: 805579698, Net SW Power: 1020.0μm, Modulation Index: 1080.0μm, Circular-Linear Corr: 1080.0μm
+  Probes: 805579700, Net SW Power: 1040.0μm, Modulation Index: 1040.0μm, Circular-Linear Corr: 1040.0μm
+  Probes: 805579706, Net SW Power: 1340.0μm, Modulation Index: 1460.0μm, Circular-Linear Corr: 1440.0μm
+  Probes: 805579710, Net SW Power: 1040.0μm, Modulation Index: 1000.0μm, Circular-Linear Corr: 1040.0μm
+  Probes: 805579713, Net SW Power: 920.0μm, Modulation Index: 900.0μm, Circular-Linear Corr: 920.0μm
+
+Session: 819186360
+  Probes: 820311760, Net SW Power: 1120.0μm, Modulation Index: 1120.0μm, Circular-Linear Corr: 1120.0μm
+  Probes: 820311762, Net SW Power: 1380.0μm, Modulation Index: 1420.0μm, Circular-Linear Corr: 1380.0μm
+  Probes: 820311764, Net SW Power: 1100.0μm, Modulation Index: 1100.0μm, Circular-Linear Corr: 1100.0μm
+
+Session: 821695405
+  Probes: 822645895, Net SW Power: 1100.0μm, Modulation Index: 1140.0μm, Circular-Linear Corr: 1140.0μm
+  Probes: 822645899, Net SW Power: 1040.0μm, Modulation Index: 960.0μm, Circular-Linear Corr: 920.0μm
+  Probes: 822645901, Net SW Power: 1080.0μm, Modulation Index: 1080.0μm, Circular-Linear Corr: 1020.0μm
+
+Session: 829720705
+  Probes: 832129149, Net SW Power: 980.0μm, Modulation Index: 980.0μm, Circular-Linear Corr: 980.0μm
+  Probes: 832129157, Net SW Power: 1160.0μm, Modulation Index: 1160.0μm, Circular-Linear Corr: 1160.0μm
+  Probes: 832129159, Net SW Power: 1180.0μm, Modulation Index: 1180.0μm, Circular-Linear Corr: 1180.0μm
+  Probes: 832129161, Net SW Power: 1060.0μm, Modulation Index: 1080.0μm, Circular-Linear Corr: 1080.0μm
+
+Session: 831882777
+  Probes: 832810573, Net SW Power: 1080.0μm, Modulation Index: 1160.0μm, Circular-Linear Corr: 1080.0μm
+  Probes: 832810576, Net SW Power: 1300.0μm, Modulation Index: 1280.0μm, Circular-Linear Corr: 1340.0μm
+  Probes: 832810582, Net SW Power: 1040.0μm, Modulation Index: 1040.0μm, Circular-Linear Corr: 1040.0μm
+
+
+IBL_SWR_MURPHYLAB2024
+Session: 280ee768-f7b8-4c6c-9ea0-48ca75d6b6f3
+  Probes: 64d04585-67e7-4320-baad-8d4589fd18f7, Net SW Power: 20.0μm, Modulation Index: 620.0μm, Circular-Linear Corr: 620.0μm
+
+Session: 5b49aca6-a6f4-4075-931a-617ad64c219c
+  Probes: f84f36c9-88f8-4d80-ba34-7f7a2b254ece, Net SW Power: 540.0μm, Modulation Index: 540.0μm, Circular-Linear Corr: 220.0μm
+
+Session: 642c97ea-fe89-4ec9-8629-5e492ea4019d
+  Probes: 49c2ea3d-2b50-4e8a-b124-9e190960784e, Net SW Power: 140.0μm, Modulation Index: 520.0μm, Circular-Linear Corr: 140.0μm
+
+Session: 64977c74-9c04-437a-9ea1-50386c4996db
+  Probes: 6292dc98-e2f1-45de-b045-56d98fdaca75, Net SW Power: 920.0μm, Modulation Index: 1600.0μm, Circular-Linear Corr: 1580.0μm
+
+Session: 6c6983ef-7383-4989-9183-32b1a300d17a
+  Probes: c0c3c95d-43c3-4e30-9ce7-0519d0473911, Net SW Power: 1140.0μm, Modulation Index: 540.0μm, Circular-Linear Corr: 480.0μm
+
+Session: c7248e09-8c0d-40f2-9eb4-700a8973d8c8
+  Probes: 84bb830f-b9ff-4e6b-9296-f458fb41d160, Net SW Power: 20.0μm, Modulation Index: 560.0μm, Circular-Linear Corr: 260.0μm
+
+Session: d901aff5-2250-467a-b4a1-0cb9729df9e2
+  Probes: 12c0f3a9-518e-4dac-9651-5d95c2b4730f, Net SW Power: 1040.0μm, Modulation Index: 980.0μm, Circular-Linear Corr: 960.0μm
+
+

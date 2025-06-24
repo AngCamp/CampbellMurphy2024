@@ -3,6 +3,7 @@ venv*
 .nfs*
 destriped_probe*
 CURSOR_INSTRUCTIONS.md
+Figures_and_Technical_Validation/Sharp_wave_component_validation/INSTRUCT_CURSOR.md
 .mypy_cache/
 .dmypy.json
 dmypy.json

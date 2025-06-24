@@ -44,7 +44,7 @@ class SWRExplorer:
     4. List available sessions and probes
     """
     
-    def __init__(self, base_path=None, allensdk_cache_dir="/space/scratch/allen_visbehave_data"):
+    def __init__(self, base_path=None, allensdk_cache_dir="/space/scratch/allen_visbehave_data", verbose_debugging=False):
         """
         Initialize the SWRExplorer.
         
@@ -52,10 +52,15 @@ class SWRExplorer:
         -----------
         base_path : str, optional
             Base path to the data directory. If None, uses default path.
+        allensdk_cache_dir : str, optional
+            Directory for AllenSDK cache
+        verbose_debugging : bool, optional
+            Whether to print detailed debug information
         """
         if base_path is None:
             raise ValueError("base_path must be specified explicitly")
         self.base_path = Path(base_path)
+        self.verbose_debugging = verbose_debugging
             
         self.data_sources = [
             "allen_visbehave_swr_murphylab2024",
@@ -76,12 +81,17 @@ class SWRExplorer:
         self._load_data()
         self._load_allensdk_cache_and_channels()
         
+    def _debug_print(self, *args, **kwargs):
+        """Helper method to print debug information only if verbose_debugging is True"""
+        if self.verbose_debugging:
+            print(*args, **kwargs)
+
     def _load_data(self):
         """Load all available data from the specified sources."""
         for source in self.data_sources:
             source_path = self.base_path / source
             if not source_path.exists():
-                print(f"Warning: Source path does not exist: {source_path}")
+                self._debug_print(f"Warning: Source path does not exist: {source_path}")
                 continue
                 
             self.data[source] = {}
@@ -101,37 +111,39 @@ class SWRExplorer:
                         filename = event_file.name
                         probe_match = re.search(r'probe_([^_]+)_channel_[^_]+_putative_swr_events', filename)
                         if not probe_match:
-                            print(f"Warning: Could not extract probe ID from filename: {filename}")
+                            self._debug_print(f"Warning: Could not extract probe ID from filename: {filename}")
                             continue
                             
                         probe_id = probe_match.group(1)
                         if probe_id not in self.data[source][session_id]:
                             self.data[source][session_id][probe_id] = {}
                         
-                        print(f"\n[DEBUG] Loading events for {source}/{session_id}/probe_{probe_id}")
+                        self._debug_print(f"\n[DEBUG] Loading events for {source}/{session_id}/probe_{probe_id}")
                         with gzip.open(event_file, 'rt') as f:
                             events_df = pd.read_csv(f)
-                            print(f"[DEBUG] Raw events DataFrame info:")
-                            print(events_df.info())
-                            print("\n[DEBUG] First few rows of raw events:")
-                            print(events_df.head())
-                            print("\n[DEBUG] Index values (first 10):")
-                            print(events_df.index.values[:10])
+                            if self.verbose_debugging:
+                                self._debug_print(f"[DEBUG] Raw events DataFrame info:")
+                                self._debug_print(events_df.info())
+                                self._debug_print("\n[DEBUG] First few rows of raw events:")
+                                self._debug_print(events_df.head())
+                                self._debug_print("\n[DEBUG] Index values (first 10):")
+                                self._debug_print(events_df.index.values[:10])
                             
                             # Check for 'Unnamed: 0' column
                             if 'Unnamed: 0' in events_df.columns:
-                                print(f"\n[DEBUG] Found 'Unnamed: 0' column, renaming to 'event_id'")
+                                self._debug_print(f"\n[DEBUG] Found 'Unnamed: 0' column, renaming to 'event_id'")
                                 events_df = events_df.rename(columns={'Unnamed: 0': 'event_id'})
                                 events_df = events_df.set_index('event_id')
-                                print("\n[DEBUG] After setting index:")
-                                print(events_df.head())
-                                print("\n[DEBUG] New index values (first 10):")
-                                print(events_df.index.values[:10])
+                                if self.verbose_debugging:
+                                    self._debug_print("\n[DEBUG] After setting index:")
+                                    self._debug_print(events_df.head())
+                                    self._debug_print("\n[DEBUG] New index values (first 10):")
+                                    self._debug_print(events_df.index.values[:10])
                             
                             self.data[source][session_id][probe_id]['events'] = events_df
                             
                     except Exception as e:
-                        print(f"Error loading {event_file}: {e}")
+                        self._debug_print(f"Error loading {event_file}: {e}")
                         continue
     
     def _load_allensdk_cache_and_channels(self):
@@ -139,7 +151,7 @@ class SWRExplorer:
             self.allensdk_cache = VisualBehaviorNeuropixelsProjectCache.from_s3_cache(cache_dir=self.allensdk_cache_dir)
             self.channel_table = self.allensdk_cache.get_channel_table()
         else:
-            print("[WARNING] AllenSDK not available. Channel sorting by AP will not work.")
+            self._debug_print("[WARNING] AllenSDK not available. Channel sorting by AP will not work.")
 
     def get_channel_ap_coordinate(self, channel_id):
         if self.channel_table is not None and channel_id in self.channel_table.index:
@@ -149,16 +161,16 @@ class SWRExplorer:
     def list_available_data(self):
         """Print available sessions and probes for each dataset."""
         for source in self.data_sources:
-            print(f"\nDataset: {source}")
+            self._debug_print(f"\nDataset: {source}")
             if source not in self.data:
-                print("  No data available")
+                self._debug_print("  No data available")
                 continue
                 
             for session_id in self.data[source]:
-                print(f"  Session: {session_id}")
+                self._debug_print(f"  Session: {session_id}")
                 for probe_id in self.data[source][session_id]:
                     event_count = len(self.data[source][session_id][probe_id].get('events', []))
-                    print(f"    Probe: {probe_id} - {event_count} events")
+                    self._debug_print(f"    Probe: {probe_id} - {event_count} events")
     
     def get_session_probe_stats(self, dataset=None):
         """
@@ -236,13 +248,13 @@ class SWRExplorer:
             raise ValueError("Invalid dataset, session_id, or probe_id")
             
         events = self.data[dataset][session_id][probe_id]['events'].copy()
-        print(f"[DEBUG] {dataset} {session_id} {probe_id} events columns: {list(events.columns)}, shape: {events.shape}")
+        self._debug_print(f"[DEBUG] {dataset} {session_id} {probe_id} events columns: {list(events.columns)}, shape: {events.shape}")
         if events.empty:
-            print(f"[INFO] No events for dataset={dataset}, session={session_id}, probe={probe_id}")
+            self._debug_print(f"[INFO] No events for dataset={dataset}, session={session_id}, probe={probe_id}")
         if 'overlaps_with_gamma' not in events.columns or 'overlaps_with_movement' not in events.columns:
-            print(f"[ERROR] Missing expected columns in events for dataset={dataset}, session={session_id}, probe={probe_id}")
-            print(f"Columns found: {list(events.columns)}")
-            print(f"File may be corrupted or from an old pipeline run.")
+            self._debug_print(f"[ERROR] Missing expected columns in events for dataset={dataset}, session={session_id}, probe={probe_id}")
+            self._debug_print(f"Columns found: {list(events.columns)}")
+            self._debug_print(f"File may be corrupted or from an old pipeline run.")
             raise KeyError("Missing 'overlaps_with_gamma' or 'overlaps_with_movement' in event file!")
         
         # Apply filters
@@ -360,10 +372,10 @@ class SWRExplorer:
             
         events = self.data[dataset][session_id][probe_id]['events'].copy()
         
-        print(f"\n[DEBUG] Filtering events for {dataset}/{session_id}/probe_{probe_id}")
-        print(f"[DEBUG] Initial events shape: {events.shape}")
-        print(f"[DEBUG] Initial events index values (first 10):")
-        print(events.index.values[:10])
+        self._debug_print(f"\n[DEBUG] Filtering events for {dataset}/{session_id}/probe_{probe_id}")
+        self._debug_print(f"[DEBUG] Initial events shape: {events.shape}")
+        self._debug_print(f"[DEBUG] Initial events index values (first 10):")
+        self._debug_print(events.index.values[:10])
         
         # Apply basic filters
         mask = (events['sw_peak_power'] > min_sw_power) & (events['duration'] > min_duration)
@@ -375,10 +387,10 @@ class SWRExplorer:
             
         filtered_events = events[mask].copy()
         
-        print(f"\n[DEBUG] After basic filtering:")
-        print(f"Shape: {filtered_events.shape}")
-        print(f"Index values (first 10):")
-        print(filtered_events.index.values[:10])
+        self._debug_print(f"\n[DEBUG] After basic filtering:")
+        self._debug_print(f"Shape: {filtered_events.shape}")
+        self._debug_print(f"Index values (first 10):")
+        self._debug_print(filtered_events.index.values[:10])
         
         # Apply speed filter if requested
         if max_speed is not None and speed_data is not None:
@@ -389,10 +401,10 @@ class SWRExplorer:
             filtered_events['speed'] = speeds
             filtered_events = filtered_events[filtered_events['speed'] <= max_speed]
             
-            print(f"\n[DEBUG] After speed filtering:")
-            print(f"Shape: {filtered_events.shape}")
-            print(f"Index values (first 10):")
-            print(filtered_events.index.values[:10])
+            self._debug_print(f"\n[DEBUG] After speed filtering:")
+            self._debug_print(f"Shape: {filtered_events.shape}")
+            self._debug_print(f"Index values (first 10):")
+            self._debug_print(filtered_events.index.values[:10])
             
         return filtered_events.sort_values('sw_ripple_clcorr', ascending=False)
     
@@ -414,21 +426,21 @@ class SWRExplorer:
         pd.Series
             The event row as a Series
         """
-        print(f"\n[DEBUG] Getting event by index for {dataset}/{session_id}/probe_{probe_id}")
-        print(f"[DEBUG] Requested event_id: {event_id}")
+        self._debug_print(f"\n[DEBUG] Getting event by index for {dataset}/{session_id}/probe_{probe_id}")
+        self._debug_print(f"[DEBUG] Requested event_id: {event_id}")
         
         events = self.data[dataset][session_id][probe_id]['events']
-        print(f"[DEBUG] Available events index values (first 10):")
-        print(events.index.values[:10])
+        self._debug_print(f"[DEBUG] Available events index values (first 10):")
+        self._debug_print(events.index.values[:10])
         
         if event_id not in events.index:
-            print(f"[DEBUG] Event ID {event_id} not found in index")
-            print(f"[DEBUG] Index contains values: {events.index.values}")
+            self._debug_print(f"[DEBUG] Event ID {event_id} not found in index")
+            self._debug_print(f"[DEBUG] Index contains values: {events.index.values}")
             raise ValueError(f"Event ID {event_id} not found in events for probe {probe_id}.")
             
         event = events.loc[event_id]
-        print(f"[DEBUG] Found event:")
-        print(event)
+        self._debug_print(f"[DEBUG] Found event:")
+        self._debug_print(event)
         return event
 
     def plot_swr_event(self, events_df, event_idx, filter_path=None, show_info_title=False, window_padding=None, figsize_mm=None, panels_to_plot=None, time_per_mm=None, envelope_mode='zscore', show_peak_dots=False, **kwargs):
@@ -480,7 +492,14 @@ class SWRExplorer:
         sharp_wave_files = glob.glob(sharp_wave_pattern)
         time_files = glob.glob(time_pattern)
         if not ripple_files or not sharp_wave_files or not time_files:
-            raise FileNotFoundError(f"Could not find required LFP files for probe {probe_id} in session {session_id}")
+            missing_files = []
+            if not ripple_files:
+                missing_files.append(f"ripple: {ripple_pattern}")
+            if not sharp_wave_files:
+                missing_files.append(f"sharp_wave: {sharp_wave_pattern}")
+            if not time_files:
+                missing_files.append(f"time: {time_pattern}")
+            raise FileNotFoundError(f"Could not find required LFP files for probe {probe_id} in session {session_id}. Missing: {'; '.join(missing_files)}")
         ripple_file = ripple_files[0]
         sharp_wave_file = sharp_wave_files[0]
         time_file = time_files[0]
@@ -590,7 +609,10 @@ class SWRExplorer:
             height_mm = 450
         else:
             height_mm = 200
-        width_mm = time_window_size * 500  # Proportional width
+        # Reduced scaling factor to make ripples less stretched out
+        width_mm = time_window_size * 200  # Reduced from 500 to 200 for more compressed ripples
+        # Ensure minimum and maximum widths for readability
+        width_mm = max(80, min(width_mm, 160))  # Min 80mm, max 160mm
         figsize = (width_mm / 25.4, height_mm / 25.4)  # Convert to inches for matplotlib
 
         fig, axes = plt.subplots(n_panels, 1, figsize=figsize, sharex=True, constrained_layout=show_info_title)
@@ -603,10 +625,12 @@ class SWRExplorer:
         # 1. Raw LFP (Pyramidal)
         if 'raw_pyramidal_lfp' in panels_to_plot:
             ax = axes[panel_map['raw_pyramidal_lfp']]
-            ax.plot(time_rel, raw_lfp_window_uv, color='black', linewidth=0.5, label='Raw LFP (Pyramidal)')
-            ax.axvspan(event['start_time']-event_peak, event['end_time']-event_peak, alpha=0.3, color='green')
+            ax.plot(time_rel, raw_lfp_window_uv, color='#2d2d2d', linewidth=0.8, label='Raw LFP (Pyramidal)')
+            ax.axvspan(event['start_time']-event_peak, event['end_time']-event_peak, alpha=0.3, color='green', linewidth=2, edgecolor='green')
             ax.set_ylabel('Pyramidal Layer LFP (μV)', fontsize=12, fontweight='bold')
-            ax.legend(loc='upper right', frameon=True, fancybox=False)
+            legend = ax.legend(loc='upper right', frameon=True, fancybox=False)
+            for text in legend.get_texts():
+                text.set_fontweight('bold')
             ax.margins(x=0)
             for label in ax.get_xticklabels() + ax.get_yticklabels():
                 label.set_fontweight('bold')
@@ -614,10 +638,12 @@ class SWRExplorer:
         # 2. Raw LFP (Sharp Wave)
         if 'raw_s_radiatum_lfp' in panels_to_plot:
             ax = axes[panel_map['raw_s_radiatum_lfp']]
-            ax.plot(time_rel, sharp_wave_window_uv, color='blue', linewidth=0.5, label='Raw LFP (Sharp Wave)')
-            ax.axvspan(event['start_time']-event_peak, event['end_time']-event_peak, alpha=0.3, color='green')
+            ax.plot(time_rel, sharp_wave_window_uv, color='#1f77b4', linewidth=0.8, label='Raw LFP (Sharp Wave)')
+            ax.axvspan(event['start_time']-event_peak, event['end_time']-event_peak, alpha=0.3, color='green', linewidth=2, edgecolor='green')
             ax.set_ylabel('S. Radiatum LFP (μV)', fontsize=12, fontweight='bold')
-            ax.legend(loc='upper right', frameon=True, fancybox=False)
+            legend = ax.legend(loc='upper right', frameon=True, fancybox=False)
+            for text in legend.get_texts():
+                text.set_fontweight('bold')
             ax.margins(x=0)
             for label in ax.get_xticklabels() + ax.get_yticklabels():
                 label.set_fontweight('bold')
@@ -625,10 +651,13 @@ class SWRExplorer:
         # 3. Bandpass signals (z-scored)
         if 'bandpass_signals' in panels_to_plot:
             ax = axes[panel_map['bandpass_signals']]
-            ax.plot(time_rel, ripple_band_window_z, color='black', linewidth=1.0, label='Ripple Band (Z-scored)')
-            ax.plot(time_rel, sharp_wave_band_window_z, color='blue', linewidth=1.0, label='Sharp Wave Band (Z-scored)')
-            ax.axvspan(event['start_time']-event_peak, event['end_time']-event_peak, alpha=0.3, color='green')
+            ax.plot(time_rel, ripple_band_window_z, color='#2d2d2d', linewidth=1.3, label='Ripple Band (Z-scored)')
+            ax.plot(time_rel, sharp_wave_band_window_z, color='#1f77b4', linewidth=1.3, label='Sharp Wave Band (Z-scored)')
+            ax.axvspan(event['start_time']-event_peak, event['end_time']-event_peak, alpha=0.3, color='green', linewidth=2, edgecolor='green')
             ax.set_ylabel('Bandpass (Z-scored)', fontsize=12, fontweight='bold')
+            legend = ax.legend(loc='upper right', frameon=True, fancybox=False)
+            for text in legend.get_texts():
+                text.set_fontweight('bold')
             ax.margins(x=0)
             for label in ax.get_xticklabels() + ax.get_yticklabels():
                 label.set_fontweight('bold')
@@ -636,17 +665,20 @@ class SWRExplorer:
         # 4. Envelope (z-scored)
         if 'envelope' in panels_to_plot:
             ax = axes[panel_map['envelope']]
-            ax.plot(time_rel, ripple_envelope_window_z, color='black', linewidth=1.0, label='Ripple Envelope (Z-scored)')
-            ax.plot(time_rel, sharp_wave_envelope_window_z, color='blue', linewidth=1.0, label='Sharp Wave Envelope (Z-scored)')
+            ax.plot(time_rel, ripple_envelope_window_z, color='#2d2d2d', linewidth=1.3, label='Ripple Envelope (Z-scored)')
+            ax.plot(time_rel, sharp_wave_envelope_window_z, color='#1f77b4', linewidth=1.3, label='Sharp Wave Envelope (Z-scored)')
             # Compute local envelope peak in the event window
             local_env_peak_idx = np.argmax(ripple_envelope_window_z)
             local_env_peak_time = time_rel[local_env_peak_idx]
             local_env_peak_value = ripple_envelope_window_z[local_env_peak_idx]
-            ax.plot(local_env_peak_time, local_env_peak_value, 'o', color='black', markersize=7, markeredgecolor='white', label='Envelope Max Z-score')
+            ax.plot(local_env_peak_time, local_env_peak_value, 'o', color='#2d2d2d', markersize=7, markeredgecolor='white', label='Envelope Max Z-score')
             # Add 2 SD threshold line
-            ax.axhline(2, color='black', linestyle='--', label='Envelope Threshold (2 SD)')
-            ax.axvspan(event['start_time']-event_peak, event['end_time']-event_peak, alpha=0.3, color='green')
+            ax.axhline(2, color='#2d2d2d', linestyle='--', linewidth=2, label='Envelope Threshold (2 SD)')
+            ax.axvspan(event['start_time']-event_peak, event['end_time']-event_peak, alpha=0.3, color='green', linewidth=2, edgecolor='green')
             ax.set_ylabel('Envelope (Z-scored)', fontsize=12, fontweight='bold')
+            legend = ax.legend(loc='upper right', frameon=True, fancybox=False)
+            for text in legend.get_texts():
+                text.set_fontweight('bold')
             ax.margins(x=0)  # Remove x margin only
             for label in ax.get_xticklabels() + ax.get_yticklabels():
                 label.set_fontweight('bold')
@@ -654,22 +686,22 @@ class SWRExplorer:
         # 5. Power (z-scored)
         if 'power' in panels_to_plot:
             ax = axes[panel_map['power']]
-            ax.plot(time_rel, ripple_power_window_z, color='black', linewidth=1.0, label='Ripple Power (Z-scored)')
-            ax.plot(time_rel, sharp_wave_power_window_z, color='blue', linewidth=1.0, label='Sharp Wave Power (Z-scored)')
+            ax.plot(time_rel, ripple_power_window_z, color='#2d2d2d', linewidth=1.3, label='Ripple Power (Z-scored)')
+            ax.plot(time_rel, sharp_wave_power_window_z, color='#1f77b4', linewidth=1.3, label='Sharp Wave Power (Z-scored)')
             if show_peak_dots:
                 # Ripple power peak: use power_peak_time and power_max_zscore
                 ripple_power_peak_time = event.get('power_peak_time', None)
                 ripple_power_peak_z = event.get('power_max_zscore', None)
                 if ripple_power_peak_time is not None and ripple_power_peak_z is not None:
-                    ax.plot(ripple_power_peak_time - (event['peak_time'] if 'peak_time' in event else event['start_time'] + event['duration']/2), ripple_power_peak_z, 'o', color='black', markersize=7, markeredgecolor='white', label='Ripple Power Peak')
+                    ax.plot(ripple_power_peak_time - (event['peak_time'] if 'peak_time' in event else event['start_time'] + event['duration']/2), ripple_power_peak_z, 'o', color='#2d2d2d', markersize=7, markeredgecolor='white', label='Ripple Power Peak')
                 # Sharp wave power peak: use sw_peak_time and sw_peak_power (these should be referenced to event_peak)
                 sharp_wave_power_peak_time = event.get('sw_peak_time', None)
                 sharp_wave_power_peak_z = event.get('sw_peak_power', None)
                 if sharp_wave_power_peak_time is not None and sharp_wave_power_peak_z is not None:
-                    ax.plot(sharp_wave_power_peak_time - event_peak, sharp_wave_power_peak_z, 'o', color='blue', markersize=7, markeredgecolor='white', label='Sharp Wave Power Peak')
-            ax.axhline(2.5, color='grey', linestyle='--', label='Ripple Threshold')
-            ax.axhline(1, color='blue', linestyle='--', label='Sharp Wave Threshold')
-            ax.axvspan(event['start_time']-event_peak, event['end_time']-event_peak, alpha=0.3, color='green')
+                    ax.plot(sharp_wave_power_peak_time - event_peak, sharp_wave_power_peak_z, 'o', color='#1f77b4', markersize=7, markeredgecolor='white', label='Sharp Wave Power Peak')
+            ax.axhline(2.5, color='grey', linestyle='--', linewidth=2, label='Ripple Threshold')
+            ax.axhline(1, color='#1f77b4', linestyle='--', linewidth=2, label='Sharp Wave Threshold')
+            ax.axvspan(event['start_time']-event_peak, event['end_time']-event_peak, alpha=0.3, color='green', linewidth=2, edgecolor='green')
             ax.set_ylabel('Power (Z-scored)', fontsize=12, fontweight='bold')
             ax.set_xlabel('Time from Ripple Peak (s)', fontsize=12, fontweight='bold')
             ax.margins(x=0)  # Remove x margin only
@@ -677,9 +709,11 @@ class SWRExplorer:
                 label.set_fontweight('bold')
             # Only add legend to the bottom panel, below the plot
             if show_info_title:
-                ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.32), ncol=2, fontsize=8, frameon=True)
+                legend = ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.32), ncol=2, fontsize=8, frameon=True)
             else:
-                ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.18), ncol=2, fontsize=9, frameon=True)
+                legend = ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.18), ncol=2, fontsize=9, frameon=True)
+            for text in legend.get_texts():
+                text.set_fontweight('bold')
 
         # Display key values at the bottom of the figure
         # Use event DataFrame columns for info block values
@@ -687,7 +721,7 @@ class SWRExplorer:
         power_max_zscore = event.get('power_max_zscore', np.nan)
         sw_peak_power = event.get('sw_peak_power', np.nan)
         fig.text(0.5, 0.01, f"envelope_max_zscore: {envelope_max_zscore:.2f}   power_max_zscore: {power_max_zscore:.2f}   sw_peak_power: {sw_peak_power:.2f}",
-                 ha='center', va='bottom', fontsize=10, fontweight='bold')
+                 ha='center', va='bottom', fontsize=11, fontweight='bold')
 
         # Add detailed info title if requested
         if show_info_title:
@@ -831,8 +865,8 @@ class SWRExplorer:
         - additional_value: str
         - relative_time: bool (if True, plot time relative to global peak; if False, plot absolute time)
         """
-        print(f"\n[DEBUG] --- Starting plot_global_swr_event for global_event_idx={global_event_idx} ---")
-        print(f"[DEBUG] relative_time: {relative_time}")
+        self._debug_print(f"\n[DEBUG] --- Starting plot_global_swr_event for global_event_idx={global_event_idx} ---")
+        self._debug_print(f"[DEBUG] relative_time: {relative_time}")
         # Settings for smoothing
         smoothing_sigma = 0.004  # 4ms
         sampling_frequency = 1500
@@ -840,13 +874,13 @@ class SWRExplorer:
         # Load global events
         global_events_path = self.base_path / dataset / f"swrs_session_{session_id}" / f"session_{session_id}_global_swr_events.csv.gz"
         if not global_events_path.exists():
-            print(f"[ERROR] Global events file not found: {global_events_path}")
+            self._debug_print(f"[ERROR] Global events file not found: {global_events_path}")
             return None
         global_events = pd.read_csv(global_events_path, index_col=0)
         
         # Get the event
         if global_event_idx not in global_events.index:
-            print(f"[ERROR] Global event {global_event_idx} not found in events DataFrame")
+            self._debug_print(f"[ERROR] Global event {global_event_idx} not found in events DataFrame")
             return None
         event = global_events.loc[global_event_idx]
         
@@ -889,7 +923,7 @@ class SWRExplorer:
             time_files = list(lfp_dir.glob(f"probe_{probe_id}_channel*_lfp_time_index_1500hz.npz"))
             
             if not lfp_files or not time_files:
-                print(f"[WARNING] Missing LFP or time index files for probe {probe_id}")
+                self._debug_print(f"[WARNING] Missing LFP or time index files for probe {probe_id}")
                 continue
                 
             # Load LFP data and time index
@@ -945,18 +979,27 @@ class SWRExplorer:
             global_start_plot = global_start_time
             global_end_plot = global_end_time
         
-        fig, axes = plt.subplots(len(all_lfp_traces), 1, figsize=(12, 2.5*len(all_lfp_traces)), sharex=True)
+        # Compute global min/max for LFP and additional traces
+        lfp_min = min([lfp.min() for lfp in all_lfp_traces]) if all_lfp_traces else 0
+        lfp_max = max([lfp.max() for lfp in all_lfp_traces]) if all_lfp_traces else 1
+        add_min = min([add.min() for add in all_additional_traces]) if all_additional_traces else 0
+        add_max = max([add.max() for add in all_additional_traces]) if all_additional_traces else 1
+        
+        fig, axes = plt.subplots(len(all_lfp_traces), 1, figsize=(8, 1.7*len(all_lfp_traces)), sharex=True)
         if len(all_lfp_traces) == 1:
             axes = [axes]
         
         for i, (ax, t, lfp, add, label, probe_id) in enumerate(zip(axes, all_time_windows, all_lfp_traces, all_additional_traces, all_probe_labels, sorted_probe_ids)):
             ax.plot(t, lfp, color='gray', linewidth=0.7, label='LFP (μV)')
             ax.set_ylabel('LFP (μV)')
+            ax.set_ylim(lfp_min, lfp_max)
             
             # Plot additional signal (right y-axis)
             ax2 = ax.twinx()
-            ax2.plot(t, add, color='black', linewidth=1.0, label=additional_value)
+            add_linewidth = 2.2 if additional_value == 'power' else 1.0
+            ax2.plot(t, add, color='black', linewidth=add_linewidth, label=additional_value)
             ax2.set_ylabel(f'{additional_value.replace("_", " ").title()} (z-scored)')
+            ax2.set_ylim(add_min, add_max)
             
             if probe_id in probe_to_peak_time:
                 peak_time = probe_to_peak_time[probe_id]
@@ -966,8 +1009,6 @@ class SWRExplorer:
                     match_rows = probe_events[probe_events['power_peak_time'] == peak_time]
                     if not match_rows.empty:
                         matching_event = match_rows.iloc[0]
-                        
-                        # Convert probe event times for display
                         if relative_time:
                             event_start_plot = matching_event['start_time'] - global_peak_time
                             event_end_plot = matching_event['end_time'] - global_peak_time
@@ -976,27 +1017,19 @@ class SWRExplorer:
                             event_start_plot = matching_event['start_time']
                             event_end_plot = matching_event['end_time']
                             peak_time_plot = matching_event['power_peak_time']
-                        
-                        # Plot green shaded area for probe-level event window
                         ax.axvspan(event_start_plot, event_end_plot, color='green', alpha=0.3)
-                        # Plot black dotted line for probe-level event peak
                         ax.axvline(peak_time_plot, color='black', linestyle='--', linewidth=1)
-                        # Plot green dotted lines for global event window
                         ax.axvline(global_start_plot, color='green', linestyle=':', linewidth=1)
                         ax.axvline(global_end_plot, color='green', linestyle=':', linewidth=1)
-            
             ax.set_title(label)
             ax.margins(x=0)
             ax2.margins(x=0)
-            
-            # Legend
             if i == 0:
                 ax.legend(loc='upper right')
                 ax2.legend(loc='upper left')
-        
         axes[-1].set_xlabel('Time from Global Peak (s)' if relative_time else 'Time (s)')
         plt.xlim(min_x, max_x)
-        plt.tight_layout()
+        plt.tight_layout(h_pad=0.2)
         
         # Save figure
         if output_dir:
@@ -1004,7 +1037,7 @@ class SWRExplorer:
             output_dir.mkdir(parents=True, exist_ok=True)
             save_path = output_dir / f"global_swr_event_{global_event_idx}_session_{session_id}.{file_ext}"
             fig.savefig(save_path, bbox_inches='tight', dpi=300)
-            print(f"Saved figure to {save_path}")
+            self._debug_print(f"Saved figure to {save_path}")
         return fig
 
     def plot_global_event_CSD_slice(self, dataset, session_id, global_event_idx, filter_path=None, 
@@ -1066,12 +1099,12 @@ class SWRExplorer:
             session = self.allensdk_cache.get_ecephys_session(ecephys_session_id=int(session_id))
             # Debug: check if get_current_source_density is a method of the session object
             has_csd_method = hasattr(session, 'get_current_source_density')
-            print(f"Session object has get_current_source_density: {has_csd_method}")
+            self._debug_print(f"Session object has get_current_source_density: {has_csd_method}")
             if not has_csd_method:
-                print(f"Session object methods: {dir(session)}")
+                self._debug_print(f"Session object methods: {dir(session)}")
             csd = session.get_current_source_density(int(probe_id))
-            print("[DEBUG] csd xarray object:")
-            print(csd)
+            self._debug_print("[DEBUG] csd xarray object:")
+            self._debug_print(csd)
             # Get the time window indices
             time = csd['time'].values
             mask = (time >= (peak_time - window)) & (time <= (peak_time + window))
@@ -1099,7 +1132,7 @@ class SWRExplorer:
 
         # 4. Stack CSDs and positions for plotting
         if not csd_matrices:
-            print("No CSD data found for this event.")
+            self._debug_print("No CSD data found for this event.")
             return None
 
         csd_all = np.concatenate(csd_matrices, axis=0)
@@ -1107,13 +1140,13 @@ class SWRExplorer:
         horiz_all = np.concatenate(horiz_pos_list, axis=0)
         
         # Debug: print shapes and types before writing
-        print("[DEBUG] Preparing to write CSD data to temp file...")
-        print(f"[DEBUG] csd_all shape: {np.array(csd_all).shape}, dtype: {np.array(csd_all).dtype}")
-        print(f"[DEBUG] vert_all shape: {np.array(vert_all).shape}, dtype: {np.array(vert_all).dtype}")
-        print(f"[DEBUG] horiz_all shape: {np.array(horiz_all).shape}, dtype: {np.array(horiz_all).dtype}")
-        print(f"[DEBUG] time_axis shape: {np.array(time_axis).shape}, dtype: {np.array(time_axis).dtype}")
-        print(f"[DEBUG] pyramidal_layer_pos: {pyramidal_layer_pos}")
-        print(f"[DEBUG] sharpwave_layer_pos: {sharpwave_layer_pos}")
+        self._debug_print("[DEBUG] Preparing to write CSD data to temp file...")
+        self._debug_print(f"[DEBUG] csd_all shape: {np.array(csd_all).shape}, dtype: {np.array(csd_all).dtype}")
+        self._debug_print(f"[DEBUG] vert_all shape: {np.array(vert_all).shape}, dtype: {np.array(vert_all).dtype}")
+        self._debug_print(f"[DEBUG] horiz_all shape: {np.array(horiz_all).shape}, dtype: {np.array(horiz_all).dtype}")
+        self._debug_print(f"[DEBUG] time_axis shape: {np.array(time_axis).shape}, dtype: {np.array(time_axis).dtype}")
+        self._debug_print(f"[DEBUG] pyramidal_layer_pos: {pyramidal_layer_pos}")
+        self._debug_print(f"[DEBUG] sharpwave_layer_pos: {sharpwave_layer_pos}")
         with tempfile.NamedTemporaryFile(prefix='temp_csdslice_', suffix='.json', delete=False, mode='w') as temp_file:
             data = {
                 'csd_all': np.array(csd_all).tolist(),
@@ -1125,7 +1158,7 @@ class SWRExplorer:
             }
             json.dump(data, temp_file)
             temp_path = temp_file.name
-        print(f"[DEBUG] CSD data written to temp file: {temp_path}")
+        self._debug_print(f"[DEBUG] CSD data written to temp file: {temp_path}")
 
         try:
             # Create a dedicated folder for CSD and brainglobe images
@@ -1233,11 +1266,11 @@ print("[PLOT DEBUG] Done.")
         lfp_dir = self.base_path / self.lfp_sources[dataset] / f"lfp_session_{session_id}"
         probe_metadata_path = session_dir / f"session_{session_id}_probe_metadata.csv.gz"
         if not probe_metadata_path.exists():
-            print(f"[CSD AVG] Probe metadata not found: {probe_metadata_path}")
+            self._debug_print(f"[CSD AVG] Probe metadata not found: {probe_metadata_path}")
             return
         probe_metadata = pd.read_csv(probe_metadata_path)
         ca1_probes = probe_metadata[probe_metadata['ca1_channel_count'] > 0]['probe_id'].astype(str).tolist()
-        print(f"[CSD AVG] Probes with CA1: {ca1_probes}")
+        self._debug_print(f"[CSD AVG] Probes with CA1: {ca1_probes}")
         
         all_csd = []
         all_vert = []
@@ -1249,7 +1282,7 @@ print("[PLOT DEBUG] Done.")
             # Load channel selection metadata
             chan_meta_path = session_dir / f"probe_{probe_id}_channel_selection_metadata.json.gz"
             if not chan_meta_path.exists():
-                print(f"[CSD AVG] Channel selection metadata not found for probe {probe_id}")
+                self._debug_print(f"[CSD AVG] Channel selection metadata not found for probe {probe_id}")
                 continue
             with gzip.open(chan_meta_path, 'rt') as f:
                 chan_meta = json.load(f)
@@ -1258,23 +1291,23 @@ print("[PLOT DEBUG] Done.")
             # Check contiguity
             diffs = np.diff(sorted(ca1_depths))
             if np.any(diffs > 50):
-                print(f"[CSD AVG] Warning: CA1 channels for probe {probe_id} are not contiguous (depth jumps: {diffs})")
+                self._debug_print(f"[CSD AVG] Warning: CA1 channels for probe {probe_id} are not contiguous (depth jumps: {diffs})")
             # Load LFP and time
             lfp_file = lfp_dir / f"probe_{probe_id}_channel_{chan_meta['ripple_band']['selected_channel_id']}_lfp_ca1_putative_pyramidal_layer.npz"
             time_file = lfp_dir / f"probe_{probe_id}_channel_{chan_meta['ripple_band']['selected_channel_id']}_lfp_time_index_1500hz.npz"
             if not lfp_file.exists() or not time_file.exists():
-                print(f"[CSD AVG] LFP or time file missing for probe {probe_id}")
+                self._debug_print(f"[CSD AVG] LFP or time file missing for probe {probe_id}")
                 continue
             lfp = np.load(lfp_file)['lfp_ca1']
             time_vals = np.load(time_file)['lfp_time_index']
             # Load events
             events_file = session_dir / f"probe_{probe_id}_channel_{chan_meta['ripple_band']['selected_channel_id']}_putative_swr_events.csv.gz"
             if not events_file.exists():
-                print(f"[CSD AVG] Events file missing for probe {probe_id}")
+                self._debug_print(f"[CSD AVG] Events file missing for probe {probe_id}")
                 continue
             events = pd.read_csv(events_file)
             if 'power_peak_time' not in events.columns:
-                print(f"[CSD AVG] No power_peak_time in events for probe {probe_id}")
+                self._debug_print(f"[CSD AVG] No power_peak_time in events for probe {probe_id}")
                 continue
             # For each event, extract window and compute CSD
             probe_csds = []
@@ -1289,7 +1322,7 @@ print("[PLOT DEBUG] Done.")
                 csd = np.pad(csd, ((0,0),(1,1)), mode='edge')
                 probe_csds.append(csd)
             if not probe_csds:
-                print(f"[CSD AVG] No valid CSD windows for probe {probe_id}")
+                self._debug_print(f"[CSD AVG] No valid CSD windows for probe {probe_id}")
                 continue
             avg_csd = np.mean(probe_csds, axis=0)
             # For plotting, restrict to ±plot_window
@@ -1310,7 +1343,7 @@ print("[PLOT DEBUG] Done.")
             pyramidal_coords.append((min(ca1_depths), probe_id))
             radiatum_coords.append((max(ca1_depths), probe_id))
         if not all_csd:
-            print("[CSD AVG] No CSD data found for this session.")
+            self._debug_print("[CSD AVG] No CSD data found for this session.")
             return
         # Stack and average
         csd_stack = np.stack(all_csd, axis=0)
@@ -1326,7 +1359,7 @@ print("[PLOT DEBUG] Done.")
         heatmap_path = os.path.join(output_dir, f'csd_average_session_{session_id}.{file_ext}')
         plt.savefig(heatmap_path, dpi=300)
         plt.close()
-        print(f"[CSD AVG] Saved average CSD heatmap: {heatmap_path}")
+        self._debug_print(f"[CSD AVG] Saved average CSD heatmap: {heatmap_path}")
         # Optionally plot brainglobe sagittal slice
         if plot_brainglobe:
             try:
@@ -1348,6 +1381,6 @@ print("[PLOT DEBUG] Done.")
                 anat_path = os.path.join(output_dir, f'ca1_locations_session_{session_id}.{file_ext}')
                 plt.savefig(anat_path, dpi=300)
                 plt.close()
-                print(f"[CSD AVG] Saved CA1 anatomical plot: {anat_path}")
+                self._debug_print(f"[CSD AVG] Saved CA1 anatomical plot: {anat_path}")
             except ImportError:
-                print("[CSD AVG] brainglobe_heatmap not available, skipping anatomical plot.")
+                self._debug_print("[CSD AVG] brainglobe_heatmap not available, skipping anatomical plot.")

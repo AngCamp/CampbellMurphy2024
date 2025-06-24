@@ -1,0 +1,29 @@
+Channel Selection Verification Report
+===================================
+
+Overall Statistics:
+Total probes analyzed: 568
+Probes with no channels below CA1: 0
+Problem rate: 0.0%
+
+Per-Dataset Statistics:
+----------------------
+
+allen_visbehave_swr_murphylab2024:
+  Total probes: 394
+  No channels below CA1: 0
+  Problem rate: 0.0%
+
+allen_viscoding_swr_murphylab2024:
+  Total probes: 27
+  No channels below CA1: 0
+  Problem rate: 0.0%
+
+ibl_swr_murphylab2024:
+  Total probes: 147
+  No channels below CA1: 0
+  Problem rate: 0.0%
+
+
+Detailed Analysis of Problematic Probes:
+----------------------------------------

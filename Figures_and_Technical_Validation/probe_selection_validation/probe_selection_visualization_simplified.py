@@ -15,11 +15,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from scipy import stats
 from collections import defaultdict
 import warnings
 warnings.filterwarnings('ignore')
-plt.rcParams['svg.fonttype'] = 'none' # Ensure SVG text stays as editable text, not paths
+mpl.rcParams['svg.fonttype'] = 'none' # Ensure SVG text stays as editable text, not paths
 # =============================================================================
 # CONFIGURATION CONTROL
 # =============================================================================
@@ -37,7 +38,7 @@ if USE_ENV_VARS:
     RUN_NAME = os.environ.get('RUN_NAME', 'default_run')
 else:
     # Use hardcoded values - EDIT THESE SETTINGS
-    BASE_DIRECTORY = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_swr_data_backup"  # CHANGE THIS
+    BASE_DIRECTORY = "/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_v2_final"  # CHANGE THIS
     RUN_NAME = "channel_selection_plots_figure_5b_and_c"  # CHANGE THIS
 
 # Rest of configuration...
@@ -236,7 +237,7 @@ def process_sharp_wave_data(metadata_files):
             
             # Process sharp wave data
             sw_depths = sharp_wave_band['depths']
-            sw_net_power = sharp_wave_band['net_sw_power']
+            sw_net_power = sharp_wave_band['modulation_index'] #'net_sw_power', 'modulation_index', or 'circular_linear_corr'
             
             # Calculate relative depths
             relative_depths = [d - ripple_depth for d in sw_depths]
@@ -405,7 +406,8 @@ def plot_sharp_wave_power(sw_means, output_dir):
         ax.axhline(y=0, color='red', linestyle='--', alpha=0.7, linewidth=1)
         ax.set_xlabel('Z-scored Net Power', fontsize=FONT_SIZE)
         ax.set_ylabel('Depth Relative to Ripple Channel (μm)', fontsize=FONT_SIZE)
-        ax.set_title('Concurrent SW Band Power (8-40Hz)', fontsize=FONT_SIZE, fontweight='bold')
+        #ax.set_title('Concurrent SW Band Power (8-40Hz)', fontsize=FONT_SIZE, fontweight='bold')
+        ax.set_title('Modulation Index (SW to Ripple)', fontsize=FONT_SIZE, fontweight='bold')
         ax.grid(True, alpha=0.3)
         
         # Set y-axis limits and ticks
