@@ -84,6 +84,9 @@ ks_results = {}
 # Create individual figures for each subplot
 individual_figures = []
 
+# Store plotting data for combined figure
+plotting_data = []
+
 for col, (dataset_title, dataset_key) in enumerate(DATASETS):
     ks_results[dataset_key] = {}
     for row, (metric_label, metric_key) in enumerate(METRICS):
@@ -114,45 +117,44 @@ for col, (dataset_title, dataset_key) in enumerate(DATASETS):
         
         # Create individual figure
         fig, ax = plt.subplots(figsize=(4, 3))
+        plot_info = {'row': row, 'col': col, 'metric_key': metric_key, 'dataset_key': dataset_key, 'data': data, 'metric_label': metric_label, 'dataset_title': dataset_title}
         
-        # Plot based on metric type
         if metric_key in ['theta_power', 'speed']:
-            # Simple histogram for theta power and speed
-            ax.hist(data, bins=50, density=True, alpha=0.7, color='skyblue', edgecolor='black')
+            # Simple histogram for theta power and speed (counts, not density)
+            n, bins, patches = ax.hist(data, bins=50, density=False, alpha=0.7, color='skyblue', edgecolor='black')
             ax.set_xlabel(metric_label, fontsize=8, fontweight='bold')
-            ax.set_ylabel('Density', fontsize=8, fontweight='bold')
+            ax.set_ylabel('Event Count', fontsize=8, fontweight='bold')
             ax.tick_params(axis='both', which='major', labelsize=8)
-            
-            # Limit number of ticks
             ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
             ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
-            
+            plot_info['hist_bins'] = bins
+            plot_info['hist_density'] = False
         else:
-            # Fitter plots for duration and peak power
+            # Fitter plots for duration and peak power (density)
             f = Fitter(data, distributions=['norm', 'halfnorm', 'lognorm'])
             f.fit()
-            
-            # Plot histogram
-            ax.hist(data, bins=50, density=True, alpha=0.7, color='skyblue', edgecolor='black')
-            
-            # Plot fitted distributions
+            # Plot histogram as density
+            n, bins, patches = ax.hist(data, bins=50, density=True, alpha=0.7, color='skyblue', edgecolor='black')
+            # Plot fitted distributions (PDFs)
             x = np.linspace(data.min(), data.max(), 1000)
-            for dist_name, color in zip(['norm', 'halfnorm', 'lognorm'], ['red', 'orange', 'green']):
+            fit_params = {}
+            for dist_name, color in zip(['norm', 'halfnorm', 'lognorm'], ['green', 'red', 'orange']):
                 if dist_name in f.fitted_param:
                     params = f.fitted_param[dist_name]
                     dist = getattr(stats, dist_name)
                     y = dist.pdf(x, *params)
                     ax.plot(x, y, color=color, label=dist_name, linewidth=2)
-            
+                    fit_params[dist_name] = {'params': params, 'color': color}
             ax.set_xlabel(metric_label, fontsize=8, fontweight='bold')
             ax.set_ylabel('Density', fontsize=8, fontweight='bold')
             ax.tick_params(axis='both', which='major', labelsize=8)
             ax.legend(fontsize=8, loc='upper right')
-            
-            # Limit number of ticks
             ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
             ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
-            
+            plot_info['hist_bins'] = bins
+            plot_info['hist_density'] = True
+            plot_info['fit_params'] = fit_params
+            plot_info['fit_x'] = x
             # Extract KS statistics for all distributions
             try:
                 summary = f.summary()
@@ -178,26 +180,14 @@ for col, (dataset_title, dataset_key) in enumerate(DATASETS):
                     'halfnorm': {'sse': np.nan, 'ks_stat': np.nan, 'ks_pvalue': np.nan, 'aic': np.nan, 'bic': np.nan},
                     'lognorm': {'sse': np.nan, 'ks_stat': np.nan, 'ks_pvalue': np.nan, 'aic': np.nan, 'bic': np.nan}
                 }
-        
-        # Set title
-        ax.set_title(f"{dataset_title}", fontsize=10, fontweight='bold')
-        
         # Save individual subplot
         subplot_path_png = os.path.join(INDIVIDUAL_DIR, f"{dataset_key}_{metric_key}.png")
         subplot_path_svg = os.path.join(INDIVIDUAL_DIR, f"{dataset_key}_{metric_key}.svg")
         fig.savefig(subplot_path_png, dpi=300, bbox_inches='tight')
         fig.savefig(subplot_path_svg, bbox_inches='tight')
-        
-        # Store figure for later combination
-        individual_figures.append({
-            'fig': fig,
-            'ax': ax,
-            'row': row,
-            'col': col,
-            'dataset_key': dataset_key,
-            'metric_key': metric_key
-        })
-        
+        plot_info['subplot_path_png'] = subplot_path_png
+        plot_info['subplot_path_svg'] = subplot_path_svg
+        plotting_data.append(plot_info)
         plt.close(fig)
 
 # Save KS results and generate caption BEFORE trying to create combined figure
@@ -218,7 +208,7 @@ print(f"Caption saved to: {caption_path}")
 print("\nCaption:")
 print(caption)
 
-# Create combined figure
+# Create combined figure by re-plotting
 print("Creating combined figure...")
 combined_fig, combined_axes = plt.subplots(4, 3, figsize=(15, 20))
 
@@ -229,48 +219,37 @@ for i, (metric_label, _) in enumerate(METRICS):
 for i, (dataset_title, _) in enumerate(DATASETS):
     combined_axes[0, i].set_title(dataset_title, fontsize=14, fontweight='bold')
 
-# Combine individual figures into the big plot
-for item in individual_figures:
-    row, col = item['row'], item['col']
-    source_ax = item['ax']
-    target_ax = combined_axes[row, col]
-    
-    # Copy all elements from source to target
-    for element in source_ax.get_children():
-        if hasattr(element, 'get_bbox'):
-            bbox = element.get_bbox()
-            if bbox is not None:
-                # Copy the element to the target axes
-                target_ax.add_patch(element)
-    
-    # Copy plot data
-    for line in source_ax.get_lines():
-        target_ax.plot(line.get_xdata(), line.get_ydata(), 
-                      color=line.get_color(), linewidth=line.get_linewidth(),
-                      label=line.get_label())
-    
-    # Copy histogram data
-    for patch in source_ax.patches:
-        target_ax.add_patch(patch)
-    
-    # Copy text elements
-    for text in source_ax.texts:
-        target_ax.text(text.get_position()[0], text.get_position()[1], 
-                      text.get_text(), fontsize=text.get_fontsize(),
-                      fontweight=text.get_fontweight())
-    
-    # Copy axis properties
-    target_ax.set_xlabel(source_ax.get_xlabel(), fontsize=8, fontweight='bold')
-    target_ax.set_ylabel(source_ax.get_ylabel(), fontsize=8, fontweight='bold')
-    target_ax.tick_params(axis='both', which='major', labelsize=8)
-    
-    # Copy legend if it exists
-    if source_ax.get_legend():
-        legend = source_ax.get_legend()
-        handles, labels = legend.legendHandles, [text.get_text() for text in legend.get_texts()]
-        target_ax.legend(handles, labels, fontsize=8, loc='upper right')
+for plot_info in plotting_data:
+    row, col = plot_info['row'], plot_info['col']
+    ax = combined_axes[row, col]
+    data = plot_info['data']
+    bins = plot_info['hist_bins']
+    metric_key = plot_info['metric_key']
+    metric_label = plot_info['metric_label']
+    dataset_title = plot_info['dataset_title']
+    if plot_info['hist_density']:
+        # Fitter plot: density
+        ax.hist(data, bins=bins, density=True, alpha=0.7, color='skyblue', edgecolor='black')
+        if 'fit_params' in plot_info:
+            x = plot_info['fit_x']
+            for dist_name, fit in plot_info['fit_params'].items():
+                params = fit['params']
+                color = fit['color']
+                dist = getattr(stats, dist_name)
+                y = dist.pdf(x, *params)
+                ax.plot(x, y, color=color, label=dist_name, linewidth=2)
+        ax.set_ylabel('Density', fontsize=8, fontweight='bold')
+        ax.legend(fontsize=8, loc='upper right')
+    else:
+        # Histogram: event count
+        ax.hist(data, bins=bins, density=False, alpha=0.7, color='skyblue', edgecolor='black')
+        ax.set_ylabel('Event Count', fontsize=8, fontweight='bold')
+    ax.set_xlabel(metric_label, fontsize=8, fontweight='bold')
+    ax.tick_params(axis='both', which='major', labelsize=8)
+    ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
+    ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
+    ax.set_title(dataset_title, fontsize=10, fontweight='bold')
 
-# Adjust layout
 plt.tight_layout()
 
 # Save combined figure with timestamp
