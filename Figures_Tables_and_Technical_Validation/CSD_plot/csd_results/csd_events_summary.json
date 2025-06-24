@@ -1,0 +1,17 @@
+[
+  {
+    "session_id": "1105543760",
+    "probe_id": "1105679699",
+    "event_id": 3942,
+    "duration": 0.1213333333325863,
+    "global_peak_power": 9.987721171038093,
+    "peak_time": 6657.02231080652,
+    "csd_file": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_data/session_1105543760_event_3942/probe_1105679699_csd_data.npz",
+    "plot_files": [
+      "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1105543760_event_3942/probe_1105679699_csd_plot.png",
+      "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1105543760_event_3942/probe_1105679699_csd_plot.svg"
+    ],
+    "event_folder": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_data/session_1105543760_event_3942",
+    "plots_folder": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1105543760_event_3942"
+  }
+]
