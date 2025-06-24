@@ -12,7 +12,7 @@ from matplotlib.patches import Rectangle
 import matplotlib.patches as mpatches
 
 # Paths
-DATA_DIR = "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/Distribution_v2/distributions_for_plotting"
+DATA_DIR = "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/technical_validation_lognorm_distributions/distributions_for_plotting"
 OUT_DIR = os.path.dirname(__file__)
 
 DATASETS = [
