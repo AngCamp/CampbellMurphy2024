@@ -55,7 +55,14 @@ CSD_COMPUTE_DEPTH_RANGE = 500  # microns from pyramidal layer for CSD computatio
 CSD_PLOT_DEPTH_RANGE = (-200, 100)  # microns from pyramidal layer for plotting (min, max)
 
 # Number of top putative events per probe
-MAX_EVENTS_PER_PROBE = 5
+MAX_EVENTS_PER_PROBE = 100
+
+# DEBUG PARAMETER - Limit number of events for quick testing
+DEBUG_EVENT_LIMIT = 100  # Set to None to use all events, or set to a number for debugging
+
+# PROBE SELECTION PARAMETER
+PROBE_RANK_TO_PROCESS = 3  # 0 = best probe, 1 = second best, 2 = third best, etc.
+# Set to None to process the best probe automatically
 
 # TRIAL AVERAGING PARAMETERS
 ENABLE_TRIAL_AVERAGING = True  # Set to False to process individual events like original
@@ -111,9 +118,9 @@ CSD_CLIP_RANGE = (-2, 2)  # (min, max) for CSD color scale
 # =============================================================================
 PUTATIVE_MIN_POWER_MAX_ZSCORE = 3.0
 PUTATIVE_MAX_POWER_MAX_ZSCORE = 10.0
-PUTATIVE_MIN_SW_PEAK_POWER = 2.0
+PUTATIVE_MIN_SW_PEAK_POWER = 1.0
 PUTATIVE_SPEED_THRESHOLD = 2.0  # cm/s
-PUTATIVE_SPEED_EXCLUSION_WINDOW = 2.0  # seconds
+PUTATIVE_SPEED_EXCLUSION_WINDOW = 0.5  # seconds
 
 
 # =============================================================================
@@ -537,9 +544,8 @@ class CSDTrialAverageWorkflow:
         if len(probe_metadata_files) == 0:
             raise RuntimeError(f"No probe metadata files found for session {session_id}")
         
-        # Select the probe with the most putative events
-        max_events = 0
-        best_recording = None
+        # Rank all probes by number of putative events
+        probe_rankings = []
         
         for metadata_file in probe_metadata_files:
             probe_id = metadata_file.name.split('_')[1]
@@ -550,17 +556,35 @@ class CSDTrialAverageWorkflow:
             ripple_channel_id = metadata['ripple_band']['selected_channel_id']
             putative_events = self.load_putative_events(session_id, probe_id, ripple_channel_id)
             
-            if len(putative_events) > max_events:
-                max_events = len(putative_events)
-                best_recording = {'probe_id': probe_id, 'metadata': metadata}
+            probe_rankings.append({
+                'probe_id': probe_id,
+                'metadata': metadata,
+                'n_events': len(putative_events),
+                'ripple_channel_id': ripple_channel_id
+            })
         
-        if best_recording is None:
+        # Sort by number of events (descending)
+        probe_rankings.sort(key=lambda x: x['n_events'], reverse=True)
+        
+        if not probe_rankings:
             raise RuntimeError(f"No probes with putative events found for session {session_id}")
         
-        # Process the best probe
-        probe_id = best_recording['probe_id']
-        metadata = best_recording['metadata']
-        ripple_channel_id = metadata['ripple_band']['selected_channel_id']
+        # Select probe based on rank
+        if PROBE_RANK_TO_PROCESS is None:
+            selected_rank = 0  # Default to best probe
+        else:
+            selected_rank = PROBE_RANK_TO_PROCESS
+            
+        if selected_rank >= len(probe_rankings):
+            raise RuntimeError(f"Probe rank {selected_rank} requested but only {len(probe_rankings)} probes available")
+        
+        selected_probe = probe_rankings[selected_rank]
+        probe_id = selected_probe['probe_id']
+        metadata = selected_probe['metadata']
+        ripple_channel_id = selected_probe['ripple_channel_id']
+        
+        print(f"Selected probe {probe_id} (rank {selected_rank}) with {selected_probe['n_events']} putative events")
+        print(f"Available probes: {[(p['probe_id'], p['n_events']) for p in probe_rankings]}")
         
         putative_events = self.load_putative_events(session_id, probe_id, ripple_channel_id)
         print(f"Probe {probe_id}: loaded {len(putative_events)} putative events")
@@ -613,6 +637,11 @@ class CSDTrialAverageWorkflow:
         
         # Limit number of events for processing
         putative_events = putative_events.head(MAX_EVENTS_PER_PROBE)
+        
+        # Apply debug limit if specified
+        if DEBUG_EVENT_LIMIT is not None:
+            putative_events = putative_events.head(DEBUG_EVENT_LIMIT)
+            print(f"DEBUG: Limiting to {DEBUG_EVENT_LIMIT} events for testing")
         
         # Prepare for trial averaging
         ca1_channel_ids = metadata['ripple_band']['channel_ids']
@@ -764,6 +793,12 @@ def main():
     print(f"Averaging method: {TRIAL_AVERAGE_METHOD}")
     print(f"Max sessions to process: {MAX_SESSIONS_TO_PROCESS}")
     print(f"Max events per probe: {MAX_EVENTS_PER_PROBE}")
+    if DEBUG_EVENT_LIMIT is not None:
+        print(f"DEBUG: Event limit for testing: {DEBUG_EVENT_LIMIT}")
+    if PROBE_RANK_TO_PROCESS is not None:
+        print(f"Processing probe rank: {PROBE_RANK_TO_PROCESS} (0 = best, 1 = second best, etc.)")
+    else:
+        print("Processing best probe automatically")
     print("=" * 50)
     
     # Create workflow

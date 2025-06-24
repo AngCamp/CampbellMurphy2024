@@ -1,17 +1,77 @@
 [
   {
-    "session_id": "1105543760",
-    "probe_id": "1105679699",
-    "event_id": 3942,
-    "duration": 0.1213333333325863,
-    "global_peak_power": 9.987721171038093,
-    "peak_time": 6657.02231080652,
-    "csd_file": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_data/session_1105543760_event_3942/probe_1105679699_csd_data.npz",
+    "session_id": "1118512505",
+    "probe_id": "1118711340",
+    "event_id": 6179,
+    "duration": 0.0740000000005238,
+    "power_max_zscore": 5.753493042631321,
+    "peak_time": 9247.384340626351,
+    "csd_file": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_data/session_1118512505_event_6179/probe_1118711340_csd_data.npz",
     "plot_files": [
-      "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1105543760_event_3942/probe_1105679699_csd_plot.png",
-      "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1105543760_event_3942/probe_1105679699_csd_plot.svg"
+      "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1118512505_event_6179/probe_1118711340_csd_plot.png",
+      "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1118512505_event_6179/probe_1118711340_csd_plot.svg"
     ],
-    "event_folder": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_data/session_1105543760_event_3942",
-    "plots_folder": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1105543760_event_3942"
+    "event_folder": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_data/session_1118512505_event_6179",
+    "plots_folder": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1118512505_event_6179"
+  },
+  {
+    "session_id": "1118512505",
+    "probe_id": "1118711340",
+    "event_id": 6107,
+    "duration": 0.043999999999869,
+    "power_max_zscore": 5.537878743584026,
+    "peak_time": 9029.993007293018,
+    "csd_file": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_data/session_1118512505_event_6107/probe_1118711340_csd_data.npz",
+    "plot_files": [
+      "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1118512505_event_6107/probe_1118711340_csd_plot.png",
+      "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1118512505_event_6107/probe_1118711340_csd_plot.svg"
+    ],
+    "event_folder": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_data/session_1118512505_event_6107",
+    "plots_folder": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1118512505_event_6107"
+  },
+  {
+    "session_id": "1118512505",
+    "probe_id": "1118711340",
+    "event_id": 6136,
+    "duration": 0.0360000000000582,
+    "power_max_zscore": 5.348124098267213,
+    "peak_time": 9094.545673959685,
+    "csd_file": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_data/session_1118512505_event_6136/probe_1118711340_csd_data.npz",
+    "plot_files": [
+      "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1118512505_event_6136/probe_1118711340_csd_plot.png",
+      "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1118512505_event_6136/probe_1118711340_csd_plot.svg"
+    ],
+    "event_folder": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_data/session_1118512505_event_6136",
+    "plots_folder": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1118512505_event_6136"
+  },
+  {
+    "session_id": "1118512505",
+    "probe_id": "1118711340",
+    "event_id": 6039,
+    "duration": 0.0699999999997089,
+    "power_max_zscore": 5.046596720826321,
+    "peak_time": 8853.193007293019,
+    "csd_file": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_data/session_1118512505_event_6039/probe_1118711340_csd_data.npz",
+    "plot_files": [
+      "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1118512505_event_6039/probe_1118711340_csd_plot.png",
+      "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1118512505_event_6039/probe_1118711340_csd_plot.svg"
+    ],
+    "event_folder": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_data/session_1118512505_event_6039",
+    "plots_folder": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1118512505_event_6039"
+  },
+  {
+    "session_id": "1118512505",
+    "probe_id": "1118711340",
+    "event_id": 6157,
+    "duration": 0.0486666666656674,
+    "power_max_zscore": 4.856653766724802,
+    "peak_time": 9170.622340626353,
+    "csd_file": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_data/session_1118512505_event_6157/probe_1118711340_csd_data.npz",
+    "plot_files": [
+      "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1118512505_event_6157/probe_1118711340_csd_plot.png",
+      "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1118512505_event_6157/probe_1118711340_csd_plot.svg"
+    ],
+    "event_folder": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_data/session_1118512505_event_6157",
+    "plots_folder": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_results/csd_plots/session_1118512505_event_6157"
   }
 ]

@@ -1,0 +1,15 @@
+[
+  {
+    "session_id": "1118512505",
+    "probe_id": "1118711336",
+    "n_events": 83,
+    "method": "mean",
+    "csd_file": "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_trial_mean/csd_data/session_1118512505_probe_1118711336_trial_averaged_csd.npz",
+    "plot_files": [
+      "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_trial_mean/csd_plots/session_1118512505_probe_1118711336_trial_averaged_csd.png",
+      "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/CSD_plot/csd_trial_mean/csd_plots/session_1118512505_probe_1118711336_trial_averaged_csd.svg"
+    ],
+    "avg_duration": 0.062265060240866636,
+    "avg_power_zscore": 5.601235083233996
+  }
+]
