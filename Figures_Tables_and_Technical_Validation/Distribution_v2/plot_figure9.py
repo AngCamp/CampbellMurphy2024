@@ -8,6 +8,8 @@ import pandas as pd
 import datetime
 import shutil
 import scipy.stats as stats
+from matplotlib.patches import Rectangle
+import matplotlib.patches as mpatches
 
 # Paths
 DATA_DIR = "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/Distribution_v2/distributions_for_plotting"
@@ -25,177 +27,261 @@ METRICS = [
     ("Peak Ripple Power (Z-score)", "peak_power"),
 ]
 
-# Plot settings
-plt.rcParams["svg.fonttype"] = "none"
-plt.rcParams["text.usetex"] = False
-plt.rcParams["font.weight"] = "bold"
-plt.rcParams["font.size"] = 8
-plt.rcParams["axes.titleweight"] = "bold"
-plt.rcParams["axes.labelweight"] = "bold"
-
-def format_scientific_notation(value):
-    """Format a number in scientific notation like 6.0x10-6"""
-    if value == 0 or np.isnan(value):
-        return "N/A"
-    exp = int(np.floor(np.log10(abs(value))))
-    mantissa = value / (10**exp)
-    return f"{mantissa:.1f}x10{exp:+d}".replace("+", "")
-
-def generate_caption(ks_results):
-    """Generate caption with actual statistical values"""
-    caption = """**Figure 9.  Detected events show expected properties for probe level putative events, occurring in the absence of the wheel movement and at lower theta power.   Plots for ABI Behaviour events are on the left, ABI Coding in the middle, and IBL on the right.  a) The mean instantaneous theta power z-scored during probe level event windows.  b) The wheel speed during the global events, note that for the ABI datasets this can be interpreted as a running speed but from the IBL the mouse uses ambulation to turn a wheel. c) The distribution of global level event durations.  The best fit distribution of the normal, half-normal and lognormal were fit to the data, the lognormal was shown to be the best fit by the Kolmogrov-Smirnov (KS) test in all entities."""
-    
-    # Add duration results (using lognorm as specified in caption)
-    if 'abi_visbehave' in ks_results and 'duration' in ks_results['abi_visbehave'] and 'lognorm' in ks_results['abi_visbehave']['duration']:
-        dur = ks_results['abi_visbehave']['duration']['lognorm']
-        caption += f"  ABI Behaviour (SSE {format_scientific_notation(dur['sse'])}, KS {format_scientific_notation(dur['ks_stat'])}, KS p-value <0.0001)"
-    
-    if 'abi_viscoding' in ks_results and 'duration' in ks_results['abi_viscoding'] and 'lognorm' in ks_results['abi_viscoding']['duration']:
-        dur = ks_results['abi_viscoding']['duration']['lognorm']
-        caption += f", ABI Coding (SSE {format_scientific_notation(dur['sse'])}, KS {format_scientific_notation(dur['ks_stat'])}, KS p-value <0.0001)"
-    
-    if 'ibl' in ks_results and 'duration' in ks_results['ibl'] and 'lognorm' in ks_results['ibl']['duration']:
-        dur = ks_results['ibl']['duration']['lognorm']
-        caption += f" and the IBL (SSE {format_scientific_notation(dur['sse'])}, KS {format_scientific_notation(dur['ks_stat'])}, KS p-value <0.0001)"
-    
-    caption += """  d)  The distribution of global event level peak ripple power (z-scored) is best fit by the lognormal distribution in all entities, all fits pass significance."""
-    
-    # Add peak power results (using lognorm as specified in caption)
-    if 'abi_visbehave' in ks_results and 'peak_power' in ks_results['abi_visbehave'] and 'lognorm' in ks_results['abi_visbehave']['peak_power']:
-        pow = ks_results['abi_visbehave']['peak_power']['lognorm']
-        caption += f"  ABI Behaviour (SSE {format_scientific_notation(pow['sse'])}, KS {format_scientific_notation(pow['ks_stat'])}, KS p-value <0.0001)"
-    
-    if 'abi_viscoding' in ks_results and 'peak_power' in ks_results['abi_viscoding'] and 'lognorm' in ks_results['abi_viscoding']['peak_power']:
-        pow = ks_results['abi_viscoding']['peak_power']['lognorm']
-        caption += f", ABI Coding (SSE {format_scientific_notation(pow['sse'])}, KS {format_scientific_notation(pow['ks_stat'])}, KS p-value <0.0001)"
-    
-    if 'ibl' in ks_results and 'peak_power' in ks_results['ibl'] and 'lognorm' in ks_results['ibl']['peak_power']:
-        pow = ks_results['ibl']['peak_power']['lognorm']
-        caption += f" and the IBL (SSE {format_scientific_notation(pow['sse'])}, KS {format_scientific_notation(pow['ks_stat'])}, KS p-value <0.0001)"
-    
-    caption += "."
-    return caption
-
-# Create figure
-fig, axes = plt.subplots(4, 3, figsize=(12, 16))
-fig.subplots_adjust(hspace=0.4, wspace=0.3)
-fig.suptitle("Figure 9: SWR Event Properties", fontsize=16, fontweight="bold")
-
-ks_results = {}
-
 # Create output directory for individual subplots
 INDIVIDUAL_DIR = os.path.join(OUT_DIR, 'individual_subplots')
 if os.path.exists(INDIVIDUAL_DIR):
     shutil.rmtree(INDIVIDUAL_DIR)
 os.makedirs(INDIVIDUAL_DIR, exist_ok=True)
 
+def format_scientific_notation(value):
+    """Format value in scientific notation for caption"""
+    if np.isnan(value):
+        return "NaN"
+    if value == 0:
+        return "0"
+    
+    exp = int(np.floor(np.log10(abs(value))))
+    mantissa = value / (10**exp)
+    
+    if exp == 0:
+        return f"{mantissa:.1f}"
+    elif exp == -1:
+        return f"{mantissa:.1f}x10-1"
+    elif exp == -2:
+        return f"{mantissa:.1f}x10-2"
+    elif exp == -3:
+        return f"{mantissa:.1f}x10-3"
+    elif exp == -4:
+        return f"{mantissa:.1f}x10-4"
+    elif exp == -5:
+        return f"{mantissa:.1f}x10-5"
+    elif exp == -6:
+        return f"{mantissa:.1f}x10-6"
+    else:
+        return f"{mantissa:.1f}x10{exp}"
+
+def generate_caption(ks_results):
+    """Generate caption with actual statistical values"""
+    caption = """**Figure 9.  Detected events show expected properties for probe level putative events, occurring in the absence of the wheel movement and at lower theta power.   Plots for ABI Behaviour events are on the left, ABI Coding in the middle, and IBL on the right.  a) The mean instantaneous theta power z-scored during probe level event windows.  b) The wheel speed during the global events, note that for the ABI datasets this can be interpreted as a running speed but from the IBL the mouse uses ambulation to turn a wheel. c) The distribution of global level event durations.  The best fit distribution of the normal, half-normal and lognormal were fit to the data, the lognormal was shown to be the best fit by the Kolmogrov-Smirnov (KS) test in all entities.  ABI Behaviour (SSE {}, KS {}, KS p-value <0.0001), ABI Coding (SSE {}, KS {}, KS p-value <0.0001) and the IBL (SSE {}, KS {}, KS p-value <0.0001)  d)  The distribution of global event level peak ripple power (z-scored) is best fit by the lognormal distribution in all entities, all fits pass significance.  ABI Behaviour (SSE {}, KS {}, KS p-value <0.0001), ABI Coding (SSE {}, KS {}, KS p-value <0.0001) and the IBL (SSE {}, KS {}, KS p-value <0.0001).""".format(
+        format_scientific_notation(ks_results['abi_visbehave']['duration']['lognorm']['sse']),
+        format_scientific_notation(ks_results['abi_visbehave']['duration']['lognorm']['ks_stat']),
+        format_scientific_notation(ks_results['abi_viscoding']['duration']['lognorm']['sse']),
+        format_scientific_notation(ks_results['abi_viscoding']['duration']['lognorm']['ks_stat']),
+        format_scientific_notation(ks_results['ibl']['duration']['lognorm']['sse']),
+        format_scientific_notation(ks_results['ibl']['duration']['lognorm']['ks_stat']),
+        format_scientific_notation(ks_results['abi_visbehave']['peak_power']['lognorm']['sse']),
+        format_scientific_notation(ks_results['abi_visbehave']['peak_power']['lognorm']['ks_stat']),
+        format_scientific_notation(ks_results['abi_viscoding']['peak_power']['lognorm']['sse']),
+        format_scientific_notation(ks_results['abi_viscoding']['peak_power']['lognorm']['ks_stat']),
+        format_scientific_notation(ks_results['ibl']['peak_power']['lognorm']['sse']),
+        format_scientific_notation(ks_results['ibl']['peak_power']['lognorm']['ks_stat'])
+    )
+    return caption
+
+# Initialize results dictionary
+ks_results = {}
+
+# Create individual figures for each subplot
+individual_figures = []
+
 for col, (dataset_title, dataset_key) in enumerate(DATASETS):
     ks_results[dataset_key] = {}
     for row, (metric_label, metric_key) in enumerate(METRICS):
-        ax = axes[row, col]
-        plt.sca(ax)  # Ensure all plotting happens on the correct axes
+        print(f"Processing {dataset_key} {metric_key}...")
+        
         npz_file = os.path.join(DATA_DIR, f"{dataset_key}_{metric_key}.npz")
         if not os.path.exists(npz_file):
-            ax.text(0.5, 0.5, f"No data", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
+            print(f"Warning: {npz_file} not found")
             continue
+            
+        # Load data
         data = np.load(npz_file)['data']
+        
+        # Check for NaN values
         nan_count = np.isnan(data).sum()
-        total_count = len(data)
-        nan_pct = 100 * nan_count / total_count if total_count > 0 else 0
-        print(f"{dataset_key} {metric_key}: {nan_count}/{total_count} ({nan_pct:.1f}%) NaN values")
-        if nan_pct > 10:
-            print(f"WARNING: More than 10% NaN in {dataset_key} {metric_key}!")
+        nan_percent = (nan_count / len(data)) * 100
+        print(f"{dataset_key} {metric_key}: {nan_count}/{len(data)} ({nan_percent:.1f}%) NaN values")
+        
+        if nan_percent > 10:
+            print(f"Warning: {nan_percent:.1f}% NaN values in {dataset_key} {metric_key}")
+        
+        # Remove NaN values
         data = data[~np.isnan(data)]
-        if metric_key == "duration":
-            data = data * 1000  # Convert to ms
+        
         if len(data) == 0:
-            ax.text(0.5, 0.5, f"No valid data", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
+            print(f"Warning: No valid data for {dataset_key} {metric_key}")
             continue
-        # Plot
-        if metric_key in ["theta_power", "speed"]:
-            ax.hist(data, bins=30, edgecolor="black", facecolor="steelblue", alpha=0.7)
-        else:  # duration, peak_power: density plot with fits
-            # Plot histogram on ax
-            ax.hist(data, bins=30, edgecolor="black", facecolor="steelblue", alpha=0.7, density=True)
-            # Fit and plot distributions on ax
+        
+        # Create individual figure
+        fig, ax = plt.subplots(figsize=(4, 3))
+        
+        # Plot based on metric type
+        if metric_key in ['theta_power', 'speed']:
+            # Simple histogram for theta power and speed
+            ax.hist(data, bins=50, density=True, alpha=0.7, color='skyblue', edgecolor='black')
+            ax.set_xlabel(metric_label, fontsize=8, fontweight='bold')
+            ax.set_ylabel('Density', fontsize=8, fontweight='bold')
+            ax.tick_params(axis='both', which='major', labelsize=8)
+            
+            # Limit number of ticks
+            ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
+            ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
+            
+        else:
+            # Fitter plots for duration and peak power
             f = Fitter(data, distributions=['norm', 'halfnorm', 'lognorm'])
             f.fit()
-            xlim = ax.get_xlim()
-            x = np.linspace(xlim[0], xlim[1], 200)
+            
+            # Plot histogram
+            ax.hist(data, bins=50, density=True, alpha=0.7, color='skyblue', edgecolor='black')
+            
+            # Plot fitted distributions
+            x = np.linspace(data.min(), data.max(), 1000)
             for dist_name, color in zip(['norm', 'halfnorm', 'lognorm'], ['red', 'orange', 'green']):
                 if dist_name in f.fitted_param:
                     params = f.fitted_param[dist_name]
                     dist = getattr(stats, dist_name)
                     y = dist.pdf(x, *params)
-                    ax.plot(x, y, color=color, label=dist_name)
-            # Store KS results for all distributions
+                    ax.plot(x, y, color=color, label=dist_name, linewidth=2)
+            
+            ax.set_xlabel(metric_label, fontsize=8, fontweight='bold')
+            ax.set_ylabel('Density', fontsize=8, fontweight='bold')
+            ax.tick_params(axis='both', which='major', labelsize=8)
+            ax.legend(fontsize=8, loc='upper right')
+            
+            # Limit number of ticks
+            ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
+            ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
+            
+            # Extract KS statistics for all distributions
             try:
                 summary = f.summary()
                 ks_results[dataset_key][metric_key] = {}
                 for dist_name in ['norm', 'halfnorm', 'lognorm']:
-                    if dist_name in summary.index:
+                    if dist_name in f.fitted_param:
                         ks_results[dataset_key][metric_key][dist_name] = {
-                            'sse': summary.loc[dist_name, 'sumsquare_error'],
-                            'ks_stat': summary.loc[dist_name, 'ks_statistic'],
-                            'ks_pvalue': summary.loc[dist_name, 'ks_pvalue'],
-                            'aic': summary.loc[dist_name, 'aic'],
-                            'bic': summary.loc[dist_name, 'bic']
+                            'sse': summary['sumsquare_error'].get(dist_name, np.nan),
+                            'ks_stat': summary.get('ks_stat', {}).get(dist_name, np.nan),
+                            'ks_pvalue': summary.get('ks_pvalue', {}).get(dist_name, np.nan),
+                            'aic': summary.get('aic', {}).get(dist_name, np.nan),
+                            'bic': summary.get('bic', {}).get(dist_name, np.nan)
                         }
                     else:
                         ks_results[dataset_key][metric_key][dist_name] = {
-                            'sse': np.nan,
-                            'ks_stat': np.nan,
-                            'ks_pvalue': np.nan,
-                            'aic': np.nan,
-                            'bic': np.nan
+                            'sse': np.nan, 'ks_stat': np.nan, 'ks_pvalue': np.nan,
+                            'aic': np.nan, 'bic': np.nan
                         }
             except Exception as e:
-                print(f"Error extracting KS results for {dataset_key} {metric_key}: {e}")
+                print(f"Error extracting KS statistics for {dataset_key} {metric_key}: {e}")
                 ks_results[dataset_key][metric_key] = {
                     'norm': {'sse': np.nan, 'ks_stat': np.nan, 'ks_pvalue': np.nan, 'aic': np.nan, 'bic': np.nan},
                     'halfnorm': {'sse': np.nan, 'ks_stat': np.nan, 'ks_pvalue': np.nan, 'aic': np.nan, 'bic': np.nan},
                     'lognorm': {'sse': np.nan, 'ks_stat': np.nan, 'ks_pvalue': np.nan, 'aic': np.nan, 'bic': np.nan}
                 }
-            if row in [2, 3]:
-                ax.legend(fontsize=10, loc='upper right')
-        # Axis labels
-        if row == 0:
-            ax.set_title(dataset_title, fontweight="bold", fontsize=16)
-        if col == 0:
-            # Row labels (a, b, c, d)
-            label = ['a', 'b', 'c', 'd'][row]
-            ax.annotate(label, xy=(-0.18, 1.05), xycoords='axes fraction', fontsize=18, fontweight='bold', va='top', ha='right')
-        ax.set_xlabel(metric_label, fontweight="bold", fontsize=14)
-        ax.set_ylabel("Event Count" if metric_key in ["theta_power", "speed"] else "Density", fontweight="bold", fontsize=14)
-        ax.xaxis.set_major_locator(ticker.MaxNLocator(5))
-        ax.yaxis.set_major_locator(ticker.MaxNLocator(5))
+        
+        # Set title
+        ax.set_title(f"{dataset_title}", fontsize=10, fontweight='bold')
+        
         # Save individual subplot
-        subplot_filename = f"{dataset_key}_{metric_key}.png"
-        subplot_svg = f"{dataset_key}_{metric_key}.svg"
-        ax.figure.savefig(os.path.join(INDIVIDUAL_DIR, subplot_filename), dpi=300, bbox_inches='tight')
-        ax.figure.savefig(os.path.join(INDIVIDUAL_DIR, subplot_svg), bbox_inches='tight')
+        subplot_path_png = os.path.join(INDIVIDUAL_DIR, f"{dataset_key}_{metric_key}.png")
+        subplot_path_svg = os.path.join(INDIVIDUAL_DIR, f"{dataset_key}_{metric_key}.svg")
+        fig.savefig(subplot_path_png, dpi=300, bbox_inches='tight')
+        fig.savefig(subplot_path_svg, bbox_inches='tight')
+        
+        # Store figure for later combination
+        individual_figures.append({
+            'fig': fig,
+            'ax': ax,
+            'row': row,
+            'col': col,
+            'dataset_key': dataset_key,
+            'metric_key': metric_key
+        })
+        
+        plt.close(fig)
 
-plt.tight_layout(rect=[0, 0, 1, 0.97])
+# Create combined figure
+print("Creating combined figure...")
+combined_fig, combined_axes = plt.subplots(4, 3, figsize=(15, 20))
 
-# Save with timestamp to avoid overwriting
+# Add row and column labels
+for i, (metric_label, _) in enumerate(METRICS):
+    combined_axes[i, 0].set_ylabel(metric_label, fontsize=12, fontweight='bold', rotation=90)
+
+for i, (dataset_title, _) in enumerate(DATASETS):
+    combined_axes[0, i].set_title(dataset_title, fontsize=14, fontweight='bold')
+
+# Combine individual figures into the big plot
+for item in individual_figures:
+    row, col = item['row'], item['col']
+    source_ax = item['ax']
+    target_ax = combined_axes[row, col]
+    
+    # Copy all elements from source to target
+    for element in source_ax.get_children():
+        if hasattr(element, 'get_bbox'):
+            bbox = element.get_bbox()
+            if bbox is not None:
+                # Copy the element to the target axes
+                target_ax.add_patch(element)
+    
+    # Copy plot data
+    for line in source_ax.get_lines():
+        target_ax.plot(line.get_xdata(), line.get_ydata(), 
+                      color=line.get_color(), linewidth=line.get_linewidth(),
+                      label=line.get_label())
+    
+    # Copy histogram data
+    for patch in source_ax.patches:
+        target_ax.add_patch(patch)
+    
+    # Copy text elements
+    for text in source_ax.texts:
+        target_ax.text(text.get_position()[0], text.get_position()[1], 
+                      text.get_text(), fontsize=text.get_fontsize(),
+                      fontweight=text.get_fontweight())
+    
+    # Copy axis properties
+    target_ax.set_xlabel(source_ax.get_xlabel(), fontsize=8, fontweight='bold')
+    target_ax.set_ylabel(source_ax.get_ylabel(), fontsize=8, fontweight='bold')
+    target_ax.tick_params(axis='both', which='major', labelsize=8)
+    
+    # Copy legend if it exists
+    if source_ax.get_legend():
+        legend = source_ax.get_legend()
+        handles, labels = legend.legendHandles, [text.get_text() for text in legend.get_texts()]
+        target_ax.legend(handles, labels, fontsize=8, loc='upper right')
+
+# Adjust layout
+plt.tight_layout()
+
+# Save combined figure with timestamp
 timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-plt.savefig(os.path.join(OUT_DIR, f"figure9_{timestamp}.png"), dpi=300, bbox_inches='tight')
-plt.savefig(os.path.join(OUT_DIR, f"figure9_{timestamp}.svg"), bbox_inches='tight')
-plt.close(fig)
-print(f"Figure saved to {OUT_DIR} as figure9_{timestamp}.png/svg")
+combined_fig_path_png = os.path.join(OUT_DIR, f"figure9_combined_{timestamp}.png")
+combined_fig_path_svg = os.path.join(OUT_DIR, f"figure9_combined_{timestamp}.svg")
+
+combined_fig.savefig(combined_fig_path_png, dpi=300, bbox_inches='tight')
+combined_fig.savefig(combined_fig_path_svg, bbox_inches='tight')
+
+print(f"Combined figure saved as:")
+print(f"  PNG: {combined_fig_path_png}")
+print(f"  SVG: {combined_fig_path_svg}")
 
 # Save KS results
-with open(os.path.join(OUT_DIR, "figure9_ks_results.json"), 'w') as f:
-    json.dump(ks_results, f, indent=2)
+ks_results_path = os.path.join(OUT_DIR, "figure9_ks_results.json")
+with open(ks_results_path, 'w') as f:
+    json.dump(ks_results, f, indent=2, default=str)
+
+print(f"KS results saved to: {ks_results_path}")
 
 # Generate and save caption
 caption = generate_caption(ks_results)
-caption_file = os.path.join(OUT_DIR, "figure9_caption_with_results.txt")
-with open(caption_file, 'w') as f:
+caption_path = os.path.join(OUT_DIR, "figure9_caption.txt")
+with open(caption_path, 'w') as f:
     f.write(caption)
 
-print(f"Figure saved to {OUT_DIR}")
-print(f"KS results saved to {os.path.join(OUT_DIR, 'figure9_ks_results.json')}")
-print(f"Caption saved to {caption_file}")
-print("\nGenerated caption:")
-print(caption) 
+print(f"Caption saved to: {caption_path}")
+print("\nCaption:")
+print(caption)
+
+plt.close(combined_fig) 
