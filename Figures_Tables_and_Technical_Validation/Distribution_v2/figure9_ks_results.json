@@ -1,0 +1,38 @@
+{
+  "abi_visbehave": {
+    "duration": {
+      "sse": 0.00014398874753502417,
+      "ks_stat": NaN,
+      "ks_pvalue": 0.30819784845132336
+    },
+    "peak_power": {
+      "sse": 0.23731654418749107,
+      "ks_stat": NaN,
+      "ks_pvalue": 0.0006181214166650937
+    }
+  },
+  "abi_viscoding": {
+    "duration": {
+      "sse": 0.0002114550171705672,
+      "ks_stat": NaN,
+      "ks_pvalue": 0.8814896309994904
+    },
+    "peak_power": {
+      "sse": 0.3282837800223294,
+      "ks_stat": NaN,
+      "ks_pvalue": 0.12409018224517243
+    }
+  },
+  "ibl": {
+    "duration": {
+      "sse": 0.000678770426155912,
+      "ks_stat": NaN,
+      "ks_pvalue": 0.6677665508730444
+    },
+    "peak_power": {
+      "sse": 0.7102800650789902,
+      "ks_stat": NaN,
+      "ks_pvalue": 0.5756403342862936
+    }
+  }
+}

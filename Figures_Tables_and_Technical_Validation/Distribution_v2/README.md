@@ -1,13 +1,82 @@
-# Figure 9 Regeneration Workflow
+# Figure 9 Workflow
 
-This directory contains scripts and resources to regenerate Figure 9 for the SWR event analysis, including data gathering, plotting, and automated caption generation with statistical test results.
+This directory contains the complete workflow for generating Figure 9, which shows SWR event properties across three datasets: ABI Visual Behaviour, ABI Visual Coding, and IBL.
 
-## Overview
+## Quick Start
 
-The workflow consists of two main steps:
+```bash
+# Run the complete workflow
+bash run_figure9_workflow.sh
 
-1. **Data Gathering**: Extracts mean theta power, mean speed, duration, and peak ripple power for all SWR events from three datasets (ABI Visual Behaviour, ABI Visual Coding, IBL) using a unified script with lazy loading.
-2. **Plotting and Caption Generation**: Generates a 3x4 grid of histograms and density plots, extracts KS test results, and automatically creates a caption with the actual statistical values.
+# For debugging: limit to first session per dataset
+bash run_figure9_workflow.sh --max_sessions 1
+
+# Skip data gathering and just plot existing data (fast debugging)
+bash run_figure9_workflow.sh --skip-gathering
+```
+
+## Workflow Steps
+
+1. **Data Gathering**: Collects mean theta power and speed data for SWR events from each dataset
+2. **Plotting**: Creates histograms and density plots with statistical fits
+3. **KS Test Analysis**: Extracts Kolmogorov-Smirnov test results for distribution fitting
+4. **Caption Generation**: Creates figure caption with actual statistical values
+
+## Files
+
+- `gather_speed_theta_data.py`: Vectorized data collection script
+- `plot_figure9.py`: Plotting and statistical analysis script
+- `run_figure9_workflow.sh`: Complete workflow orchestration
+- `theta_1500hz_bandpass_filter.npz`: Theta band filter for LFP analysis
+
+## Command Line Options
+
+### `run_figure9_workflow.sh`
+
+- `--max_sessions N`: Limit processing to first N sessions per dataset (for debugging)
+- `--skip-gathering`: Skip data gathering and go straight to plotting (for debugging)
+- `--help, -h`: Show help message
+
+### `gather_speed_theta_data.py`
+
+- `--dataset`: Choose dataset (`abi_visbehave`, `abi_viscoding`, `ibl`)
+- `--max_sessions N`: Limit number of sessions (for debugging)
+
+## Output Files
+
+- `figure9.png` and `figure9.svg`: The complete figure
+- `figure9_ks_results.json`: KS test results for distribution fitting
+- `figure9_caption_with_results.txt`: Figure caption with actual statistical values
+
+## Data Processing
+
+The workflow processes putative SWR events that meet the following criteria:
+- `power_max_zscore` between 3 and 10
+- `sw_peak_power` greater than 1
+- No overlap with gamma events (`overlaps_with_gamma == False`)
+- No overlap with movement (`overlaps_with_movement == False`)
+- Valid start and end times
+
+## Performance Features
+
+- **Vectorized processing**: Uses NumPy operations for fast data processing
+- **Lazy loading**: Loads APIs only when needed to avoid dependency conflicts
+- **NaN handling**: Robust handling of missing or invalid data
+- **Data overwriting**: Automatically removes old data files to ensure fresh results
+- **Skip gathering**: Can skip data collection for fast plotting iteration
+
+## Environment Management
+
+The script automatically manages conda environments:
+- `allensdk_env` for ABI datasets
+- `ONE_ibl_env` for IBL dataset
+
+## Troubleshooting
+
+- **Empty results**: Check that SWR event files exist and meet filtering criteria
+- **Missing data**: Ensure LFP and speed data are available for the sessions
+- **Environment issues**: Verify conda environments are properly set up
+- **Memory issues**: Use `--max_sessions` to limit processing scope
 
 ---
 
@@ -57,11 +126,12 @@ Complete automation script that runs all steps in the correct environments.
 
 **Usage:**
 ```bash
-./run_figure9_workflow.sh [--max_sessions N] [--help]
+./run_figure9_workflow.sh [--max_sessions N] [--skip-gathering] [--help]
 ```
 
 **Parameters:**
 - `--max_sessions N`: Optional. Limit processing to first N sessions per dataset (for debugging)
+- `--skip-gathering`: Optional. Skip data gathering and go straight to plotting (for debugging)
 - `--help, -h`: Show help message
 
 ---

@@ -7,13 +7,13 @@ import json
 import pandas as pd
 
 # Paths
-DATA_DIR = "/space/scratch/SWR_final_pipeline/validation_data_figure9"
+DATA_DIR = "/home/acampbell/NeuropixelsLFPOnRamp/Figures_Tables_and_Technical_Validation/Distribution_v2/distributions_for_plotting"
 OUT_DIR = os.path.dirname(__file__)
 
 DATASETS = [
-    ("ABI Behaviour", "abi_visbehave_swr_theta_speed.npz"),
-    ("ABI Coding", "abi_viscoding_swr_theta_speed.npz"),
-    ("IBL", "ibl_swr_theta_speed.npz"),
+    ("ABI Behaviour", "abi_visbehave"),
+    ("ABI Coding", "abi_viscoding"),
+    ("IBL", "ibl"),
 ]
 
 # Plot settings
@@ -26,8 +26,8 @@ plt.rcParams["axes.labelweight"] = "bold"
 
 def format_scientific_notation(value):
     """Format a number in scientific notation like 6.0x10-6"""
-    if value == 0:
-        return "0"
+    if value == 0 or np.isnan(value):
+        return "N/A"
     exp = int(np.floor(np.log10(abs(value))))
     mantissa = value / (10**exp)
     return f"{mantissa:.1f}x10{exp:+d}".replace("+", "")
@@ -73,21 +73,21 @@ fig.suptitle("Figure 9: SWR Event Properties", fontsize=12, fontweight="bold")
 
 ks_results = {}
 
-for col, (title, fname) in enumerate(DATASETS):
-    data_path = os.path.join(DATA_DIR, fname)
-    if not os.path.exists(data_path):
-        print(f"Missing data: {data_path}")
-        continue
-    
-    # Load data
-    arr = np.load(data_path, allow_pickle=True)["results"]
-    df = pd.DataFrame(list(arr))
-    dataset_key = fname.split('_swr')[0]
+for col, (title, dataset_key) in enumerate(DATASETS):
+    print(f"Processing dataset: {dataset_key}")
     ks_results[dataset_key] = {}
     
     # Row 1: Histogram of mean theta power (z-score)
     ax = axes[0, col]
-    ax.hist(df["mean_theta_power"].dropna(), bins=20, edgecolor="black", facecolor="steelblue", alpha=0.7)
+    theta_file = os.path.join(DATA_DIR, f"{dataset_key}_theta_power.npz")
+    if os.path.exists(theta_file):
+        theta_data = np.load(theta_file)['data']
+        if len(theta_data) > 0:
+            ax.hist(theta_data, bins=20, edgecolor="black", facecolor="steelblue", alpha=0.7)
+        else:
+            ax.text(0.5, 0.5, "No valid theta data", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
+    else:
+        ax.text(0.5, 0.5, "No theta data file", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
     ax.set_xlabel("Mean Theta Power (z-score)", fontweight="bold")
     ax.set_ylabel("Count", fontweight="bold")
     ax.set_title(f"{title}", fontweight="bold")
@@ -96,7 +96,15 @@ for col, (title, fname) in enumerate(DATASETS):
     
     # Row 2: Histogram of mean speed
     ax = axes[1, col]
-    ax.hist(df["mean_speed"].dropna(), bins=20, edgecolor="black", facecolor="lightcoral", alpha=0.7)
+    speed_file = os.path.join(DATA_DIR, f"{dataset_key}_speed.npz")
+    if os.path.exists(speed_file):
+        speed_data = np.load(speed_file)['data']
+        if len(speed_data) > 0:
+            ax.hist(speed_data, bins=20, edgecolor="black", facecolor="lightcoral", alpha=0.7)
+        else:
+            ax.text(0.5, 0.5, "No valid speed data", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
+    else:
+        ax.text(0.5, 0.5, "No speed data file", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
     ax.set_xlabel("Mean Speed (cm/s)", fontweight="bold")
     ax.set_ylabel("Count", fontweight="bold")
     ax.yaxis.set_major_locator(ticker.MaxNLocator(4))
@@ -104,12 +112,20 @@ for col, (title, fname) in enumerate(DATASETS):
     
     # Row 3: Density plot of duration
     ax = axes[2, col]
-    durations = df["duration"].dropna() * 1000  # Convert to ms
-    f_duration = Fitter(durations, distributions=['norm', 'halfnorm', 'lognorm'])
-    f_duration.fit()
-    best_dist_duration = f_duration.get_best(method='sumsquare_error')
-    f_duration.hist()
-    f_duration.plot_pdf()
+    f_duration = None  # Initialize to None
+    duration_file = os.path.join(DATA_DIR, f"{dataset_key}_duration.npz")
+    if os.path.exists(duration_file):
+        durations = np.load(duration_file)['data'] * 1000  # Convert to ms
+        if len(durations) > 0:
+            f_duration = Fitter(durations, distributions=['norm', 'halfnorm', 'lognorm'])
+            f_duration.fit()
+            best_dist_duration = f_duration.get_best(method='sumsquare_error')
+            f_duration.hist()
+            f_duration.plot_pdf()
+        else:
+            ax.text(0.5, 0.5, "No valid duration data", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
+    else:
+        ax.text(0.5, 0.5, "No duration data file", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
     ax.set_xlabel("Duration (ms)", fontweight="bold")
     ax.set_ylabel("Density", fontweight="bold")
     ax.grid(False)
@@ -117,22 +133,43 @@ for col, (title, fname) in enumerate(DATASETS):
     ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
     
     # Store KS results for duration
-    if 'lognorm' in f_duration.fitted_param:
+    if f_duration is not None and 'lognorm' in f_duration.fitted_param:
+        try:
+            summary = f_duration.summary()
+            ks_results[dataset_key]['duration'] = {
+                'sse': summary['sumsquare_error']['lognorm'],
+                'ks_stat': summary.get('ks_stat', {}).get('lognorm', np.nan),
+                'ks_pvalue': summary.get('ks_pvalue', {}).get('lognorm', np.nan)
+            }
+        except (KeyError, TypeError) as e:
+            print(f"Warning: Could not extract KS results for {dataset_key} duration: {e}")
+            ks_results[dataset_key]['duration'] = {
+                'sse': np.nan,
+                'ks_stat': np.nan,
+                'ks_pvalue': np.nan
+            }
+    else:
+        print(f"Warning: No valid duration data for {dataset_key}")
         ks_results[dataset_key]['duration'] = {
-            'sse': f_duration.summary()['sumsquare_error']['lognorm'],
-            'ks_stat': f_duration.summary()['ks_stat']['lognorm'],
-            'ks_pvalue': f_duration.summary()['ks_pvalue']['lognorm']
+            'sse': np.nan,
+            'ks_stat': np.nan,
+            'ks_pvalue': np.nan
         }
     
-    # Row 4: Density plot of peak ripple power (if available)
+    # Row 4: Density plot of peak ripple power
     ax = axes[3, col]
-    if 'power_max_zscore' in df.columns:
-        peak_power = df["power_max_zscore"].dropna()
-        f_power = Fitter(peak_power, distributions=['norm', 'halfnorm', 'lognorm'])
-        f_power.fit()
-        best_dist_power = f_power.get_best(method='sumsquare_error')
-        f_power.hist()
-        f_power.plot_pdf()
+    f_power = None  # Initialize to None
+    power_file = os.path.join(DATA_DIR, f"{dataset_key}_peak_power.npz")
+    if os.path.exists(power_file):
+        peak_power = np.load(power_file)['data']
+        if len(peak_power) > 0:
+            f_power = Fitter(peak_power, distributions=['norm', 'halfnorm', 'lognorm'])
+            f_power.fit()
+            best_dist_power = f_power.get_best(method='sumsquare_error')
+            f_power.hist()
+            f_power.plot_pdf()
+        else:
+            ax.text(0.5, 0.5, "No valid peak power data", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
         ax.set_xlabel("Peak Ripple Power (z-score)", fontweight="bold")
         ax.set_ylabel("Density", fontweight="bold")
         ax.grid(False)
@@ -140,16 +177,38 @@ for col, (title, fname) in enumerate(DATASETS):
         ax.xaxis.set_major_locator(ticker.MaxNLocator(4))
         
         # Store KS results for peak power
-        if 'lognorm' in f_power.fitted_param:
+        if f_power is not None and 'lognorm' in f_power.fitted_param:
+            try:
+                summary = f_power.summary()
+                ks_results[dataset_key]['peak_power'] = {
+                    'sse': summary['sumsquare_error']['lognorm'],
+                    'ks_stat': summary.get('ks_stat', {}).get('lognorm', np.nan),
+                    'ks_pvalue': summary.get('ks_pvalue', {}).get('lognorm', np.nan)
+                }
+            except (KeyError, TypeError) as e:
+                print(f"Warning: Could not extract KS results for {dataset_key} peak power: {e}")
+                ks_results[dataset_key]['peak_power'] = {
+                    'sse': np.nan,
+                    'ks_stat': np.nan,
+                    'ks_pvalue': np.nan
+                }
+        else:
+            print(f"Warning: No valid peak power data for {dataset_key}")
             ks_results[dataset_key]['peak_power'] = {
-                'sse': f_power.summary()['sumsquare_error']['lognorm'],
-                'ks_stat': f_power.summary()['ks_stat']['lognorm'],
-                'ks_pvalue': f_power.summary()['ks_pvalue']['lognorm']
+                'sse': np.nan,
+                'ks_stat': np.nan,
+                'ks_pvalue': np.nan
             }
     else:
-        ax.text(0.5, 0.5, "Peak power data\nnot available", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
+        ax.text(0.5, 0.5, "No peak power data file", ha='center', va='center', transform=ax.transAxes, fontweight="bold")
         ax.set_xlabel("Peak Ripple Power (z-score)", fontweight="bold")
         ax.set_ylabel("Density", fontweight="bold")
+        # Set default peak power results
+        ks_results[dataset_key]['peak_power'] = {
+            'sse': np.nan,
+            'ks_stat': np.nan,
+            'ks_pvalue': np.nan
+        }
 
 plt.tight_layout()
 
