@@ -1,87 +1,106 @@
-# SWR Detection Pipeline Environment Setup
+# Project Setup
 
-This document describes how to set up the required environments for running the SWR detection pipeline.
+This directory contains resources and information related to setting up the environment for the SWR Neuropixels Detector project, this will allow you to run the notebooks in Data Usage, or if you chose to modify the pipeline and detect your own set of high frequency events.
+
+## Environment Management
+
+We use **Conda** as our environment manager for this project. While we chose Conda because most researchers are familiar with it, please note that we primarily use `pip` for package installations within the conda environments as most do not have a Conda installation available.
+
+**Important:** The pipeline expects specific environment names (`allensdk_env` and `ONE_ibl_env`) as these are hardcoded in the `run_pipeline.sh` script. Please use the exact names provided by our setup script.
 
 ## Prerequisites
 
-- Git (to clone the repository)
-- Conda (Miniconda or Anaconda)
+**Install Conda:** If you don't have Conda installed, please install Miniconda or Anaconda:
+- Miniconda (recommended): [https://docs.conda.io/projects/miniconda/en/latest/](https://docs.conda.io/projects/miniconda/en/latest/)
+- Anaconda: [https://www.anaconda.com/products/distribution](https://www.anaconda.com/products/distribution)
 
-## Installing Conda
+## Automated Environment Setup
 
-If you don't have Conda installed, follow these steps:
-
-1. Download Miniconda:
-
-   - **Linux**:
-     ```bash
-     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
-     ```
-   
-   - **MacOS**:
-     ```bash
-     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -O miniconda.sh
-     ```
-
-2. Install Miniconda:
-   ```bash
-   bash miniconda.sh -b -p $HOME/miniconda
-   ```
-
-3. Initialize conda:
-   ```bash
-   source $HOME/miniconda/bin/activate
-   conda init
-   ```
-
-4. Restart your shell or terminal
-
-## Installing Snakemake
-
-Install Snakemake in your base conda environment:
+We provide a single setup script that creates both required environments. Simply run:
 
 ```bash
-conda install -c bioconda -c conda-forge snakemake
+cd Setup/
+./setup_environments.sh
 ```
 
-## Setting Up Required Environments
+If you get a permission error, make the script executable first:
+```bash
+chmod +x setup_environments.sh
+./setup_environments.sh
+```
 
-The SWR detection pipeline requires two different conda environments:
+### What the Setup Script Does
 
-1. `allensdk_env`: For processing Allen Brain Institute datasets
-2. `ONE_ibl_env`: For processing IBL datasets
+The `setup_environments.sh` script performs the following steps:
 
-### Creating the Environments
+1. **Checks for Conda installation** and exits with helpful error message if not found
+2. **Makes itself executable** (includes `chmod +x` command)
+3. **Creates `allensdk_env` environment** with Python 3.10 for Allen Institute datasets:
+   - Installs core packages: numpy, pandas, scipy, matplotlib, tqdm, pyyaml
+   - Installs AllenSDK via pip
+   - Installs ripple_detection package from conda-forge (edeno channel)
+   - Sets up Jupyter kernel support
+4. **Creates `ONE_ibl_env` environment** with Python 3.10 for IBL datasets:
+   - Installs core packages: numpy, pandas, scipy, matplotlib, tqdm, pyyaml  
+   - Installs ONE-api via pip
+   - Installs ibllib via pip
+   - Installs ibl-neuropixel version 1.8.1 via pip
+   - Installs ripple_detection package from conda-forge (edeno channel)
+   - Sets up Jupyter kernel support
+5. **Configures Jupyter kernels** so you can select the appropriate environment in notebooks
 
-Navigate to the repository's root directory and create the environments:
+### Using the Environments
+
+After setup, you can activate the environments manually:
 
 ```bash
-# Create the Allen SDK environment
-conda env create -f envs/allensdk_env.yml
+# For Allen Institute datasets
+conda activate allensdk_env
 
-# Create the IBL environment
-conda env create -f envs/ONE_ibl_env.yml
+# For IBL datasets  
+conda activate ONE_ibl_env
 ```
 
-### Verifying the Environments
+**Note:** The `run_pipeline.sh` script automatically activates the correct environment based on the dataset being processed, so manual activation is only needed for interactive work or running individual notebooks.
 
-Verify that the environments were created correctly:
+### Jupyter Notebook Support
 
-```bash
-conda env list
-```
+Both environments are configured as Jupyter kernels:
+- **Python (allensdk_env)** - for Allen Institute data analysis
+- **Python (ONE_ibl_env)** - for IBL data analysis
 
-You should see both `allensdk_env` and `ONE_ibl_env` in the list.
+Select the appropriate kernel when working with notebooks.
 
-## Note on Working Directory
+## Configuration
 
-All pipeline code is located in the `DetectionSWRs` folder. This folder should be used as the working directory when running the pipeline.
+The main configuration file `united_detector_config.yaml` (or a user-specified one) controls various aspects of the pipeline, including paths, dataset selection, processing parameters, and flags.
 
-## Environment Files
+Ensure that the paths specified in the configuration file (e.g., `swr_output_dir`, `lfp_output_dir`, `session_list_file`, cache directories) are correct for your system.
 
-The environment YAML files contain all necessary dependencies:
+## MNE Environment (Optional - For Filter Design)
 
-- `allensdk_env.yml`: Contains dependencies for Allen Brain Institute data processing
-- `ONE_ibl_env.yml`: Contains dependencies for IBL data processing
+If you intend to design your own bandpass filters (e.g., for the ripple band or sharp-wave component) using the MNE-Python library, you will need an environment with MNE installed. This is separate from the main pipeline execution environment unless you combine them.
 
-These environments include all required packages, with specific versions to ensure reproducibility.
+1.  **Create MNE Environment:**
+    ```bash
+    # Create a new conda environment (e.g., named 'mne')
+    conda create --name mne --channel=conda-forge --override-channels python=3.9 mne matplotlib scipy notebook ipython pandas
+    ```
+
+2.  **Activate MNE Environment:**
+    ```bash
+    conda activate mne
+    ```
+
+3.  **Run Jupyter Notebook:** You can then run the filter design notebook (e.g., `PowerBandFIlters/mne_filter_design_1500hz.ipynb`):
+    ```bash
+    jupyter notebook
+    ```
+
+Refer to the official MNE installation guide for the most up-to-date instructions: [https://mne.tools/stable/install/manual_install.html](https://mne.tools/stable/install/manual_install.html)
+
+*(Note: Installing MNE in the main pipeline environment is also possible but might increase complexity and potential conflicts.)*
+
+## Running the Pipeline
+
+Use the `run_pipeline.sh` script located in the main `SWR_Neuropixels_Detector` directory. See the main project README for detailed usage instructions. 
