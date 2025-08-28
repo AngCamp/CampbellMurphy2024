@@ -10,6 +10,6 @@ dmypy.json
 setup_allen_cache.py
 # Pyre type checker
 .pyre/
-
+OSF_README.txt
 # VS Code settings folder (including launch.json)
 .vscode/

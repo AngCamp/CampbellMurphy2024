@@ -2,6 +2,14 @@
 
 This folder contains tutorials for understanding and analyzing Sharp Wave Ripple (SWR) data collected from Neuropixels recordings. The tutorials are designed to help researchers work with SWR datasets at different scales and for different analytical purposes.
 
+## Downloading SWR data
+
+The SWR data is published on the [Open Science Framework](https://osf.io/) at the following URL [https://osf.io/9gm6x/](https://osf.io/9gm6x/) (DOI 10.17605/OSF.IO/9GM6X).  Gunzip the data, then to use the notebooks change `SWR_INPUT_DIR` variable, located near the top of either notebook, to the local path, do the same for the cache variables for the Allen SDK or the ONE-api as the case may be.
+
+## Setting up the Allen SDK and the ONE-API
+
+Both the data/development tools for the Allen Brain Institute's data and the International Brain Laboratories data will run with local caches that store the NWB files.  Downloading what is needed as you go to a local cache folder.  The notebooks set the cache using the `CACHE_DIR` varible so these will need to be set as well for you to run the notebooks locally.
+
 ## Notebooks Overview
 
 ### 1. `swrs_allen_visual_behaviour.ipynb` - Single Session Data Alignment
