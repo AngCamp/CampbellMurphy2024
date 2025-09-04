@@ -13,46 +13,46 @@ Both the data/development tools for the Allen Brain Institute's data and the Int
 ## Data Description
 
 #### Event Timing information
-• 'start_time': The start time of the SWR event
-• 'end_time': The end time of the SWR event
-• 'duration': The duration of the SWR event
-• 'power_peak_time': Time of peak power within the SWR event
+• 'start_time': The start time of the SWR event  
+• 'end_time': The end time of the SWR event  
+• 'duration': The duration of the SWR event  
+• 'power_peak_time': Time of peak power within the SWR event  
 
 #### Power Z-scores
-• 'power_max_zscore': Maximum z-score of power during the event
-• 'power_median_zscore': Median z-score of power during the event
-• 'power_mean_zscore': Mean z-score of power during the event
-• 'power_min_zscore': Minimum z-score of power during the event
-• 'power_90th_percentile': 90th percentile of power z-score during the event
+• 'power_max_zscore': Maximum z-score of power during the event  
+• 'power_median_zscore': Median z-score of power during the event  
+• 'power_mean_zscore': Mean z-score of power during the event  
+• 'power_min_zscore': Minimum z-score of power during the event  
+• 'power_90th_percentile': 90th percentile of power z-score during the event  
 
 #### Sharp Wave Metrics
-• 'sw_exceeds_threshold': Boolean indicating if sharp wave exceeds detection threshold
-• 'sw_peak_power': Peak power of the sharp wave component
-• 'sw_peak_time': Time of peak sharp wave power
+• 'sw_exceeds_threshold': Boolean indicating if sharp wave exceeds detection threshold  
+• 'sw_peak_power': Peak power of the sharp wave component  
+• 'sw_peak_time': Time of peak sharp wave power  
 
 #### Sharp Wave-Ripple Coupling
-• 'sw_ripple_plv': Phase-locking value between sharp wave and ripple components
-• 'sw_ripple_mi': Modulation index between sharp wave and ripple
-• 'sw_ripple_clcorr': Cross-correlation between sharp wave and ripple
+• 'sw_ripple_plv': Phase-locking value between sharp wave and ripple components  
+• 'sw_ripple_mi': Modulation index between sharp wave and ripple  
+• 'sw_ripple_clcorr': Cross-correlation between sharp wave and ripple  
 
 #### Envelope Metrics
-• 'envelope_peak_time': Time of peak envelope amplitude
-• 'envelope_max_thresh': Maximum envelope threshold value
-• 'envelope_mean_zscore': Mean z-score of envelope amplitude
-• 'envelope_median_zscore': Median z-score of envelope amplitude
-• 'envelope_max_zscore': Maximum z-score of envelope amplitude
-• 'envelope_min_zscore': Minimum z-score of envelope amplitude
-• 'envelope_area': Area under the envelope curve
-• 'envelope_total_energy': Total energy of the envelope signal
-• 'envelope_90th_percentile': 90th percentile of envelope amplitude
+• 'envelope_peak_time': Time of peak envelope amplitude  
+• 'envelope_max_thresh': Maximum envelope threshold value  
+• 'envelope_mean_zscore': Mean z-score of envelope amplitude  
+• 'envelope_median_zscore': Median z-score of envelope amplitude  
+• 'envelope_max_zscore': Maximum z-score of envelope amplitude  
+• 'envelope_min_zscore': Minimum z-score of envelope amplitude  
+• 'envelope_area': Area under the envelope curve  
+• 'envelope_total_energy': Total energy of the envelope signal  
+• 'envelope_90th_percentile': 90th percentile of envelope amplitude  
 
 #### Gamma Overlap
-• 'overlaps_with_gamma': Boolean indicating if SWR overlaps with gamma oscillations
-• 'gamma_overlap_percent': Percentage of SWR duration that overlaps with gamma
+• 'overlaps_with_gamma': Boolean indicating if SWR overlaps with gamma oscillations  
+• 'gamma_overlap_percent': Percentage of SWR duration that overlaps with gamma  
 
 #### Movement Overlap
-• 'overlaps_with_movement': Boolean indicating if SWR overlaps with movement periods
-• 'movement_overlap_percent': Percentage of SWR duration that overlaps with movement
+• 'overlaps_with_movement': Boolean indicating if SWR overlaps with movement periods  
+• 'movement_overlap_percent': Percentage of SWR duration that overlaps with movement  
 
 
 ## Notebooks Overview
