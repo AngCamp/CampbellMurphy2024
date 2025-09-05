@@ -12,6 +12,8 @@ Both the data/development tools for the Allen Brain Institute's data and the Int
 
 ## Data Description
 
+These are the columns of the karlsson_filter.csv files.  The columns are in order of appearance, the columns are organized here by their general type of data.  The timing which includes the time of the peak power values.  The power, zscored.  The Sharp-Wave band, from the striatum radiatum.
+
 #### Event Timing information
 • 'start_time': The start time of the SWR event  
 • 'end_time': The end time of the SWR event  
