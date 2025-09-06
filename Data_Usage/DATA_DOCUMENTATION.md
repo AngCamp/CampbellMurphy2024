@@ -10,6 +10,8 @@ The dataset contains CSV and JSON files which have been compressed with gzip.
 
 ## Putative SWR Events (`probe_{Probe_ID}_channel_{Channel_ID}_putative_swr_events.csv.gz`)
 
+The Putative SWR Events table is comprised of Event Timing Information, Power Z-scores, Sharp Wave Metrics (computed from the sharp wave band of the putative stratum radiatum channel during events), the Envelope Metrics (provided by the `Karlsson_ripple_detector()` function in the `edeno` library), the Gamma Overlap, and the Movement Overlap. The columns here are presented in their order from left to right of the table.
+
 ### Event Timing Information
 
 All time is referenced to the session time that spiking, behavioral, and all other data in the session are set to as well.
@@ -55,7 +57,7 @@ This is done on a per-event basis using phase computed by the scipy.signal `hilb
 
 ### Envelope Metrics
 
-These come from the edeno ripple_detection library from the `Karlsson_ripple_detector()`. They are computed from the 150-250 Hz signal, filtered with the `ripple_filter()` method, then smoothed on the envelope with a half-gaussian, then z-scored. The metrics including area are computed from the z-score.
+These come from the `Karlsson_ripple_detector()` function in the `edeno` ripple detection library. They are computed from the 150-250 Hz signal, filtered with the `ripple_filter()` method, then smoothed on the envelope with a half-Gaussian kernel, then z-scored. The metrics including area are computed from the z-score.  We have removed the speed column they provided.
 
 | Column Name | Description | Units | Data Type | Notes |
 |-------------|-------------|-------|-----------|-------|
@@ -80,7 +82,7 @@ Gamma band was defined as 20-80 Hz. If power was above a z-scored threshold, thi
 
 ### Movement Overlap
 
-The ripple detector was also run on two randomly selected non-hippocampal channels to detect simultaneous high frequency events outside of the hippocampus. See movement event artifacts table description.
+The ripple detector was also run on two randomly selected non-hippocampal channels to detect simultaneous high frequency events outside of the hippocampus. See movement event artifacts table description for more details.
 
 | Column Name | Description | Units | Data Type | Notes |
 |-------------|-------------|-------|-----------|-------|
@@ -89,7 +91,7 @@ The ripple detector was also run on two randomly selected non-hippocampal channe
 
 ## Movement Artifacts (`probe_{Probe_ID}_channel_{Channel_ID}_movement_artifacts.csv.gz`)
 
-The ripple detector was also run on two randomly selected non-hippocampal channels to detect simultaneous high frequency events outside of the hippocampus. These are the fields directly provided by the edeno Karlsson_ripple_detector, though we removed the speed column. The signal is filtered to between 150 and 250 Hz, then the envelope is computed from the Hilbert transform, smoothed, and z-scored. From the z-score, the min, max, median, mean, area, and total energy are computed. Used to produce the Movement Overlap fields in the Putative SWRs table.
+The ripple detector was also run on two randomly selected non-hippocampal channels to detect simultaneous high frequency events outside of the hippocampus. These are the fields directly provided by the `Karlsson_ripple_detector()` function in the `edeno` library, though we removed the speed column. The signal is filtered to between 150 and 250 Hz, then the envelope is computed from the Hilbert transform, smoothed, and z-scored. From the z-score, the min, max, median, mean, area, and total energy are computed. Used to produce the Movement Overlap fields in the Putative SWRs table.
 
 | Column Name | Description | Units | Data Type | Notes |
 |-------------|-------------|-------|-----------|-------|
@@ -106,7 +108,7 @@ The ripple detector was also run on two randomly selected non-hippocampal channe
 
 ## Gamma Band Events (`probe_{Probe_ID}_channel_{Channel_ID}_gamma_band_events.csv.gz`)
 
-Here we filter using the fast Fourier transform for between 20-80 Hz from the putative pyramidal cell layer channel.  FIltering is done with the `fftconvovle()` function from `scipy.signal`.  The envelope is then computed from the Hilbert transform of the filtered LFP. A half-Gaussian smoothing operation takes place, and then we compute the power from this and z-score it. If the signal was above an SD threshold set in the united_detector_config.yaml, then this was considered a gamma band event and is represented with a row in this table. Used to produce the Gamma Overlap field in the Putative SWRs table.
+Here we filter using the fast Fourier transform for between 20-80 Hz from the putative pyramidal cell layer channel. Filtering is done with the `fftconvolve()` function from the `scipy.signal` module. The envelope is then computed from the Hilbert transform of the filtered LFP. A half-Gaussian smoothing operation takes place, and then we compute the power from this and z-score it. If the signal was above an SD threshold set in the `united_detector_config.yaml`, then this was considered a gamma band event and is represented with a row in this table. Used to produce the Gamma Overlap field in the Putative SWRs table. The threshold we chose was based on Frank & Kai (2008) which chose 3 SD as its threshold.
 
 | Column Name | Description | Units | Data Type | Notes |
 |-------------|-------------|-------|-----------|-------|
