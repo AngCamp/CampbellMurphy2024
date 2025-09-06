@@ -1,6 +1,6 @@
 # Sharp Wave Ripple Dataset: Complete Column Documentation
 
-This document provides documentation for all data files in Campbell, Murphy 2025, including column descriptions, units, data types, and computational notes.  Intended to describe the data itself in detail sufficient to run analyses with it.
+This document provides documentation for all data files in Campbell, Murphy 2025, including column descriptions, units, data types, and computational notes. It is intended to describe the data itself in sufficient detail to run analyses with it.
 
 ## File Overview
 
@@ -8,11 +8,11 @@ The dataset contains CSV and JSON files which have been compressed with gzip.
 - **CSV files**: Event data with detailed metrics.
 - **JSON files**: Metadata and processing parameters, here we detail their structure as well.
 
-## Putative SWR Events (probe_{ Probe ID }_channel_{ Channel ID }_putative_swr_events.csv.gz)
+## Putative SWR Events (`probe_{Probe_ID}_channel_{Channel_ID}_putative_swr_events.csv.gz`)
 
 ### Event Timing Information
 
-All time is referenced to the session time that spiking, behavioural etc all other data in the session is set to as well.
+All time is referenced to the session time that spiking, behavioral, and all other data in the session are set to as well.
 
 | Column Name | Description | Units | Data Type | Notes |
 |-------------|-------------|-------|-----------|-------|
@@ -31,11 +31,11 @@ These are computed from 150-250 Hz signal, smoothed on the envelope, then square
 | `power_median_zscore` | Median z-score of power during the event | z-score | float64 | |
 | `power_mean_zscore` | Mean z-score of power during the event | z-score | float64 | |
 | `power_min_zscore` | Minimum z-score of power during the event | z-score | float64 | |
-| `power_90th_percentile` | 90th percentile of power z-score during the event | z-score |float64 | |
+| `power_90th_percentile` | 90th percentile of power z-score during the event | z-score | float64 | |
 
 ### Sharp Wave Metrics
 
-Power computed from 8-40 Hz signal, smoothing is done on envelope before squaring for power.  Z-score is then reported.
+Power computed from 8-40 Hz signal. Smoothing is done on the envelope before squaring for power. Z-score is then reported.
 
 | Column Name | Description | Units | Data Type | Notes |
 |-------------|-------------|-------|-----------|-------|
@@ -45,17 +45,17 @@ Power computed from 8-40 Hz signal, smoothing is done on envelope before squarin
 
 ### Sharp Wave-Ripple Coupling
 
-This is done on a per-event basis using phase computed by scipy.signal hilbert function.  Here power was not z-scored before using to compute the cross-frequncy phase-amplitude coupling.
+This is done on a per-event basis using phase computed by the scipy.signal `hilbert()` function. Here power was not z-scored before using it to compute the cross-frequency phase-amplitude coupling.
 
 | Column Name | Description | Units | Data Type | Notes |
 |-------------|-------------|-------|-----------|-------|
-| `sw_ripple_plv` | Phase-locking value between sharp wave and ripple components | - | float64 | Ranges from 0-1, 0 being no synchony 1 being perfect synchrony. |
+| `sw_ripple_plv` | Phase-locking value between sharp wave and ripple components | - | float64 | Ranges from 0-1, 0 being no synchrony, 1 being perfect synchrony. |
 | `sw_ripple_mi` | Modulation index between sharp wave and ripple | - | float64 | A measure of how much ripple amplitude distribution deviates from uniform across sharp wave phase bins. Normalized, therefore unitless mutual information between ripple amplitude and sharp wave phase. Ranges 0-1.|
 | `sw_ripple_clcorr` | Circular-linear Correlation between sharp wave phase and ripple power| correlation coefficient | float64 | The linear relationship between circular sharp wave phase and ripple amplitude; differs from regular correlation due to circular nature of phase. Ranges -1 to +1. |
 
 ### Envelope Metrics
 
-These come from the edeno ripple_detection library.  They are computed from 150-250 Hz signal, smoothed on the envelope then z-scored.  The metrics including area are compute from the z-score.
+These come from the edeno ripple_detection library from the `Karlsson_ripple_detector()`. They are computed from the 150-250 Hz signal, filtered with the `ripple_filter()` method, then smoothed on the envelope with a half-gaussian, then z-scored. The metrics including area are computed from the z-score.
 
 | Column Name | Description | Units | Data Type | Notes |
 |-------------|-------------|-------|-----------|-------|
@@ -71,7 +71,7 @@ These come from the edeno ripple_detection library.  They are computed from 150-
 
 ### Gamma Overlap
 
-Gamma band was defined as 20-80 Hz, if power was above a z-scored threshold this was labled a gamma band event.  See gamma artifacts events table description for more details.
+Gamma band was defined as 20-80 Hz. If power was above a z-scored threshold, this was labeled a gamma band event. See gamma artifact events table description for more details.
 
 | Column Name | Description | Units | Data Type | Notes |
 |-------------|-------------|-------|-----------|-------|
@@ -80,16 +80,16 @@ Gamma band was defined as 20-80 Hz, if power was above a z-scored threshold this
 
 ### Movement Overlap
 
-Ripple detector was also ran on two randomly selected non-hippocampal channels to detect simultaneous high frequency events outside of hippocampus.  See movement events artifacts table description.
+The ripple detector was also run on two randomly selected non-hippocampal channels to detect simultaneous high frequency events outside of the hippocampus. See movement event artifacts table description.
 
 | Column Name | Description | Units | Data Type | Notes |
 |-------------|-------------|-------|-----------|-------|
 | `overlaps_with_movement` | Boolean indicating if SWR overlaps with movement periods | - | bool | |
 | `movement_overlap_percent` | Percentage of SWR duration that overlaps with movement | percentage | float64 | |
 
-## Movement Artifacts (probe_{ Probe ID }_channel_{ Channel ID }_movement_artifacts.csv.gz)
+## Movement Artifacts (`probe_{Probe_ID}_channel_{Channel_ID}_movement_artifacts.csv.gz`)
 
-Ripple detector was also ran on two randomly selected non-hippocampal channels to detect simultaneous high frequency events outside of hippocampus.  These are the filds directly provided by the edeno Karlsson_ripple_detector though we removed the speed column.  Signal is filtered to between 150 and 250 Hz, then the envelope is computed from the hilbert transform, smoothed, and z-scored.  From the z-score the min, max, median, mean, area, and total energy are computed.  Used to produce the Movement Overlap fields in the Putative SWRs table.
+The ripple detector was also run on two randomly selected non-hippocampal channels to detect simultaneous high frequency events outside of the hippocampus. These are the fields directly provided by the edeno Karlsson_ripple_detector, though we removed the speed column. The signal is filtered to between 150 and 250 Hz, then the envelope is computed from the Hilbert transform, smoothed, and z-scored. From the z-score, the min, max, median, mean, area, and total energy are computed. Used to produce the Movement Overlap fields in the Putative SWRs table.
 
 | Column Name | Description | Units | Data Type | Notes |
 |-------------|-------------|-------|-----------|-------|
@@ -104,9 +104,9 @@ Ripple detector was also ran on two randomly selected non-hippocampal channels t
 | `area` | Area under the envelope curve | z-score·s | float64 | |
 | `total_energy` | Total energy of the envelope signal | z-score²·s | float64 | |
 
-## Gamma Band Events (probe_{ Probe ID }_channel_{ Channel ID }_gamma_band_events.csv.gz)
+## Gamma Band Events (`probe_{Probe_ID}_channel_{Channel_ID}_gamma_band_events.csv.gz`)
 
-Here we filter using the fast fourier transform for between 20-80 Hz from the putative pyramidal cell layer channel.  The envelope is then computed from the hilbert transform of the filtered LFP. A half-guassian smoothing operation takes place and then we computed the power from this, the z-scored.  If the signal was above an SD threshold set in the united_detector_config.yaml then this was considered a gamma band event and is represented with a row in this table.  Used to produce the Gamma Overlap field in the Putative SWRs table.
+Here we filter using the fast Fourier transform for between 20-80 Hz from the putative pyramidal cell layer channel.  FIltering is done with the `fftconvovle()` function from `scipy.signal`.  The envelope is then computed from the Hilbert transform of the filtered LFP. A half-Gaussian smoothing operation takes place, and then we compute the power from this and z-score it. If the signal was above an SD threshold set in the united_detector_config.yaml, then this was considered a gamma band event and is represented with a row in this table. Used to produce the Gamma Overlap field in the Putative SWRs table.
 
 | Column Name | Description | Units | Data Type | Notes |
 |-------------|-------------|-------|-----------|-------|
@@ -114,7 +114,7 @@ Here we filter using the fast fourier transform for between 20-80 Hz from the pu
 | `end_time` | The end time of the gamma event | seconds | float64 | |
 | `duration` | The duration of the gamma event | seconds | float64 | |
 
-## Global SWR Events (session_{ Session ID }_global_swr_events.csv.gz)
+## Global SWR Events (`session_{Session_ID}_global_swr_events.csv.gz`)
 
 | Column Name | Description | Units | Data Type | Notes |
 |-------------|-------------|-------|-----------|-------|
@@ -122,7 +122,7 @@ Here we filter using the fast fourier transform for between 20-80 Hz from the pu
 | `end_time` | The end time of the global SWR event | seconds | float64 | |
 | `duration` | The duration of the global SWR event | seconds | float64 | |
 
-## Probe Metadata (session_{ Session ID }_probe_metadata.csv.gz)
+## Probe Metadata (`session_{Session_ID}_probe_metadata.csv.gz`)
 
 | Column Name | Description | Units | Data Type | Notes |
 |-------------|-------------|-------|-----------|-------|
@@ -134,7 +134,7 @@ Here we filter using the fast fourier transform for between 20-80 Hz from the pu
 
 ## Hierarchical JSON Files
 
-### Selection Metadata (probe_{ Probe ID }_channel_selection_metadata.json.gz)
+### Selection Metadata (`probe_{Probe_ID}_channel_selection_metadata.json.gz`)
 **Format**: JSONL (JSON Lines) - each line is a separate JSON object
 
 **Structure per line**:
@@ -171,10 +171,10 @@ Here we filter using the fast fourier transform for between 20-80 Hz from the pu
 | `selected_channel_id` | ID of the selected channel | - | int64 | |
 | `selection_method` | Method used for channel selection | - | string | |
 | `net_sw_power` | Net sharp wave power per channel | μV² in 8-40 Hz | array[float64] | Summed over entire recording. |
-| `modulation_index` | Cross-Frequency Phase-amplitude coupling per channel | - | array[float64] | Summed over entire recording. Computed across times when z-scored ripple power and sharp-wave power was greater than 1>SD in both channels. |
-| `circular_linear_corrs` | Cross-Frequency Phase-amplitude coupling per channel | correlation coefficient | array[float64] | Summed over entire recording. Computed across times when z-scored ripple power and sharp-wave power was greater than 1>SD in both channels. |
+| `modulation_index` | Cross-frequency phase-amplitude coupling per channel | - | array[float64] | Summed over entire recording. Computed across times when z-scored ripple power and sharp-wave power were greater than 1 SD in both channels. |
+| `circular_linear_corrs` | Cross-frequency phase-amplitude coupling per channel | correlation coefficient | array[float64] | Summed over entire recording. Computed across times when z-scored ripple power and sharp-wave power were greater than 1 SD in both channels. |
 
-### Run Settings (session_{ Session ID }_run_settings.json.gz)
+### Run Settings (`session_{Session_ID}_run_settings.json.gz`)
 
 **Format**: Single JSON object
 
