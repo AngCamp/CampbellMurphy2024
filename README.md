@@ -11,10 +11,131 @@ A repo showcasing how to process and analyze Neuropixels LFP from the two larges
 
 The data set is available at the [OSF](https://osf.io/9gm6x/).
 
-    ```
-    wget -O "swr_dataset.zip" 
-    "https://files.osf.io/v1/resources/9gm6x/providers/osfstorage/?zip="
-    ```
+## How to get started...
+
+### 1. Clone the Repository
+
+First, you'll need Git and this repository to access the environment files and pipeline code:
+
+#### Install Git (if not already installed)
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt update && sudo apt install git
+```
+
+**macOS:**
+```bash
+# Using Homebrew (install Homebrew first if needed: https://brew.sh/)
+brew install git
+
+# Or download from: https://git-scm.com/download/mac
+```
+
+**Windows:**
+```bash
+# Download Git for Windows from: https://git-scm.com/download/win
+# Or use Windows Subsystem for Linux (WSL)
+```
+
+#### Clone this Repository
+```bash
+git clone https://github.com/AllenInstitute/NeuropixelsLFPOnRamp.git
+cd NeuropixelsLFPOnRamp
+```
+
+### 2. Setup Environments
+
+#### Install Conda/Mamba (Required)
+
+First, install a conda distribution. We recommend **Miniforge** or **Mambaforge** over Anaconda Distribution due to recent licensing changes:
+
+**Option A: Miniforge (Recommended)**
+```bash
+# Download and install Miniforge (includes conda-forge by default)
+curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+bash Miniforge3-$(uname)-$(uname -m).sh
+```
+
+**Option B: Miniconda (Alternative)**
+```bash
+# Download from: https://www.anaconda.com/docs/getting-started/miniconda/main
+# Follow installation instructions for your operating system
+```
+
+**Option C: Mambaforge (Fastest)**
+```bash
+# Download and install Mambaforge (includes mamba for faster package resolution)
+curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh"
+bash Mambaforge-$(uname)-$(uname -m).sh
+```
+
+For more details on conda installation, see the [official Miniconda documentation](https://www.anaconda.com/docs/getting-started/miniconda/main).
+
+#### Create Analysis Environments
+
+After installing conda/mamba, set up the required environments for data analysis:
+
+```bash
+# For Allen Institute datasets
+conda env create -f Setup/allensdk_environment.yml
+conda activate allensdk_env
+
+# For IBL datasets  
+conda env create -f Setup/ibl_environment.yml
+conda activate ONE_ibl_env
+
+# For general analysis and visualization
+conda env create -f Setup/analysis_environment.yml
+conda activate analysis_env
+```
+
+**Note on Licensing**: Anaconda Distribution requires paid licenses for commercial use (companies with 200+ employees). Our environment files are designed to work with conda-forge channels to avoid licensing restrictions. If you encounter issues with the "defaults" channel, use Miniforge or Mambaforge which default to conda-forge.
+
+For detailed environment setup instructions and troubleshooting, see the [Setup README](Setup/README.md).
+
+### 3. Download the Dataset
+
+The processed SWR dataset is available from OSF:
+
+```bash
+# Download the complete dataset (~XX GB)
+wget -O "CampbellMurphy2025_SWRs_data.zip" "https://files.osf.io/v1/resources/9gm6x/providers/osfstorage/?zip="
+
+# Extract the dataset
+unzip CampbellMurphy2025_SWRs_data.zip
+```
+
+The dataset is also available at the [OSF project page](https://osf.io/9gm6x/).
+
+### 4. Explore the Data
+
+Start with these key resources:
+
+- **Data Usage Tutorials**: [Data_Usage/](Data_Usage/) - Interactive notebooks and tutorials
+- **Data Documentation**: [Data_Usage/DATA_DOCUMENTATION.md](Data_Usage/DATA_DOCUMENTATION.md) - Complete column descriptions and data structure
+- **Global Events Tutorial**: [Data_Usage/global_swr_events_tutorial.py](Data_Usage/global_swr_events_tutorial.py) - Step-by-step analysis of network-level events
+
+### 5. If you wish to customize the detection pipeline...
+
+To rerun detection with different thresholds or modify the pipeline:
+
+- See [SWR_Neuropixels_Detector/README.md](SWR_Neuropixels_Detector/README.md) for pipeline configuration
+- Modify parameters in `united_detector_config.yaml`
+- Use `run_pipeline.sh` with appropriate flags
+
+
+## Table of Contents
+
+| Section | Description | README |
+|---------|-------------|--------|
+| [**Data_Usage/**](Data_Usage/) | Interactive tutorials for data exploration and analysis | [📖 README](Data_Usage/README.md) |
+| [**SWR_Neuropixels_Detector/**](SWR_Neuropixels_Detector/) | Main SWR detection pipeline with configurable parameters | [📖 README](SWR_Neuropixels_Detector/README.md) |
+| [**Setup/**](Setup/) | Conda environment configurations for different datasets | [📖 README](Setup/README.md) |
+| [**Figures_Tables_and_Technical_Validation/**](Figures_Tables_and_Technical_Validation/) | Publication figures, technical validation, and analysis scripts | [📖 README](Figures_Tables_and_Technical_Validation/README.md) |
+| [**RepoImages/**](RepoImages/) | Documentation images and publication figures | - |
+
+### Section Descriptions
 
 ### Data_Usage
 
