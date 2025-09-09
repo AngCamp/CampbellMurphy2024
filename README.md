@@ -125,7 +125,7 @@ To rerun detection with different thresholds or modify the pipeline:
 - Use `run_pipeline.sh` with appropriate flags
 
 
-## Table of Contents
+## Repo Table of Contents
 
 | Section | Description | README |
 |---------|-------------|--------|
