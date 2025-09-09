@@ -1472,8 +1472,7 @@ def merge_probe_events(probe_events_dict, merge_window, min_probe_count=1):
     # Create DataFrame for global events
     global_events = pd.DataFrame({
         'start_time': [interval[0] for interval in merged_intervals],
-        'end_time': [interval[1] for interval in merged_intervals],
-        'contributing_probe_events_idx': [interval[2] for interval in merged_intervals]  # Now contains list of all contributing events
+        'end_time': [interval[1] for interval in merged_intervals]
     })
     
     global_events['duration'] = global_events['end_time'] - global_events['start_time']

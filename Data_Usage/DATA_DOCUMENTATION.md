@@ -126,11 +126,10 @@ Global SWR events are detected when putative SWR events occur simultaneously acr
 | `start_time` | The start time of the global SWR event | seconds | float64 | |
 | `end_time` | The end time of the global SWR event | seconds | float64 | |
 | `duration` | The duration of the global SWR event | seconds | float64 | |
-| `contributing_probe_events_idx` | Array of event indices from each contributing probe | - | object (array as string) | Indices refer to rows in individual probe event files |
 | `participating_probes` | Array of probe IDs that contributed to this global event | - | object (array as string) | Probe identifiers as strings |
 | `peak_times` | Array of peak times from each contributing probe | seconds | object (array as string) | One peak time per contributing probe |
 | `peak_powers` | Array of peak powers from each contributing probe | z-score | object (array as string) | Peak power values corresponding to peak_times |
-| `probe_event_file_index` | Array of file indices for each contributing probe event | - | object (array as string) | Used for cross-referencing with individual probe files |
+| `probe_event_file_index` | Array of event indices for each contributing probe event, so if in participating probes ['1234','4323'] and in probe_event_file_index you had [5,7] it means the global event consists of event 5 from probe '1234' and evetn 7 from probe '4323' | - | object (array as string) | Used for cross-referencing with individual probe files |
 | `probe_count` | Number of probes that contributed to this global event | count | int64 | |
 | `global_peak_time` | Time of maximum power across all contributing probes | seconds | float64 | |
 | `global_peak_power` | Maximum power value across all contributing probes | z-score | float64 | |
