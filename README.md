@@ -74,7 +74,22 @@ For more details on conda installation, see the [official Miniconda documentatio
 
 #### Create Analysis Environments
 
-After installing conda/mamba, set up the required environments for data analysis:
+After installing conda/mamba, set up the required environments for data analysis.
+
+**Recommended: Automated Setup**
+
+Use the provided setup script to automatically create both required environments:
+
+```bash
+cd Setup/
+./setup_environments.sh
+```
+
+This script works with Miniconda, Mambaforge, or Anaconda and creates both `allensdk_env` and `ONE_ibl_env` environments with all necessary packages. See [Setup/README.md](Setup/README.md) for details on what the script does.
+
+**Alternative: Manual Environment Creation**
+
+If you prefer manual setup or encounter issues with the automated script:
 
 ```bash
 # For Allen Institute datasets
