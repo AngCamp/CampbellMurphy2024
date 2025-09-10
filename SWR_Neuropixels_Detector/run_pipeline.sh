@@ -25,7 +25,7 @@ export IBL_ONEAPI_CACHE=${IBL_ONEAPI_CACHE:-"your/path_to/IBL_data_cache"}
 # Run name for tracking pipeline settings across different runs
 # Consider including date/time for better organization: "swr_detection_$(date +%Y%m%d_%H%M%S)"
 # Detection thresholds from config file are stored with each session's output
-export RUN_NAME=${RUN_NAME:-"run_name_here"}
+export RUN_NAME=${RUN_NAME:-"run_name_here_$(date +%Y%m%d_%H%M%S)"}
 
 # prevents pycache files from being created in working directory
 export PYTHONDONTWRITEBYTECODE=1 
