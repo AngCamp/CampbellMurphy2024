@@ -151,7 +151,7 @@ export RUN_NAME="run_name_here"
 
 - **Session Organization**: The pipeline processes data in "sessions" - the fundamental unit of neurophysiology recordings following NWB and Alyx standards. Each of the three datasets (ABI Visual Behavior, ABI Visual Coding, IBL) contains multiple sessions, and results are organized by session within each dataset folder.
 
-Please refer to Figure 3 as well as the `DATA_DESCRIPTION.md`, and the tutorials in `\Data_Usage` to better understand how we have structured the events tables, artifacts tables (for movement and gamma artifacts), as well as the metadata for probe selection and run settings.
+Please refer to Figure 3 as well as the `DATA_DESCRIPTION.md`, and the tutorials in `/Data_Usage` to better understand how we have structured the events tables, artifacts tables (for movement and gamma artifacts), as well as the metadata for probe selection and run settings.
 
 
 ## Repo Table of Contents
