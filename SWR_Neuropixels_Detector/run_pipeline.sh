@@ -4,18 +4,28 @@
 # IMPORTANT CONFIGURATION VARIABLES - EDIT THESE FOR YOUR ENVIRONMENT
 # =====================================================================
 
-# Output directory for all results
-export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/osf_campbellmurphy2025_v2_final"}
-#export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/muckingabout"}
-#export OUTPUT_DIR=${OUTPUT_DIR:-"/space/scratch/SWR_final_pipeline/testing_dir"}
+# Output directory for all SWR detection results
+# This is where all processed data, events, and metadata will be saved
+# Structure: $OUTPUT_DIR/{dataset_name}/{session_id}/...
+export OUTPUT_DIR=${OUTPUT_DIR:-"your/path_to/output_directory"}
 
-# Cache directories for datasets (where raw data is stored/downloaded)
-export ABI_VISUAL_CODING_SDK_CACHE=${ABI_VISUAL_CODING_SDK_CACHE:-"/space/scratch/allen_viscoding_data"}
-export ABI_VISUAL_BEHAVIOUR_SDK_CACHE=${ABI_VISUAL_BEHAVIOUR_SDK_CACHE:-"/space/scratch/allen_visbehave_data"}
-export IBL_ONEAPI_CACHE=${IBL_ONEAPI_CACHE:-"/space/scratch/IBL_data_cache"}
+# Cache directories for datasets - these store raw neurophysiology data downloaded by APIs/SDKs
+# Each dataset API maintains its own cache to avoid re-downloading large files
+# These directories can grow to hundreds of GB, so ensure sufficient storage space
 
-# Run name used for organizing log files
-export RUN_NAME=${RUN_NAME:-"campbell_murphy_2025_v2.0"}
+# Allen Brain Institute Visual Coding dataset cache (AllenSDK)
+export ABI_VISUAL_CODING_SDK_CACHE=${ABI_VISUAL_CODING_SDK_CACHE:-"your/path_to/ABI_visual_coding_cache"}
+
+# Allen Brain Institute Visual Behaviour dataset cache (AllenSDK)
+export ABI_VISUAL_BEHAVIOUR_SDK_CACHE=${ABI_VISUAL_BEHAVIOUR_SDK_CACHE:-"your/path_to/ABI_visual_behavior_cache"}
+
+# International Brain Laboratory dataset cache (ONE-API)
+export IBL_ONEAPI_CACHE=${IBL_ONEAPI_CACHE:-"your/path_to/IBL_data_cache"}
+
+# Run name for tracking pipeline settings across different runs
+# Consider including date/time for better organization: "swr_detection_$(date +%Y%m%d_%H%M%S)"
+# Detection thresholds from config file are stored with each session's output
+export RUN_NAME=${RUN_NAME:-"run_name_here"}
 
 # prevents pycache files from being created in working directory
 export PYTHONDONTWRITEBYTECODE=1 

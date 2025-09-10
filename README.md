@@ -122,7 +122,34 @@ To rerun detection with different thresholds or modify the pipeline:
 
 - See [SWR_Neuropixels_Detector/README.md](SWR_Neuropixels_Detector/README.md) for pipeline configuration
 - Modify parameters in `united_detector_config.yaml`
-- Use `run_pipeline.sh` with appropriate flags
+- Configure environment variables and use `run_pipeline.sh` with appropriate flags
+
+#### Environment Variables Configuration
+
+Before running the pipeline, you must configure these essential environment variables in the `run_pipeline.sh` script:
+
+```bash
+# Output directory for all results - where all SWR detection results will be saved
+export OUTPUT_DIR="your/path_to/output_directory"
+
+# Cache directories for datasets - these store raw data downloaded by the APIs/SDKs
+export ABI_VISUAL_CODING_SDK_CACHE="your/path_to/ABI_visual_coding_cache"
+export ABI_VISUAL_BEHAVIOUR_SDK_CACHE="your/path_to/ABI_visual_behavior_cache"
+export IBL_ONEAPI_CACHE="your/path_to/IBL_data_cache"
+
+# Run name for tracking different pipeline runs and their settings
+export RUN_NAME="run_name_here"
+```
+
+**Important Notes:**
+
+- **Cache Directories**: These are where the Allen SDK and IBL ONE-API store downloaded raw neurophysiology data. Each dataset API maintains its own cache to avoid re-downloading large files. Set these to locations with sufficient storage space (hundreds of GB).  Some of the `run_pipeline.sh` flags allow this data to be cleaned up as the pipeline is running to save the users storage space.
+
+- **Output Directory**: All SWR detection results, including session-level events, metadata, and global events, will be organized under this directory by dataset.
+
+- **Run Name**: Used to track pipeline settings across different runs. Consider including date/time (e.g., `"swr_detection_20240315_v2"`). The detection thresholds from the config file are stored with each session's output, allowing you to trace results back to specific parameter settings.
+
+- **Session Organization**: The pipeline processes data in "sessions" - the fundamental unit of neurophysiology recordings following NWB and Alyx standards. Each of the three datasets (ABI Visual Behavior, ABI Visual Coding, IBL) contains multiple sessions, and results are organized by session within each dataset folder.
 
 
 ## Repo Table of Contents
@@ -150,15 +177,19 @@ Contains tutorials for understanding and analyzing Sharp Wave Ripple (SWR) data 
 Contains the main pipeline for running the detection scripts. It includes a config file (`united_detector_config.yaml`) which sets input and output paths, parameters for detection (e.g., ripple envelope threshold), and filtering options. If one wishes to rerun the detection pipelines, this config file can be modified accordingly. There is also a `run_pipeline.sh` script to execute the different stages of the pipeline.
 
 #### Example Usage
-1. Start a `tmux` session (as the code can take a while to run):
+1. **Configure Environment Variables**: Edit the environment variables at the top of `SWR_Neuropixels_Detector/run_pipeline.sh`:
     ```bash
-    tmux
+    # Example configuration
+    export OUTPUT_DIR="/data/swr_results"
+    export ABI_VISUAL_CODING_SDK_CACHE="/data/allen_cache/visual_coding"
+    export ABI_VISUAL_BEHAVIOUR_SDK_CACHE="/data/allen_cache/visual_behavior"
+    export IBL_ONEAPI_CACHE="/data/ibl_cache"
+    export RUN_NAME="swr_detection_$(date +%Y%m%d_%H%M%S)"
     ```
 
-2. Activate the appropriate conda environment (e.g., `allensdk_env` or `ONE_ibl_env` depending on the data source targeted in the config):
+2. Start a `tmux` session (as the code can take a while to run):
     ```bash
-    conda activate allensdk_env 
-    # or conda activate ONE_ibl_env
+    tmux
     ```
 
 3. Change directory to the pipeline folder:
@@ -166,14 +197,22 @@ Contains the main pipeline for running the detection scripts. It includes a conf
     cd SWR_Neuropixels_Detector
     ```
 
-4. Ensure the config file, `united_detector_config.yaml`, is set correctly, including the number of cores (`pool_size`) your machine can handle.
+4. Ensure the config file, `united_detector_config.yaml`, is set correctly, including the number of cores (`pool_sizes`) your machine can handle for each dataset.
 
-5. Run the pipeline script. Use flags to specify which stages to run (this will be implemented in a later step):
+5. Run the pipeline script. The script automatically activates the appropriate conda environment for each dataset:
     ```bash
-    ./run_pipeline.sh # Add flags like -p -f -g as needed later
+    # Run all datasets
+    ./run_pipeline.sh
+    
+    # Run specific dataset(s)
+    ./run_pipeline.sh subset ibl
+    ./run_pipeline.sh subset ibl,abi_visual_behaviour
+    
+    # Run with additional options
+    ./run_pipeline.sh subset ibl --save-lfp --overwrite-existing
     ```
 
-6.  Use ctrl+b, d to exit the tmux session without killing it. It is recomended to check htop to ensure the server is behaving appropriately.
+6. Use `ctrl+b, d` to exit the tmux session without killing it. It is recommended to check `htop` to ensure the server is behaving appropriately.
 
 Note:  We have also created scripts for running the pipelines on slurm for shared computing clusters.  (Will be provided)
 
