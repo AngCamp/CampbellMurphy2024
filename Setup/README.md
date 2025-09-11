@@ -36,18 +36,35 @@ The `setup_environments.sh` script performs the following steps:
 1. **Checks for Conda installation** and exits with helpful error message if not found
 2. **Makes itself executable** (includes `chmod +x` command)
 3. **Creates `allensdk_env` environment** with Python 3.10 for Allen Institute datasets:
-   - Installs core packages: numpy, pandas, scipy, matplotlib, tqdm, pyyaml
-   - Installs AllenSDK via pip
-   - Installs ripple_detection package from conda-forge (edeno channel)
-   - Sets up Jupyter kernel support
+   - Installs AllenSDK==2.16.2 via pip (brings numpy, pandas, scipy, matplotlib, tqdm as dependencies)
+   - Installs pyyaml=6.0.2 via conda (pipeline requirement)
+   - Installs ripple_detection=1.5.1 from conda-forge (edeno channel)
+   - Sets up Jupyter kernel support with ipykernel==6.26.0
 4. **Creates `ONE_ibl_env` environment** with Python 3.10 for IBL datasets:
-   - Installs core packages: numpy, pandas, scipy, matplotlib, tqdm, pyyaml  
-   - Installs ONE-api via pip
-   - Installs ibllib via pip
-   - Installs ibl-neuropixel version 1.8.1 via pip
-   - Installs ripple_detection package from conda-forge (edeno channel)
-   - Sets up Jupyter kernel support
+   - Installs ONE-api==3.0.0 via pip (brings numpy, pandas, pyyaml, tqdm as dependencies)
+   - Installs ibllib==3.3.0 via pip (brings matplotlib, seaborn as dependencies)
+   - Installs ibl-neuropixel==1.8.1 via pip
+   - Installs ripple_detection=1.5.1 from conda-forge (edeno channel)
+   - Sets up Jupyter kernel support with ipykernel==6.26.0
 5. **Configures Jupyter kernels** so you can select the appropriate environment in notebooks
+
+### Package Dependencies
+
+The setup script uses a minimal approach - it only installs the essential packages and lets the main packages handle their own dependencies:
+
+**allensdk_env core packages come from:**
+- **numpy, pandas, scipy, matplotlib, seaborn, tqdm** → installed as AllenSDK dependencies
+- **pyyaml** → installed separately for pipeline requirements
+- **ripple_detection** → specialized package from conda-forge
+- **ipykernel** → for Jupyter notebook support
+
+**ONE_ibl_env core packages come from:**
+- **numpy, pandas, pyyaml, tqdm** → installed as ONE-api dependencies  
+- **matplotlib, seaborn** → installed as ibllib dependencies
+- **ripple_detection** → specialized package from conda-forge
+- **ipykernel** → for Jupyter notebook support
+
+This approach ensures compatibility and reduces installation conflicts by letting each main package manage its own dependency versions.
 
 ### Using the Environments
 
