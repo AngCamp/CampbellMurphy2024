@@ -182,7 +182,7 @@ Please refer to Figure 3 as well as the `DATA_DESCRIPTION.md`, and the tutorials
 | [**Data_Usage/**](Data_Usage/) | Interactive tutorials for data exploration and analysis | [📖 README](Data_Usage/README.md) |
 | [**SWR_Neuropixels_Detector/**](SWR_Neuropixels_Detector/) | Main SWR detection pipeline with configurable parameters | [📖 README](SWR_Neuropixels_Detector/README.md) |
 | [**Setup/**](Setup/) | Conda environment configurations for different datasets | [📖 README](Setup/README.md) |
-| [**Figures_Tables_and_Technical_Validation/**](Figures_Tables_and_Technical_Validation/) | Publication figures, technical validation, and analysis scripts | [📖 README](Figures_Tables_and_Technical_Validation/README.md) |
+| [**Figures_Tables_and_Technical_Validation/**](Figures_Tables_and_Technical_Validation/) | Publication figures, technical validation, and scripts to generate publication images/search data for aesthetic events. | [📖 README](Figures_Tables_and_Technical_Validation/README.md) |
 | [**RepoImages/**](RepoImages/) | Documentation images and publication figures | - |
 
 ### Section Descriptions
