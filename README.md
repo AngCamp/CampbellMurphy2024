@@ -243,7 +243,7 @@ Note:  We have also created scripts for running the pipelines on slurm for share
 
 The code outputs the following set of files for each session.
 ![](RepoImages/Figure_3_revision2_withabackground.png)
-*Schematic showing the output file structure for each SWR session, including event files, metadata, and channel selection information organized by probe and session. The file names have wild cards in them (k = Probe ID wild card, n = CA1 Pyramidal Cell Layer Channel ID wildcard, t1 and t2 = the non-Hp control Channel ID wildcards)*
+*Schematic showing the output file structure for each SWR session, including event files, metadata, and channel selection information organized by probe and session. The file names have wild cards in them (k = Probe ID wild card, n = CA1 Pyramidal Cell Layer Channel ID wildcard, t1 and t2 = the non-Hp control Channel ID wildcards).*
 
 #### Filters
 
