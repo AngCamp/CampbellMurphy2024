@@ -81,8 +81,7 @@ After installing conda/mamba, set up the required environments for data analysis
 Use the provided setup script to automatically create both required environments:
 
 ```bash
-cd Setup/
-./setup_environments.sh
+Setup/./setup_environments.sh
 ```
 
 This script works with Miniconda, Mambaforge, or Anaconda and creates both `allensdk_env` and `ONE_ibl_env` environments with all necessary packages. See [Setup/README.md](Setup/README.md) for details on what the script does.
@@ -144,8 +143,6 @@ To rerun detection with different thresholds or modify the pipeline:
 Before running the pipeline, you must configure these essential environment variables in the `run_pipeline.sh` script:
 
 ```bash
-cd SWR_Neuropisels_Detector/
-
 # Output directory for all results - where all SWR detection results will be saved
 export OUTPUT_DIR="your/path_to/output_directory"
 
@@ -156,6 +153,13 @@ export IBL_ONEAPI_CACHE="your/path_to/IBL_data_cache"
 
 # Run name for tracking different pipeline runs and their settings
 export RUN_NAME="run_name_here"
+```
+
+Then you just run the pipeline. The pipeline's default settings save channel selection metadata but do not save LFP data or overwrite existing results. See the [SWR_Neuropixels_Detector/README.md](SWR_Neuropixels_Detector/README.md) for detailed configuration options and the `united_detector_config.yaml` file for detection thresholds.
+
+```bash
+cd SWR_Neuropixels_Detector/ 
+./run_pipeline.sh
 ```
 
 **Important Notes:**
