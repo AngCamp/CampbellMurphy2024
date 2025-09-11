@@ -196,7 +196,7 @@ The global events file serves as an index that links individual probe events int
 | `ca1_total_unit_count` | Total CA1 units on this probe | count | int64 | |
 | `ca1_good_unit_count` | Good quality CA1 units on this probe | count | int64 | |
 
-![Session File Structure](../RepoImages/figure_3_SWR_Dataset_v3_withbackground.png)
+![Session File Structure](../RepoImages/Figure_3_withabackground.pdf)
 *Schematic showing the output file structure for each SWR session, including event files, metadata, and channel selection information organized by probe and session. This illustrates how the various CSV and JSON files relate to each other within a session folder.*
 
 ## Hierarchical JSON Files

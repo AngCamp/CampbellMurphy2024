@@ -242,7 +242,7 @@ Note:  We have also created scripts for running the pipelines on slurm for share
 #### SWR session folder structure
 
 The code outputs the following set of files for each session.
-![](RepoImages/figure_3_SWR_Dataset_v3_withbackground.png)
+![](RepoImages/Figure_3_withabackground.pdf)
 *Schematic showing the output file structure for each SWR session, including event files, metadata, and channel selection information organized by probe and session.*
 
 #### Filters
