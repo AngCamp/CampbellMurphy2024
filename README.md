@@ -144,6 +144,8 @@ To rerun detection with different thresholds or modify the pipeline:
 Before running the pipeline, you must configure these essential environment variables in the `run_pipeline.sh` script:
 
 ```bash
+cd SWR_Neuropisels_Detector/
+
 # Output directory for all results - where all SWR detection results will be saved
 export OUTPUT_DIR="your/path_to/output_directory"
 
