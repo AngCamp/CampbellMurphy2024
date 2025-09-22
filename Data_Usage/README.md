@@ -12,7 +12,7 @@ Both the data/development tools for the Allen Brain Institute's data and the Int
 
 ## Data Description
 
-These are the columns of the karlsson_filter.csv files.  The columns are in order of appearance, the columns are organized here by their general type of data.  The timing which includes the time of the peak power values.  The power, zscored.  The Sharp-Wave band, from the stratum radiatum.
+These are the columns of the `probe_{Probe_ID}_channel_{Channel_ID}_putative_swr_events.csv.gz` files.  The columns are in order of appearance, the columns are organized here by their general type of data.  The timing which includes the time of the peak power values.  The power, zscored.  The Sharp-Wave band, from the stratum radiatum.
 
 #### Event Timing information
 • 'start_time': The start time of the SWR event  
@@ -47,6 +47,7 @@ These are the columns of the karlsson_filter.csv files.  The columns are in orde
 • 'envelope_area': Area under the envelope curve  
 • 'envelope_total_energy': Total energy of the envelope signal  
 • 'envelope_90th_percentile': 90th percentile of envelope amplitude  
+*Note that all of these except for the 90th percentile are directly provided by the `karlsson_ripple_detector()` function in the `ripple_detection` library.  These are the same data as provided in the movement artifacts CSVs but those columns are not explicitly labelled envelope in their column names as they come directly from that funciton.
 
 #### Gamma Overlap
 • 'overlaps_with_gamma': Boolean indicating if SWR overlaps with gamma oscillations  
