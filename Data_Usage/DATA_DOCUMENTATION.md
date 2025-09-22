@@ -8,15 +8,15 @@ The dataset contains CSV and JSON files which have been compressed with gzip.
 - **CSV files**: Event data with detailed metrics.
 - **JSON files**: Metadata and processing parameters, here we detail their structure as well.
 
+![Session File Structure](../RepoImages/Figure_3_revision2_withabackground.png)
+*Schematic showing the output file structure for each SWR session, including event files, metadata, and channel selection information organized by probe and session. This illustrates how the various CSV and JSON files relate to each other within a session folder.*
+
 ## Putative SWR Events (`probe_{Probe_ID}_channel_{Channel_ID}_putative_swr_events.csv.gz`)
 
 The Putative SWR Events table is comprised of Event Timing Information, Power Z-scores, Sharp Wave Metrics (computed from the sharp wave band of the putative stratum radiatum channel during events), the Envelope Metrics (provided by the `Karlsson_ripple_detector()` function in the `edeno` library), the Gamma Overlap, and the Movement Overlap. The columns here are presented in their order from left to right of the table.
 
 ![Dataset Overview](../RepoImages/figure_one_revised.png)
 *Overview figure showing the dataset structure and probe placements across the three datasets (ABI Visual Behavior, ABI Visual Coding, and IBL), with a pictoral explanation of the detector pipeline showing how the values in the Events CSV relates to source data of the anatomy and electrophysiology.*
-
-![SWR Detection Pipeline](../RepoImages/SupplementalSWRDetectorWorkflow.png)
-*Detailed workflow diagram showing the SWR detection pipeline steps and data flow, including preprocessing, detection, filtering, and output generation stages that produce the putative SWR events data.*
 
 ### Event Timing Information
 
@@ -198,8 +198,7 @@ The global events file serves as an index that links individual probe events int
 | `ca1_total_unit_count` | Total CA1 units on this probe | count | int64 | |
 | `ca1_good_unit_count` | Good quality CA1 units on this probe | count | int64 | |
 
-![Session File Structure](../RepoImages/Figure_3_revision2_withabackground.png)
-*Schematic showing the output file structure for each SWR session, including event files, metadata, and channel selection information organized by probe and session. This illustrates how the various CSV and JSON files relate to each other within a session folder.*
+
 
 ## Hierarchical JSON Files
 
