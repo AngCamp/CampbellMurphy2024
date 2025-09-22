@@ -2,14 +2,18 @@
 
 This document provides documentation for all data files in Campbell, Murphy 2025, including column descriptions, units, data types, and computational notes. It is intended to describe the data itself in sufficient detail to run analyses with it.
 
-## File Overview
+## Dataset Structure, Session Folder, and File Type Overview
 
-The dataset contains CSV and JSON files which have been compressed with gzip.
-- **CSV files**: Event data with detailed metrics.
-- **JSON files**: Metadata and processing parameters, here we detail their structure as well.
+The dataset contains CSV and JSON files which have been compressed with gzip.  The three datasets are seperated into seperate folders each containing the collection of sessions used to derive data from based on criteria described in manuscript.  Session folder names contain the session IDs, integers for the ABI, UUIDs for the IBL.
+
+- **Session Folders**: The session is the unit of data organization in NWB file system, the Alyx file system and here, the session folders contain the session IDs in their folder name `swrs_session_{Session_ID}/`.
+- **CSV files**: Event data with detailed metrics used to describe putative SWRs, movement artifacts, and gamma band events.
+- **JSON files**: Used for metadata and processing parameters, here we detail their structure as well.
+
+A datasets structure and an example session folder are shown in the figure below.
 
 ![Session File Structure](../RepoImages/Figure_3_revision2_withabackground.png)
-*Schematic showing the output file structure for each SWR session, including event files, metadata, and channel selection information organized by probe and session. This illustrates how the various CSV and JSON files relate to each other within a session folder.*
+*Figure 3 in manuscript.  Schematic showing the output file structure for each SWR session, including event files, metadata, and channel selection information organized by probe and session. This illustrates how the various CSV and JSON files relate to each other within a session folder.*
 
 ## Putative SWR Events (`probe_{Probe_ID}_channel_{Channel_ID}_putative_swr_events.csv.gz`)
 
