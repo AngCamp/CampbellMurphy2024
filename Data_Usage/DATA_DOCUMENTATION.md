@@ -7,7 +7,7 @@ This document provides documentation for all data files in Campbell, Murphy 2025
 The dataset contains CSV and JSON files which have been compressed with gzip.  The three datasets are seperated into seperate folders each containing the collection of sessions used to derive data from based on criteria described in manuscript.  Session folder names contain the session IDs, integers for the ABI, UUIDs for the IBL.
 
 - **Session Folders**: The session is the unit of data organization in NWB file system, the Alyx file system and here, the session folders contain the session IDs in their folder name `swrs_session_{Session_ID}/`.
-- **CSV files**: Mostly event data with detailed metrics used to describe putative SWRs, movement artifacts, gamma band events, and gloabl events.  Probe metadata used for inclusion cirteria in global events is alsoe stored in a CSV.
+- **CSV files**: Mostly event data with detailed metrics used to describe putative SWRs, movement artifacts, gamma band events, and gloabl events.  Probe metadata used for inclusion cirteria in global events is alsoe stored in a CSV.  Note these were stored with their index value so will have an `Unamed Row: 0` for thie first column unless loaded appropriately `df = pd.read_csv('filename.csv', index_col=0)`, this serves as the event index.
 - **JSON files**: Used for metadata and processing parameters, here we detail their structure as well.
 
 A datasets structure and an example session folder are shown in the figure below.
@@ -161,7 +161,6 @@ Global SWR events are detected when putative SWR events occur simultaneously acr
 
 | Column Name | Description | Units | Data Type | Notes |
 |-------------|-------------|-------|-----------|-------|
-| `Unnamed: 0` | Row index from original dataset | - | int64 | |
 | `start_time` | The start time of the global SWR event | seconds | float64 | |
 | `end_time` | The end time of the global SWR event | seconds | float64 | |
 | `duration` | The duration of the global SWR event | seconds | float64 | |
