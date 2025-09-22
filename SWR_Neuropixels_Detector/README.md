@@ -5,6 +5,8 @@ This pipeline processes Neuropixels electrophysiology data from different source
 ## Overview
 ![](../RepoImages/SupplementalSWRDetectorWorkflow.png)
 
+A schematic overview of the pipeline showing the conceptual organization of the steps, this is supplemental figure 1 for the manuscript.  An even mroe complete description is depicted in in the [SWRDetectorWorkflow_Data_flow_diagram.jpeg](https://github.com/AngCamp/CampbellMurphy2024/blob/main/SWR_Neuropixels_Detector/SWRDetectorWorkflow_Data_flow_diagram.jpeg).  The figures are meant to aid in understanding the `BaseLoader` class and `process_session()` method from [swr_neuropixels_collection_core.py](https://github.com/AngCamp/CampbellMurphy2024/blob/main/SWR_Neuropixels_Detector/swr_neuropixels_collection_core.py). 
+
 ## Description
 The pipeline used to derive SWRs from Neuropixels LFP of CA1, from the two largest publicly available datasets: the ABI Visual Behaviour and the IBL dataset.  Currently both the IBL and ABI datasets are missing NWB files on DANDI archive.  Once they are done I'd like to switch to a single pipeline that processes all of them but right now we have to use the individual APIs to get the full datasets.  A more detailed diagram is available in the 'SWRDetectorWorkflow_Data_flow_diagram.jpeg' image.
 
