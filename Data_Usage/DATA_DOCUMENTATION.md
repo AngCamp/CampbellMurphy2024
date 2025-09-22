@@ -194,6 +194,8 @@ The global events file serves as an index that links individual probe events int
 
 ## Probe Metadata (`session_{Session_ID}_probe_metadata.csv.gz`)
 
+Summarizes unit counts and identifies the probes from a session that were used.  CA1 good unit count was used for determining if a probe should be used for creating the Global Events CSV, the unit threshold is set in the config file in the detector folder.
+
 | Column Name | Description | Units | Data Type | Notes |
 |-------------|-------------|-------|-----------|-------|
 | `probe_id` | Unique identifier for the probe | - | string | |
@@ -207,6 +209,9 @@ The global events file serves as an index that links individual probe events int
 ## Hierarchical JSON Files
 
 ### Selection Metadata (`probe_{Probe_ID}_channel_selection_metadata.json.gz`)
+
+The criteria used to determine which channel to take as the putative pyramidal cell layer channel and the putative stratum radiatum layer channel.  Our selection criterai for pyramidal layer channel was highest net ripple band power summed over whole session on that channel.  Then once that was identified the channels 500 microns deeper were considered possible stratum radiatum candidates.  During times when the sharp-wave band power on those channels AND the ripple band power on the putative pyramidal cell layer channel were both >1SD we computed the modulation index (MI) between sharp-wave phase and ripple power.  The highest net MI across this set of channels was then used.  We collected this measure, as well as net sharp-wave power and net circular-lieanr correlation of sharp-wave phase to ripple band power.
+
 **Format**: JSONL (JSON Lines) - each line is a separate JSON object
 
 **Structure per line**:
@@ -250,6 +255,8 @@ The global events file serves as an index that links individual probe events int
 *Visualization of channel selection methodology showing net ripple power-based selection for pyramidal layer identification (left) and modulation index-based selection for mid stratum radiatum layer identification (right). The plots demonstrate how different channels are evaluated and selected based on their electrophysiological signatures.*
 
 ### Run Settings (`session_{Session_ID}_run_settings.json.gz`)
+
+Stores the settings and provides an identification mechanism for a run of the pipeline.  The thresholds stored are what was set in the config file ([united_detector_config.yaml](https://github.com/AngCamp/CampbellMurphy2024/blob/main/SWR_Neuropixels_Detector/united_detector_config.yaml)) used during the execution of the bash script ([run_pipeline.sh](https://github.com/AngCamp/CampbellMurphy2024/blob/main/SWR_Neuropixels_Detector/run_pipeline.sh)) which manages the conda environments for the python scripts used for detection.  See the [SWR_Neuropixels_Detector](https://github.com/AngCamp/CampbellMurphy2024/blob/main/SWR_Neuropixels_Detector) and the associated [readme](https://github.com/AngCamp/CampbellMurphy2024/blob/main/SWR_Neuropixels_Detector/README.md) for details.  Pipeline itself is depicted in figure 2 of the manuscript.  Then in more detail in supplemental figure 1, as well as in the detector folder in [SWR_Neuropixels_Detector/SWRDetectorWorkflow_Data_flow_diagram.jpeg](https://github.com/AngCamp/CampbellMurphy2024/blob/main/SWR_Neuropixels_Detector/SWRDetectorWorkflow_Data_flow_diagram.jpeg).
 
 **Format**: Single JSON object
 
