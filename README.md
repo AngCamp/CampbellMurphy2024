@@ -126,9 +126,9 @@ The dataset is also available at the [OSF project page](https://osf.io/9gm6x/).
 
 Start with these key resources:
 
-- **Data Usage Tutorials**: [Data_Usage/](Data_Usage/) - Interactive notebooks and tutorials
+- **Data Usage Tutorials**: [Data_Usage/](Data_Usage/) - Interactive notebooks and tutorials, see readme for explanations
 - **Data Documentation**: [Data_Usage/DATA_DOCUMENTATION.md](Data_Usage/DATA_DOCUMENTATION.md) - Complete column descriptions and data structure
-- **Global Events Tutorial**: [Data_Usage/global_swr_events_tutorial.py](Data_Usage/global_swr_events_tutorial.py) - Step-by-step analysis of network-level events
+
 
 ### 5. If you wish to customize the detection pipeline...
 
