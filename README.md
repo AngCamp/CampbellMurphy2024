@@ -7,7 +7,7 @@
 *Detailed workflow diagram showing the SWR detection pipeline steps and data flow, including preprocessing, detection, filtering, and output generation stages.*
 
 ## Description
-A repo showcasing how to process and analyze Neuropixels LFP from the three largest publicly available datasets: the ABI Visual Behaviour, ABI Visual Coding, and the IBL Decision-making datasets. 
+A repo showcasing sharp wave-ripples (SWRs) in hippocampal CA1 from 210 mice from the three largest publicly available datasets: the ABI Visual Behaviour, ABI Visual Coding, and the IBL Decision-making datasets.  Demonstrates how to report and share SWR data in an easily shareable format for Open datasets which does not require processing LFP data to reproduce results.  The derived data has been shared with an overly-permissive definition of SWRs allowing users to determine their own thresholds.  Code for processing and analyze Neuropixels LFP for SWRs is also provided.
 
 The data set is available at the [OSF](https://osf.io/9gm6x/).
 
