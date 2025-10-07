@@ -7,7 +7,7 @@
 *Detailed workflow diagram showing the SWR detection pipeline steps and data flow, including preprocessing, detection, filtering, and output generation stages.*
 
 ## Description
-A repo showcasing how to process and analyze Neuropixels LFP from the two largest publicly available datasets: the ABI Visual Behaviour and the IBL dataset. 
+A repo showcasing how to process and analyze Neuropixels LFP from the three largest publicly available datasets: the ABI Visual Behaviour, ABI Visual Coding, and the IBL Decision-making datasets. 
 
 The data set is available at the [OSF](https://osf.io/9gm6x/).
 
