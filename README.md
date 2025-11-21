@@ -11,6 +11,9 @@ A repo showcasing sharp wave-ripples (SWRs) in hippocampal CA1 from 210 mice fro
 
 The data set is available at the [OSF](https://osf.io/9gm6x/).
 
+Assocaited publication: [Callaghan-Campbell, A.G.J., Murphy, T.H. Mouse Hippocampal Sharp-Wave Ripple Dataset Curated From Public Neuropixels Datasets. Sci Data 12, 1841 (2025). https://doi.org/10.1038/s41597-025-06115-0](https://www.nature.com/articles/s41597-025-06115-0)
+
+
 ## How to get started...
 
 ### 1. Clone the Repository
