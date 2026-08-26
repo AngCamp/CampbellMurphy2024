@@ -1,5 +1,3 @@
-# Standard library imports
-# swr_neuropixels_collection_core
 import os
 import time
 import sys
@@ -10,69 +8,27 @@ import gzip
 import string
 import glob
 import re
-
-# Third-party data processing libraries
 import numpy as np
 import pandas as pd
 import yaml
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-
-# SciPy imports
 from scipy import io, signal, stats, interpolate
 from scipy.signal import lfilter, hilbert, fftconvolve
 import scipy.ndimage
 from scipy.ndimage import gaussian_filter, gaussian_filter1d
 from scipy.stats import pearsonr, skew
-
-
-# Multiprocessing
 from multiprocessing import Pool, Process, Queue, Manager, set_start_method
-
-# AWS
 import boto3
 from botocore.config import Config
-
-# Ripple detection
 import ripple_detection
 from ripple_detection import filter_ripple_band
 import ripple_detection.simulate as ripsim
 from ripple_detection.core import gaussian_smooth
-
-# Logging
 import logging
 import logging.handlers
-
-# United SWR detector
-import os
-import subprocess
-import numpy as np
-import pandas as pd
-from scipy import io, signal, stats
-from scipy.signal import lfilter
-import scipy.ndimage
-from scipy.ndimage import gaussian_filter
-from scipy.ndimage import gaussian_filter1d
-from scipy import interpolate
-import matplotlib.pyplot as plt
-import ripple_detection
-from ripple_detection import filter_ripple_band
-import ripple_detection.simulate as ripsim  # for making our time vectors
-from tqdm import tqdm
-import time
-import traceback
-import logging
-import logging.handlers
-import sys
-from multiprocessing import Pool, Process, Queue, Manager, set_start_method
-import yaml
-import json
-import gzip
-import string
-from botocore.config import Config
-import boto3
 import shutil
-
+import importlib
 
 # ===================================
 # Helper functions
@@ -94,16 +50,6 @@ def get_filter(filter_path):
 # swr_neuropixels_collection_core.py
 
 # Standard library imports
-import os
-import time
-import sys
-import importlib
-
-# Common numerical/scientific imports
-import numpy as np
-from scipy import signal, interpolate, stats
-from scipy.signal import hilbert, fftconvolve
-
 class BaseLoader:
     """
     Base class for all dataset loaders with common functionality.
@@ -517,10 +463,12 @@ class BaseLoader:
         ref_depth = channel_positions.loc[peak_ripple_chan_id]
         print(f"Reference channel {peak_ripple_chan_id} depth: {ref_depth}")
         
-        # Get CA1 channels that are below the reference
+        # Get CA1 channels that are below the reference in the actual probe depth axis.
+        # In this dataset, smaller probe_vertical_position values are deeper toward CA1/DG,
+        # while larger values are more superficial / toward visual cortex.
         below_ids = []
         for cid in ca1_chan_ids:  # Only consider CA1 channels
-            if channel_positions.loc[cid] > ref_depth:  # Check if below reference
+            if channel_positions.loc[cid] < ref_depth:
                 below_ids.append(cid)
         
         print(f"Found {len(below_ids)} CA1 channels below reference channel")
@@ -571,10 +519,11 @@ class BaseLoader:
             self.channel_selection_metadata_dict['sharp_wave_band']['modulation_index'].append(float(modulation_index) if not np.isnan(modulation_index) else None)
             self.channel_selection_metadata_dict['sharp_wave_band']['circular_linear_corrs'].append(float(circular_linear_corr) if not np.isnan(circular_linear_corr) else None)
 
-        # Now apply distance constraint for channel selection (but keep all metadata)
+        # Now apply distance constraint for channel selection (but keep all metadata).
+        # Use the signed distance in the actual depth direction: lower depth = further below.
         distance_filtered_candidates = []
         for cid in below_ids:  # Use the original list of channels below reference
-            distance_from_ref = channel_positions.loc[cid] - ref_depth
+            distance_from_ref = ref_depth - channel_positions.loc[cid]
             if 0 < distance_from_ref <= max_distance_microns:
                 distance_filtered_candidates.append(cid)
 
