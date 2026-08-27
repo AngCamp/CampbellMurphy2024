@@ -90,6 +90,8 @@ SAVE_CHANNEL_METADATA=true
 OVERWRITE_EXISTING=false
 DEBUG_MODE=false
 FIND_GLOBAL=false
+SESSION_ID=""
+PROBE_ID=""
 
 # Initialize defaults
 COMMAND="all"
@@ -140,6 +142,14 @@ while [[ $# -gt 0 ]]; do
     -d|--debug)
       DEBUG_MODE=true
       shift
+      ;;
+    --session-id)
+      SESSION_ID="$2"
+      shift 2
+      ;;
+    --probe-id)
+      PROBE_ID="$2"
+      shift 2
       ;;
     -h|--help)
       show_help
@@ -215,6 +225,8 @@ if [[ "$SAVE_CHANNEL_METADATA" == "true" ]]; then PYTHON_ARGS+=" --save-channel-
 if [[ "$OVERWRITE_EXISTING" == "true" ]]; then PYTHON_ARGS+=" --overwrite-existing"; fi
 if [[ "$CLEANUP_AFTER" == "true" ]]; then PYTHON_ARGS+=" --cleanup-after"; fi
 if [[ "$DEBUG_MODE" == "true" ]]; then PYTHON_ARGS+=" --debug"; fi
+if [[ -n "$SESSION_ID" ]]; then PYTHON_ARGS+=" --session-id $SESSION_ID"; fi
+if [[ -n "$PROBE_ID" ]]; then PYTHON_ARGS+=" --probe-id $PROBE_ID"; fi
 PYTHON_ARGS+=" --config $CONFIG_PATH"
 
 # Create output/log directories
