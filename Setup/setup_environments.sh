@@ -40,14 +40,15 @@ conda create --name allensdk_env python=3.10 -y
 echo "Activating allensdk_env..."
 conda activate allensdk_env
 
+# install this first to avoid conflicts with other packages, they can overwrite the numpy and scipy versions that way
+echo "Installing ripple detection package..." 
+conda install -c edeno ripple_detection==1.5.1 -y
+
 echo "Installing AllenSDK..."
 pip install allensdk==2.16.2
 
 echo "Installing additional packages..."
 pip install PyYAML==6.0.3
-
-echo "Installing ripple detection package..."
-conda install -c edeno ripple_detection==1.5.1 -y
 
 echo "Installing Jupyter kernel support..."
 pip install ipykernel==7.3.0
@@ -66,6 +67,10 @@ conda create --name ONE_ibl_env python=3.13 -y
 echo "Activating ONE_ibl_env..."
 conda activate ONE_ibl_env
 
+# install this first to avoid conflicts with other packages, they can overwrite the numpy and scipy versions that way
+echo "Installing ripple detection package..." 
+conda install -c edeno ripple_detection==1.5.1 -y
+
 echo "Installing ONE-api..."
 pip install ONE-api==3.5.2
 
@@ -74,9 +79,6 @@ pip install ibllib==4.0.1
 
 echo "Installing ibl-neuropixel version 1.12.0..."
 pip install ibl-neuropixel==1.12.0
-
-echo "Installing ripple detection package..."
-conda install -c edeno ripple_detection==1.5.1 -y
 
 echo "Installing Jupyter kernel support..."
 pip install ipykernel==7.3.0
