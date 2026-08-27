@@ -34,7 +34,7 @@ echo "Setting up environment 1/2: allensdk_env"
 echo "=========================================="
 
 # Create the AllenSDK environment
-echo "Creating conda environment 'allensdk_env'..."
+echo "Creating conda environment 'allensdk_env' with Python 3.10..."
 conda create --name allensdk_env python=3.10 -y
 
 echo "Activating allensdk_env..."
@@ -44,13 +44,13 @@ echo "Installing AllenSDK..."
 pip install allensdk==2.16.2
 
 echo "Installing additional packages..."
-conda install pyyaml=6.0.2 -y
+pip install PyYAML==6.0.3
 
 echo "Installing ripple detection package..."
-conda install -c edeno ripple_detection=1.5.1 -y
+conda install -c edeno ripple_detection==1.5.1 -y
 
 echo "Installing Jupyter kernel support..."
-pip install ipykernel==6.26.0
+pip install ipykernel==7.3.0
 python -m ipykernel install --user --name=allensdk_env --display-name="Python (allensdk_env)"
 
 echo "✅ allensdk_env setup complete!"
@@ -60,26 +60,26 @@ echo "Setting up environment 2/2: ONE_ibl_env"
 echo "========================================"
 
 # Create the IBL/ONE environment
-echo "Creating conda environment 'ONE_ibl_env'..."
-conda create --name ONE_ibl_env python=3.10 -y
+echo "Creating conda environment 'ONE_ibl_env' with Python 3.13..."
+conda create --name ONE_ibl_env python=3.13 -y
 
 echo "Activating ONE_ibl_env..."
 conda activate ONE_ibl_env
 
 echo "Installing ONE-api..."
-pip install ONE-api==3.0.0
+pip install ONE-api==3.5.2
 
 echo "Installing ibllib..."
-pip install ibllib==3.3.0
+pip install ibllib==4.0.1
 
-echo "Installing ibl-neuropixel version 1.8.1..."
-pip install ibl-neuropixel==1.8.1
+echo "Installing ibl-neuropixel version 1.12.0..."
+pip install ibl-neuropixel==1.12.0
 
 echo "Installing ripple detection package..."
-conda install -c edeno ripple_detection=1.5.1 -y
+conda install -c edeno ripple_detection==1.5.1 -y
 
 echo "Installing Jupyter kernel support..."
-pip install ipykernel==6.26.0
+pip install ipykernel==7.3.0
 python -m ipykernel install --user --name=ONE_ibl_env --display-name="Python (ONE_ibl_env)"
 
 echo "✅ ONE_ibl_env setup complete!"
