@@ -131,9 +131,24 @@ def main():
     parser.add_argument("-m", "--save-channel-metadata", action="store_true", default=True, help="Enable saving of channel selection metadata.")
     parser.add_argument("-o", "--overwrite-existing", action="store_true", help="Overwrite existing session output.")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable debug mode (for internal script use).")
+    parser.add_argument("--session-id", type=str, default=os.environ.get('SESSION_ID', os.environ.get('SESSION_IDS', '')), help="Optional comma-separated session IDs to process.")
+    parser.add_argument("--probe-id", type=str, default=os.environ.get('PROBE_ID', os.environ.get('PROBE_IDS', '')), help="Optional comma-separated probe IDs to process within each selected session.")
     # Add argument for config path if needed, overriding env var
     parser.add_argument("--config", type=str, default=os.environ.get('CONFIG_PATH', 'united_detector_config.yaml'), help="Path to configuration YAML file.")
     args = parser.parse_args()
+
+    def parse_optional_csv_ids(value):
+        if value is None or str(value).strip() == "":
+            return None
+        ids = []
+        for entry in str(value).split(','):
+            cleaned = entry.strip()
+            if cleaned:
+                ids.append(cleaned)
+        return ids if ids else None
+
+    target_session_ids = parse_optional_csv_ids(args.session_id)
+    target_probe_ids = parse_optional_csv_ids(args.probe_id)
 
     # Assign flags from args to variables used later
     save_lfp = args.save_lfp
@@ -251,6 +266,13 @@ def main():
         del data
         print(f"Loaded {len(all_sesh_with_ca1_eid)} sessions from {session_file_path}")
 
+    if target_session_ids is not None:
+        target_session_id_set = {str(sid) for sid in target_session_ids}
+        all_sesh_with_ca1_eid = np.array([
+            sid for sid in np.asarray(all_sesh_with_ca1_eid).tolist() if str(sid) in target_session_id_set
+        ], dtype=int)
+        print(f"Filtered to {len(all_sesh_with_ca1_eid)} sessions by explicit session IDs: {target_session_ids}")
+
     # --- Consolidate Config Dictionary --- 
     config = {
         "paths": {
@@ -265,6 +287,8 @@ def main():
         "run_details": {
             "dataset_to_process": DATASET_TO_PROCESS,
             "run_name": run_name,
+            "session_ids": target_session_ids,
+            "probe_ids": target_probe_ids,
             # Add other relevant details from dataset_config?
             "dont_wipe_these_sessions": dont_wipe_these_sessions,
             "only_brain_observatory_sessions": only_brain_observatory_sessions if DATASET_TO_PROCESS != 'ibl' else None,

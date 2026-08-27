@@ -1595,6 +1595,7 @@ def process_session(session_id, config):
     lfp_output_dir_path = config['paths']['lfp_output_dir']
     dataset_to_process = config['run_details']['dataset_to_process']
     run_name = config['run_details']['run_name']
+    requested_probe_ids = config['run_details'].get('probe_ids')
     
     # Extract processing flags
     save_lfp = config['flags']['save_lfp']
@@ -1669,10 +1670,20 @@ def process_session(session_id, config):
         elif dataset_to_process == 'ibl':
             # Get probes with CA1 directly - this will handle both getting all probes and filtering
             probelist, probenames = loader.get_probes_with_ca1()
+
+        if requested_probe_ids is not None:
+            requested_probe_id_set = {str(pid) for pid in requested_probe_ids}
+            if dataset_to_process == 'ibl':
+                filtered_probe_pairs = [(pid, name) for pid, name in zip(probelist, probenames) if str(pid) in requested_probe_id_set]
+                probelist = [pid for pid, _ in filtered_probe_pairs]
+                probenames = [name for _, name in filtered_probe_pairs]
+            else:
+                probelist = [pid for pid in probelist if str(pid) in requested_probe_id_set]
+            logger.info(f"Session {session_id}: Filtered probes to {len(probelist)} selected IDs: {requested_probe_ids}")
         
         # If no probes with CA1, log and return
         if not probelist:
-            logger.warning(f"Session {session_id}: No probes with CA1 found, skipping.")
+            logger.warning(f"Session {session_id}: No probes with CA1 found or no requested probes matched, skipping.")
             return
             
         # Process probes
