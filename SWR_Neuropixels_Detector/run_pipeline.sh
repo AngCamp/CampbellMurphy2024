@@ -3,34 +3,46 @@
 # =====================================================================
 # IMPORTANT CONFIGURATION VARIABLES - EDIT THESE FOR YOUR ENVIRONMENT
 # =====================================================================
+# Currently set up so that a plain ./run_pipeline.sh on tm-titan makes version 2
+# of the Allen (ABI) datasets from the version 1 OSF data. Each value can still be
+# overridden by exporting the variable of the same name before running.
+
+# Folder holding the repo, the dataset caches and the version 1 data
+PROJECT_DIR=${PROJECT_DIR:-"/home/caoyut/AngusC/SWR_project_folders"}
+
+# Datasets processed when no command is given (./run_pipeline.sh all still runs all three)
+DEFAULT_DATASETS=${DEFAULT_DATASETS:-"abi_visual_coding,abi_visual_behaviour"}
+
+# Save LFP traces by default (true/false). -s on the command line also turns it on
+SAVE_LFP=${SAVE_LFP:-true}
 
 # Output directory for all SWR detection results
 # This is where all processed data, events, and metadata will be saved
 # Structure: $OUTPUT_DIR/{dataset_name}/{session_id}/...
-export OUTPUT_DIR=${OUTPUT_DIR:-"your/path_to/output_directory"}
+export OUTPUT_DIR=${OUTPUT_DIR:-"$PROJECT_DIR/version_2_data"}
 
 # Cache directories for datasets - these store raw neurophysiology data downloaded by APIs/SDKs
 # Each dataset API maintains its own cache to avoid re-downloading large files
 # These directories can grow to hundreds of GB, so ensure sufficient storage space
 
 # Allen Brain Institute Visual Coding dataset cache (AllenSDK)
-export ABI_VISUAL_CODING_SDK_CACHE=${ABI_VISUAL_CODING_SDK_CACHE:-"your/path_to/ABI_visual_coding_cache"}
+export ABI_VISUAL_CODING_SDK_CACHE=${ABI_VISUAL_CODING_SDK_CACHE:-"$PROJECT_DIR/dataset_caches/abi_visual_coding"}
 
 # Allen Brain Institute Visual Behaviour dataset cache (AllenSDK)
-export ABI_VISUAL_BEHAVIOUR_SDK_CACHE=${ABI_VISUAL_BEHAVIOUR_SDK_CACHE:-"your/path_to/ABI_visual_behavior_cache"}
+export ABI_VISUAL_BEHAVIOUR_SDK_CACHE=${ABI_VISUAL_BEHAVIOUR_SDK_CACHE:-"$PROJECT_DIR/dataset_caches/abi_visual_behaviour"}
 
 # International Brain Laboratory dataset cache (ONE-API)
-export IBL_ONEAPI_CACHE=${IBL_ONEAPI_CACHE:-"your/path_to/IBL_data_cache"}
+export IBL_ONEAPI_CACHE=${IBL_ONEAPI_CACHE:-"$PROJECT_DIR/dataset_caches/ibl"}
 
 # Run name for tracking pipeline settings across different runs
 # Consider including date/time for better organization: "swr_detection_$(date +%Y%m%d_%H%M%S)"
 # Detection thresholds from config file are stored with each session's output
-export RUN_NAME=${RUN_NAME:-"run_name_here_$(date +%Y%m%d_%H%M%S)"}
+export RUN_NAME=${RUN_NAME:-"version_2_flipped_depth_sw"}
 
 # Output directory of a previous version of the pipeline to keep channel choices from
-# (the OUTPUT_DIR that run used). Leave empty to choose every channel fresh.
+# (the OUTPUT_DIR that run used, or an unzipped download of it). Set it to "" to choose every channel fresh.
 # Can also be set with -nv/--newver. Which choices are kept is set with --keep or previous_version.keep_channels in the config file
-export PREVIOUS_VERSION_DIR=${PREVIOUS_VERSION_DIR:-""}
+export PREVIOUS_VERSION_DIR=${PREVIOUS_VERSION_DIR-"$PROJECT_DIR/version_1_OSF_data/CampbellMurphy2025_SWRs_data"}
 
 # prevents pycache files from being created in working directory
 export PYTHONDONTWRITEBYTECODE=1 
@@ -43,7 +55,8 @@ show_help() {
   echo "Usage: ./run_pipeline.sh [command] [datasets] [options]"
   echo ""
   echo "Commands:"
-  echo "  all                     Process all datasets (default if no command provided)"
+  echo "  (no command)            Process the default datasets: $DEFAULT_DATASETS"
+  echo "  all                     Process all datasets"
   echo "  subset DATASETS         Process only specified datasets"
   echo "  debug DATASET           Run in debug mode for a specific dataset"
   echo ""
@@ -57,7 +70,7 @@ show_help() {
   echo "  -c, --config FILE               Specify a custom configuration YAML file"
   echo "                                  (default: united_detector_config.yaml)"
   echo "  -fg, --find-global             Run global event detection using existing probe events (skip probe processing)"
-  echo "  -s, --save-lfp, --save-lfp-data Enable saving of LFP data (overrides config)"
+  echo "  -s, --save-lfp, --save-lfp-data Enable saving of LFP data (default: $SAVE_LFP, set SAVE_LFP=false to turn off)"
   echo "  -m, --save-metadata             Enable saving of channel selection metadata"
   echo "  -o, --overwrite, --overwrite-existing   Overwrite existing session output folders"
   echo "  -X, --cleanup, --cleanup-after  Clean up cache after processing each session"
@@ -71,7 +84,8 @@ show_help() {
   echo "                                  (default: choose it fresh and log a warning)"
   echo ""
   echo "Examples:"
-  echo "  ./run_pipeline.sh                          # Run all datasets with all stages"
+  echo "  ./run_pipeline.sh                          # Run the default datasets with the settings at the top of this script"
+  echo "  ./run_pipeline.sh all                      # Run all datasets"
   echo "  ./run_pipeline.sh subset ibl              # Run only the IBL dataset"
   echo "  ./run_pipeline.sh subset ibl,abi_visual_behaviour   # Run IBL and ABI Visual Behaviour"
   echo "  ./run_pipeline.sh debug ibl               # Debug the IBL dataset"
@@ -100,7 +114,6 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PYTHON_CMD="python"
 CONFIG_FILE="united_detector_config.yaml"
 CLEANUP_AFTER=false
-SAVE_LFP=false
 SAVE_CHANNEL_METADATA=true
 OVERWRITE_EXISTING=false
 DEBUG_MODE=false
@@ -111,12 +124,13 @@ KEEP_CHANNELS=""
 STRICT_PREVIOUS=false
 
 # Initialize defaults
-COMMAND="all"
-DATASETS="ibl,abi_visual_behaviour,abi_visual_coding"
+COMMAND="default"
+DATASETS="$DEFAULT_DATASETS"
 
 # Handle positional arguments for dataset selection
 if [[ "$1" == "all" ]]; then
   COMMAND="all"
+  DATASETS="ibl,abi_visual_behaviour,abi_visual_coding"
   shift
 elif [[ "$1" == "subset" && -n "$2" ]]; then
   COMMAND="subset"
@@ -202,7 +216,7 @@ if [[ "$COMMAND" == "subset" && -z "$DATASETS" ]]; then
 fi
 
 # Decide which dataset(s) to process
-if [[ "$COMMAND" == "subset" ]]; then
+if [[ "$COMMAND" != "all" ]]; then
   # Check if there's a comma in DATASETS
   if [[ "$DATASETS" == *","* ]]; then
     # Multiple datasets specified
