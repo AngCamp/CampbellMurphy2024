@@ -44,6 +44,43 @@ def get_filter(filter_path):
     filter_data = np.load(filter_path)
     return filter_data["arr_0"]
 
+
+def _trace_enabled():
+    """Enable verbose runtime prints by setting SWR_TRACE_PRINTS=1."""
+    return str(os.environ.get("SWR_TRACE_PRINTS", "0")).lower() in {"1", "true", "yes", "on"}
+
+
+def _shape_or_len(obj):
+    """Best-effort shape/length summary for debug tracing."""
+    if obj is None:
+        return "None"
+    if hasattr(obj, "shape"):
+        try:
+            return f"shape={tuple(obj.shape)}"
+        except Exception:
+            pass
+    if isinstance(obj, (list, tuple, set, dict)):
+        try:
+            return f"len={len(obj)}"
+        except Exception:
+            pass
+    return type(obj).__name__
+
+
+def _trace(stage, session_id=None, probe_id=None, **objects):
+    """Print compact trace lines for notebook/server debugging."""
+    if not _trace_enabled():
+        return
+    prefix = f"[TRACE] stage={stage}"
+    if session_id is not None:
+        prefix += f" session={session_id}"
+    if probe_id is not None:
+        prefix += f" probe={probe_id}"
+    print(prefix, flush=True)
+    if objects:
+        obj_parts = [f"{key}:{_shape_or_len(value)}" for key, value in objects.items()]
+        print(f"[TRACE]   objects -> {' | '.join(obj_parts)}", flush=True)
+
 # ===================================
 # BASE LOADER CLASS
 # ===================================
@@ -1589,6 +1626,12 @@ def process_session(session_id, config):
     
     # Log the session ID and dataset being processed
     logger.info(f"Processing session {session_id} for dataset {config['run_details']['dataset_to_process']}")
+    _trace(
+        "process_session.start",
+        session_id=session_id,
+        dataset=config['run_details'].get('dataset_to_process'),
+        requested_probe_ids=config['run_details'].get('probe_ids')
+    )
     
     # Extract necessary paths and settings from config
     swr_output_dir_path = config['paths']['swr_output_dir']
@@ -1655,21 +1698,31 @@ def process_session(session_id, config):
         # Set up logging
         process_stage = "Setting up"
         logger.info(f"Session {session_id}: Beginning processing, dataset {dataset_to_process}")
+        _trace("setup.paths", session_id=session_id, session_subfolder=session_subfolder, lfp_output_dir_path=lfp_output_dir_path)
         
         # Initialize and set up the loader using the BaseLoader factory
         process_stage = "Setting up loader"
+        _trace("loader.create.start", session_id=session_id, dataset=dataset_to_process)
         loader = BaseLoader.create(dataset_to_process, session_id)
+        _trace("loader.create.done", session_id=session_id, loader=loader)
+        _trace("loader.set_config.start", session_id=session_id, config=config)
         loader.set_config(config)  # Pass the config to the loader
+        _trace("loader.set_up.start", session_id=session_id)
         loader.set_up()
+        _trace("loader.set_up.done", session_id=session_id)
         
         # Get probe IDs and names
         process_stage = "Getting probe IDs and names"
         if dataset_to_process == 'abi_visual_coding' or dataset_to_process == 'abi_visual_behaviour':
             probenames = None
+            _trace("loader.get_probes_with_ca1.start", session_id=session_id)
             probelist = loader.get_probes_with_ca1()
+            _trace("loader.get_probes_with_ca1.done", session_id=session_id, probelist=probelist)
         elif dataset_to_process == 'ibl':
             # Get probes with CA1 directly - this will handle both getting all probes and filtering
+            _trace("loader.get_probes_with_ca1.start", session_id=session_id)
             probelist, probenames = loader.get_probes_with_ca1()
+            _trace("loader.get_probes_with_ca1.done", session_id=session_id, probelist=probelist, probenames=probenames)
 
         if requested_probe_ids is not None:
             requested_probe_id_set = {str(pid) for pid in requested_probe_ids}
@@ -1680,6 +1733,7 @@ def process_session(session_id, config):
             else:
                 probelist = [pid for pid in probelist if str(pid) in requested_probe_id_set]
             logger.info(f"Session {session_id}: Filtered probes to {len(probelist)} selected IDs: {requested_probe_ids}")
+            _trace("probes.filtered", session_id=session_id, requested_probe_ids=requested_probe_ids, probelist=probelist)
         
         # If no probes with CA1, log and return
         if not probelist:
@@ -1698,13 +1752,16 @@ def process_session(session_id, config):
                 probe_id = probelist[this_probe]
                 probe_id_log = str(probe_id)
                 logger.info(f"Session {session_id}: Processing probe {probe_id_log}")
+                _trace("probe.start", session_id=session_id, probe_id=probe_id_log)
                 
                 # Process the probe and get results
                 process_stage = f"Processing probe with id {probe_id_log}"
+                _trace("loader.process_probe.start", session_id=session_id, probe_id=probe_id_log)
                 if dataset_to_process == 'abi_visual_coding' or dataset_to_process == 'abi_visual_behaviour':
                     results = loader.process_probe(probe_id, filter_ripple_band)
                 elif dataset_to_process == 'ibl':
                     results = loader.process_probe(this_probe, filter_ripple_band)
+                _trace("loader.process_probe.done", session_id=session_id, probe_id=probe_id_log, results=results)
                
                 # Extract results using the standardized key names
                 peakripple_chan_raw_lfp = results['peak_ripple_raw_lfp']
@@ -1714,6 +1771,18 @@ def process_session(session_id, config):
                 take_two = results['control_channel_ids'] # Use standardized key
                 peakrippleband = results['ripple_band_filtered'] # Use standardized key
                 peak_ripple_chan_id = results['peak_ripple_chan_id']
+                _trace(
+                    "probe.results.extracted",
+                    session_id=session_id,
+                    probe_id=probe_id_log,
+                    peakripple_chan_raw_lfp=peakripple_chan_raw_lfp,
+                    lfp_time_index=lfp_time_index,
+                    ca1_chans=ca1_chans,
+                    outof_hp_chans_lfp=outof_hp_chans_lfp,
+                    take_two=take_two,
+                    peakrippleband=peakrippleband,
+                    peak_ripple_chan_id=peak_ripple_chan_id
+                )
                 
                 # Save channel selection metadata only if the flag is enabled
                 if save_channel_metadata:
@@ -1767,11 +1836,13 @@ def process_session(session_id, config):
                     speed=dummy_speed,
                     sampling_frequency=1500.0,
                 )
+                _trace("events.karlsson_raw", session_id=session_id, probe_id=probe_id_log, Karlsson_ripple_times=Karlsson_ripple_times)
                 
                 # Filter by duration
                 Karlsson_ripple_times = Karlsson_ripple_times[
                     Karlsson_ripple_times.duration < 0.25
                 ]
+                _trace("events.karlsson_duration_filtered", session_id=session_id, probe_id=probe_id_log, Karlsson_ripple_times=Karlsson_ripple_times)
                 
                 # Remove speed columns
                 speed_cols = [
@@ -1832,6 +1903,7 @@ def process_session(session_id, config):
                     maximum_duration=float("inf"),
                     five_to_fourty_band_power_df=gamma_power,
                 )
+                _trace("events.gamma", session_id=session_id, probe_id=probe_id_log, gamma_times=gamma_times, gamma_power=gamma_power)
                 
                 # Save gamma events
                 csv_filename = f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_gamma_band_events.csv.gz"
@@ -1869,6 +1941,14 @@ def process_session(session_id, config):
                         zscore_threshold=movement_artifact_ripple_band_threshold,
                         sampling_frequency=1500.0,
                     )
+                    _trace(
+                        "events.movement_control",
+                        session_id=session_id,
+                        probe_id=probe_id_log,
+                        control_channel=channel_outside_hp,
+                        movement_controls=movement_controls,
+                        rip_power_controlchan=rip_power_controlchan
+                    )
                     
                     # Remove speed columns
                     speed_cols = [
@@ -1887,6 +1967,7 @@ def process_session(session_id, config):
                 logger.info(f"Session {session_id}: Filtering events for probe {probe_id_log}")
                 Karlsson_ripple_times = check_gamma_overlap(Karlsson_ripple_times, gamma_times)
                 Karlsson_ripple_times = check_movement_overlap(Karlsson_ripple_times, movement_control_list[0], movement_control_list[1])
+                _trace("events.filtered_overlap", session_id=session_id, probe_id=probe_id_log, Karlsson_ripple_times=Karlsson_ripple_times)
                 
                 # Define the desired column order
                 column_order = [
@@ -1911,6 +1992,7 @@ def process_session(session_id, config):
                 Karlsson_ripple_times.to_csv(csv_path, index=True, compression="gzip")
                 probe_events_dict[probe_id_log] = Karlsson_ripple_times
                 logger.info(f"Session {session_id}: Saved {len(Karlsson_ripple_times)} filtered events for probe {probe_id_log}")
+                _trace("probe.done", session_id=session_id, probe_id=probe_id_log, n_events=len(Karlsson_ripple_times))
                 
         else:
             logger.info(f"\n{'='*80}\nSkipping probe processing (find_global=True)\n{'='*80}")
@@ -1926,11 +2008,14 @@ def process_session(session_id, config):
         logger.info(f"Session {session_id}: Generating metadata for all probes")
         all_probe_metadata = []
         for probe_id in probelist:
+            _trace("metadata.get_probe.start", session_id=session_id, probe_id=probe_id)
             probe_metadata = loader.get_metadata_for_probe(probe_id, config=config)
             all_probe_metadata.append(probe_metadata)
+            _trace("metadata.get_probe.done", session_id=session_id, probe_id=probe_id, probe_metadata=probe_metadata)
         
         # Create metadata DataFrame
         probe_metadata_df = pd.DataFrame(all_probe_metadata)
+        _trace("metadata.dataframe", session_id=session_id, probe_metadata_df=probe_metadata_df)
         if probe_metadata_df.empty:
             logger.error(f"Session {session_id}: No valid probe metadata generated")
             return
@@ -1966,6 +2051,7 @@ def process_session(session_id, config):
                 session_id,
                 logger
             )
+            _trace("global_events.created", session_id=session_id, global_events=global_events)
             
             # Save global events if created successfully
             if global_events is not None and not global_events.empty:
@@ -1995,8 +2081,10 @@ def process_session(session_id, config):
         
         # Cleanup resources
         if loader is not None:
+            _trace("loader.cleanup.start", session_id=session_id)
             loader.cleanup()
             logger.info(f"Session {session_id}: Loader cleanup finished")
+            _trace("loader.cleanup.done", session_id=session_id)
             
             # Optional cache cleanup based on flag
             if cleanup_after:
@@ -2013,6 +2101,7 @@ def process_session(session_id, config):
         tb_str = traceback.format_exc()
         logger.error(f"Session {session_id}: Error during processing at stage '{process_stage}' for probe '{probe_id_log}': {e_main}")
         logger.error(f"Traceback:\n{tb_str}")
+        _trace("process_session.exception", session_id=session_id, probe_id=probe_id_log, error=str(e_main), process_stage=process_stage)
         
         # Attempt loader cleanup if it exists
         if loader is not None:

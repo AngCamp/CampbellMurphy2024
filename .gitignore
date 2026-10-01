@@ -13,3 +13,4 @@ setup_allen_cache.py
 OSF_README.txt
 # VS Code settings folder (including launch.json)
 .vscode/
+SWR_Neuropixels_Detector/debug_single_session_trace_runner.py
