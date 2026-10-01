@@ -287,6 +287,28 @@ if [[ -n "$PREVIOUS_VERSION_DIR" && ! -d "$PREVIOUS_VERSION_DIR" ]]; then
   exit 1
 fi
 
+# The previous version may still be zipped (the OSF download holds the data as a zip inside
+# a folder). If no session folders are found, unzip the one zip inside the folder, once.
+if [[ -n "$PREVIOUS_VERSION_DIR" ]]; then
+  if [[ -z "$(find "$PREVIOUS_VERSION_DIR" -maxdepth 5 -type d -name 'swrs_session_*' -print -quit)" ]]; then
+    PREVIOUS_ZIPS=$(find "$PREVIOUS_VERSION_DIR" -maxdepth 2 -type f -name '*.zip')
+    if [[ -n "$PREVIOUS_ZIPS" && $(echo "$PREVIOUS_ZIPS" | wc -l) -eq 1 ]]; then
+      echo "Previous version is still zipped. Unzipping $PREVIOUS_ZIPS into $PREVIOUS_VERSION_DIR ..."
+      unzip -q -n "$PREVIOUS_ZIPS" -d "$PREVIOUS_VERSION_DIR"
+      if [ $? -ne 0 ]; then
+        echo "Error: could not unzip $PREVIOUS_ZIPS"
+        exit 1
+      fi
+    fi
+    if [[ -z "$(find "$PREVIOUS_VERSION_DIR" -maxdepth 5 -type d -name 'swrs_session_*' -print -quit)" ]]; then
+      echo "Error: no swrs_session_* folders found in the previous version directory: $PREVIOUS_VERSION_DIR"
+      echo "It contains:"
+      ls "$PREVIOUS_VERSION_DIR" | head -n 20
+      exit 1
+    fi
+  fi
+fi
+
 # Create output/log directories
 mkdir -p "$OUTPUT_DIR"
 mkdir -p "$LOG_DIR"
@@ -373,7 +395,8 @@ for dataset in "${DATASET_ARRAY[@]}"; do
   
   echo "Running swr_neuropixels_detector_main.py for $dataset with $CORES cores..."
   python swr_neuropixels_detector_main.py $PYTHON_ARGS 2>&1 | tee "$LOG_FILE"
-  DETECTOR_STATUS=$?
+  # Status of the python script, not of tee
+  DETECTOR_STATUS=${PIPESTATUS[0]}
   
   if [ $DETECTOR_STATUS -eq 0 ]; then
     echo "Processing of $dataset completed successfully at $(date)"
