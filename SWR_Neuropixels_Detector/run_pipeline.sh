@@ -254,7 +254,7 @@ if [[ "$FIND_GLOBAL" == "true" ]]; then PYTHON_ARGS+=" --find-global"; fi
 if [[ "$SAVE_LFP" == "true" ]]; then PYTHON_ARGS+=" --save-lfp"; fi
 if [[ "$SAVE_CHANNEL_METADATA" == "true" ]]; then PYTHON_ARGS+=" --save-channel-metadata"; fi
 if [[ "$OVERWRITE_EXISTING" == "true" ]]; then PYTHON_ARGS+=" --overwrite-existing"; fi
-if [[ "$CLEANUP_AFTER" == "true" ]]; then PYTHON_ARGS+=" --cleanup-after"; fi
+if [[ "$CLEANUP_AFTER" == "true" ]]; then PYTHON_ARGS+=" --cleanup-cache"; fi
 if [[ "$DEBUG_MODE" == "true" ]]; then PYTHON_ARGS+=" --debug"; fi
 if [[ -n "$SESSION_ID" ]]; then PYTHON_ARGS+=" --session-id $SESSION_ID"; fi
 if [[ -n "$PROBE_ID" ]]; then PYTHON_ARGS+=" --probe-id $PROBE_ID"; fi
@@ -262,6 +262,16 @@ if [[ -n "$PROBE_ID" ]]; then PYTHON_ARGS+=" --probe-id $PROBE_ID"; fi
 if [[ -n "$KEEP_CHANNELS" ]]; then PYTHON_ARGS+=" --keep $KEEP_CHANNELS"; fi
 if [[ "$STRICT_PREVIOUS" == "true" ]]; then PYTHON_ARGS+=" --strict-previous"; fi
 PYTHON_ARGS+=" --config $CONFIG_PATH"
+
+# Stop early if the paths have not been set, or the previous version is not where it was said to be
+if [[ "$OUTPUT_DIR" == your/path_to/* ]]; then
+  echo "Error: OUTPUT_DIR is not set. Edit it at the top of run_pipeline.sh or export OUTPUT_DIR=/your/output/path"
+  exit 1
+fi
+if [[ -n "$PREVIOUS_VERSION_DIR" && ! -d "$PREVIOUS_VERSION_DIR" ]]; then
+  echo "Error: previous version directory does not exist: $PREVIOUS_VERSION_DIR"
+  exit 1
+fi
 
 # Create output/log directories
 mkdir -p "$OUTPUT_DIR"
@@ -317,7 +327,21 @@ for dataset in "${DATASET_ARRAY[@]}"; do
   export DATASET_TO_PROCESS="$dataset"
   export POOL_SIZE="$CORES"
   export LOG_FILE="$LOG_DIR/${dataset}.log"
-  
+
+  # The dataset's cache directory must be set, and is created if it does not exist yet
+  case "$dataset" in
+    ibl) CACHE_DIR="$IBL_ONEAPI_CACHE" ;;
+    abi_visual_behaviour) CACHE_DIR="$ABI_VISUAL_BEHAVIOUR_SDK_CACHE" ;;
+    abi_visual_coding) CACHE_DIR="$ABI_VISUAL_CODING_SDK_CACHE" ;;
+    *) CACHE_DIR="" ;;
+  esac
+  if [[ "$CACHE_DIR" == your/path_to/* ]]; then
+    echo "Error: cache directory for $dataset is not set. Edit it at the top of run_pipeline.sh or export it."
+    PIPELINE_STATUS=1
+    continue
+  fi
+  if [[ -n "$CACHE_DIR" ]]; then mkdir -p "$CACHE_DIR"; fi
+
   # Activate environment
   activate_environment "$dataset"
   if [ $? -ne 0 ]; then

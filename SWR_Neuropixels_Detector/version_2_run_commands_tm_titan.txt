@@ -1,0 +1,69 @@
+VERSION 2 RUN ON tm-titan
+=========================
+Reruns the pipeline against the version 1 (OSF) data. Keeps the version 1 control and
+ripple channels, rechooses the sharp wave channel, saves channel metadata and LFP traces.
+Pool size is 2 for every dataset (pool_sizes in united_detector_config.yaml).
+Copy and paste each block into the terminal on tm-titan.
+
+
+1. GET THE CODE
+---------------
+cd /home/caoyut/AngusC/SWR_project_folders/CampbellMurphy2024
+git pull origin flipped_depth_correction
+cd SWR_Neuropixels_Detector
+
+
+2. SET THE PATHS (needed in every new terminal, including inside tmux)
+----------------------------------------------------------------------
+export PROJECT_DIR=/home/caoyut/AngusC/SWR_project_folders
+export OLD_VERSION_DIR=$PROJECT_DIR/version_1_OSF_data/CampbellMurphy2025_SWRs_data
+export OUTPUT_DIR=$PROJECT_DIR/version_2_data
+export ABI_VISUAL_CODING_SDK_CACHE=$PROJECT_DIR/dataset_caches/abi_visual_coding
+export ABI_VISUAL_BEHAVIOUR_SDK_CACHE=$PROJECT_DIR/dataset_caches/abi_visual_behaviour
+export IBL_ONEAPI_CACHE=$PROJECT_DIR/dataset_caches/ibl
+export RUN_NAME=version_2_flipped_depth_sw
+
+
+3. CHECK THE OLD DATA (takes a few seconds, run once)
+-----------------------------------------------------
+The channel choices are read from the old file names, so each count should be above zero.
+
+find $OLD_VERSION_DIR -maxdepth 5 -type d -name "*_swr_murphylab2024"
+find $OLD_VERSION_DIR -type d -name "swrs_session_*" | wc -l
+find $OLD_VERSION_DIR -name "probe_*_channel_*_movement_artifacts.csv.gz" | wc -l
+find $OLD_VERSION_DIR -name "probe_*_channel_*_putative_swr_events.csv.gz" | wc -l
+ls "$(find $OLD_VERSION_DIR -type d -name "swrs_session_*" | head -n 1)"
+
+The first command should list three dataset folders. If a count is zero, stop and check
+the file names printed by the last command before running anything.
+
+Both conda environments must exist (create them with Setup/setup_environments.sh if not):
+
+conda env list | grep -e allensdk_env -e ONE_ibl_env
+
+
+4. RUN (inside tmux so it survives a disconnect)
+------------------------------------------------
+tmux new -s swr_v2
+
+Then repeat block 2 inside tmux, and run:
+
+cd /home/caoyut/AngusC/SWR_project_folders/CampbellMurphy2024/SWR_Neuropixels_Detector
+./run_pipeline.sh all -nv $OLD_VERSION_DIR -k control,ripple -m -s
+
+Detach with Ctrl-b then d. Reattach with: tmux attach -t swr_v2
+
+
+5. IF IT STOPS
+--------------
+Run blocks 2 and 4 again with the same command. Finished sessions and probes are skipped,
+using pipeline_progress.json in each dataset's output folder.
+
+
+FLAGS USED
+----------
+all                  all three datasets, one after another
+-nv DIR              new version: folder of the previous version to keep channel choices from
+-k control,ripple    keep the control and ripple channels; the sharp wave channel is rechosen
+-m                   save channel selection metadata (stats for every CA1 channel)
+-s                   save LFP traces

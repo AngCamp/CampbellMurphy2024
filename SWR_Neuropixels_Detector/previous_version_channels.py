@@ -48,19 +48,27 @@ def parse_keep_list(value):
 def resolve_previous_dataset_dir(previous_dir, swr_output_dir_name):
     """
     Find the previous version's dataset folder (the one holding swrs_session_* folders).
-    previous_dir may be that folder itself, or the previous run's base OUTPUT_DIR, in
-    which case the dataset's swr_output_dir name is appended.
+    previous_dir may be that folder itself, or a folder above it such as the previous
+    run's OUTPUT_DIR or an unzipped download. In that case the folder named after the
+    dataset's swr_output_dir is searched for, up to max_depth levels down.
     """
+    max_depth = 4
     if not os.path.isdir(previous_dir):
         raise FileNotFoundError(f"Previous version directory does not exist: {previous_dir}")
     if any(name.startswith('swrs_session_') for name in os.listdir(previous_dir)):
         return previous_dir
-    dataset_dir = os.path.join(previous_dir, swr_output_dir_name)
-    if not os.path.isdir(dataset_dir):
-        raise FileNotFoundError(
-            f"No swrs_session_* folders in {previous_dir} and no dataset folder {dataset_dir}"
-        )
-    return dataset_dir
+    previous_dir = previous_dir.rstrip(os.sep)
+    for root, dirs, _ in os.walk(previous_dir):
+        dirs.sort()
+        if swr_output_dir_name in dirs:
+            return os.path.join(root, swr_output_dir_name)
+        if root[len(previous_dir):].count(os.sep) >= max_depth - 1:
+            dirs[:] = []
+        else:
+            dirs[:] = [name for name in dirs if not name.startswith('swrs_session_')]
+    raise FileNotFoundError(
+        f"No swrs_session_* folders in {previous_dir} and no dataset folder '{swr_output_dir_name}' within {max_depth} levels below it"
+    )
 
 
 def _channel_number(text):
