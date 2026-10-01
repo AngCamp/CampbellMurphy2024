@@ -82,6 +82,220 @@ def _trace(stage, session_id=None, probe_id=None, **objects):
         print(f"[TRACE]   objects -> {' | '.join(obj_parts)}", flush=True)
 
 # ===================================
+# PROGRESS TRACKER
+# ===================================
+
+class ProgressTracker:
+    """
+    Records which sessions and probes have been run in a JSON file at the top of
+    the SWR output folder, so an interrupted pipeline can pick up where it left off.
+
+    Worker processes do not share memory, so the JSON file on disk is the single
+    shared record. Every update takes the lock, re-reads the file, changes only
+    this session's entry, writes it back and releases the lock. self.state is
+    only this process's latest snapshot of the file.
+
+    Session statuses: pending, running, done, partial (only a requested subset of
+    probes was run), failed, no_ca1. Probe statuses: pending, running, done, failed.
+
+    Known failure modes and how they are handled:
+    - Kill while holding the lock: the lock file is left behind and every worker
+      would wait forever. A lock older than STALE_LOCK_SECONDS is treated as stale
+      and removed.
+    - Hard kill mid-session: the status stays running. On restart, running is
+      treated as not done and is rerun, which is safe because no workers survive
+      a restart.
+    - Two pipeline runs on the same output folder at once: both would process the
+      same running session. The tracker records progress; it does not claim work.
+    - JSON says done but the files were deleted: covered by checking the events
+      file exists before skipping a probe.
+    - Half-written files from a probe that never finished: removed by
+      clear_incomplete_outputs before the session is resumed and after an error.
+      If no probe is done the whole session is cleared.
+    - Changed thresholds between runs: old results would be skipped as done. Use
+      -o to force a rerun; run_name is stored per session so a mismatch can be
+      warned about.
+    - ID types: JSON keys are strings, so all session and probe IDs are cast
+      with str().
+    - find_global mode: the session-level skip is disabled there, since that mode
+      exists to rerun the global step on finished sessions. The tracker is
+      read_only in that mode so the probe-stage record is left untouched.
+    - Network drives: the lock-file approach works on NFS, which is why it is
+      used over fcntl locks.
+    """
+    FILENAME = "pipeline_progress.json"
+    LOCK_WAIT_SECONDS = 3
+    STALE_LOCK_SECONDS = 60
+
+    def __init__(self, output_dir, dataset, run_name, session_id, read_only=False):
+        self.path = os.path.join(output_dir, self.FILENAME)
+        self.lock_path = self.path + ".lock"
+        self.dataset = dataset
+        self.run_name = run_name
+        self.session_id = str(session_id)
+        self.read_only = read_only
+        # Written into the lock file so this process can tell the lock is still its own
+        self._lock_token = f"{os.getpid()}_{time.time()}"
+        os.makedirs(output_dir, exist_ok=True)
+        self.state = self._read()
+
+    # ---------- file and lock handling ----------
+    def _read(self):
+        """Read the progress file. Safe without the lock because writes are atomic renames."""
+        if not os.path.exists(self.path):
+            return {"dataset": self.dataset, "sessions": {}}
+        with open(self.path, 'r') as f:
+            return json.load(f)
+
+    def _acquire_lock(self):
+        """Create the lock file, waiting LOCK_WAIT_SECONDS between attempts if another worker holds it."""
+        while True:
+            try:
+                # O_CREAT | O_EXCL is atomic: exactly one process can create the file
+                fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                with os.fdopen(fd, 'w') as f:
+                    f.write(self._lock_token)
+                return
+            except FileExistsError:
+                try:
+                    lock_age = time.time() - os.path.getmtime(self.lock_path)
+                except OSError:
+                    continue  # lock was released between the two calls, retry now
+                if lock_age > self.STALE_LOCK_SECONDS:
+                    try:
+                        os.remove(self.lock_path)
+                    except OSError:
+                        pass
+                    continue
+                time.sleep(self.LOCK_WAIT_SECONDS)
+
+    def _holds_lock(self):
+        """True if the lock file on disk is still the one this process created."""
+        try:
+            with open(self.lock_path, 'r') as f:
+                return f.read() == self._lock_token
+        except OSError:
+            return False
+
+    def _update(self, change):
+        """Apply change(entry) to this session's entry in the shared file, under the lock."""
+        if self.read_only:
+            return
+        while True:
+            self._acquire_lock()
+            try:
+                state = self._read()
+                state["dataset"] = self.dataset
+                entry = state.setdefault("sessions", {}).setdefault(
+                    self.session_id, {"status": "pending", "probes": {}}
+                )
+                change(entry)
+                entry["updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                if not self._holds_lock():
+                    continue  # our lock was removed as stale by another worker, redo the update
+                # Write to a temp file then rename, so a kill mid-write cannot corrupt the JSON
+                tmp_path = f"{self.path}.{os.getpid()}.tmp"
+                with open(tmp_path, 'w') as f:
+                    json.dump(state, f, indent=2)
+                os.replace(tmp_path, self.path)
+                self.state = state
+                return
+            finally:
+                if self._holds_lock():
+                    os.remove(self.lock_path)
+
+    # ---------- reading progress ----------
+    def session_entry(self):
+        """Re-read the file and return this session's entry (empty dict if never run)."""
+        self.state = self._read()
+        return self.state.get("sessions", {}).get(self.session_id, {})
+
+    def probe_done(self, probe_id):
+        return self.session_entry().get("probes", {}).get(str(probe_id)) == "done"
+
+    # ---------- clearing unfinished work ----------
+    def clear_incomplete_outputs(self, session_folders):
+        """
+        Delete output files left behind by work that never finished, so a
+        half-written file cannot interrupt a resumed run. Returns the paths removed.
+
+        - Session never recorded by the tracker: nothing is touched.
+        - No probe is done: the session is cleared (every file in session_folders).
+        - Otherwise: the files of each probe not marked done are removed, plus the
+          session-level files (rewritten at the end of every session) unless the
+          session itself is done.
+        """
+        if self.read_only:
+            return []
+        entry = self.session_entry()
+        if not entry:
+            return []
+        probes = entry.get("probes", {})
+        done_probes = [probe_id for probe_id, status in probes.items() if status == "done"]
+        unfinished_prefixes = tuple(f"probe_{probe_id}_" for probe_id, status in probes.items() if status != "done")
+        session_prefix = f"session_{self.session_id}_"
+
+        removed = []
+        for folder in session_folders:
+            if not os.path.isdir(folder):
+                continue
+            for name in os.listdir(folder):
+                path = os.path.join(folder, name)
+                if not os.path.isfile(path):
+                    continue
+                if not done_probes:
+                    unfinished = True
+                elif name.startswith(session_prefix):
+                    unfinished = entry.get("status") != "done"
+                else:
+                    unfinished = name.startswith(unfinished_prefixes)
+                if unfinished:
+                    os.remove(path)
+                    removed.append(path)
+        return removed
+
+    # ---------- recording progress ----------
+    def start_session(self, reset=False):
+        """Mark the session running. reset=True forgets earlier probe results (overwrite runs)."""
+        def change(entry):
+            if reset:
+                entry["probes"] = {}
+            entry["status"] = "running"
+            entry["run_name"] = self.run_name
+            entry.pop("failed_stage", None)
+            entry.pop("error", None)
+        self._update(change)
+
+    def register_probes(self, probe_ids):
+        """Add probes as pending, leaving the status of any already recorded untouched."""
+        def change(entry):
+            for probe_id in probe_ids:
+                entry.setdefault("probes", {}).setdefault(str(probe_id), "pending")
+        self._update(change)
+
+    def set_probe(self, probe_id, status):
+        def change(entry):
+            entry.setdefault("probes", {})[str(probe_id)] = status
+        self._update(change)
+
+    def set_session(self, status):
+        def change(entry):
+            entry["status"] = status
+        self._update(change)
+
+    def fail_session(self, stage, error):
+        """Mark the session failed, along with whichever probe was mid-processing."""
+        def change(entry):
+            entry["status"] = "failed"
+            entry["failed_stage"] = str(stage)
+            entry["error"] = str(error)
+            for probe_id, status in entry.get("probes", {}).items():
+                if status == "running":
+                    entry["probes"][probe_id] = "failed"
+        self._update(change)
+
+
+# ===================================
 # BASE LOADER CLASS
 # ===================================
 # swr_neuropixels_collection_core.py
@@ -94,7 +308,8 @@ class BaseLoader:
     def __init__(self, session_id):
         self.session_id = session_id
         self.config = None  # Will be set later
-        
+        self.progress = None  # ProgressTracker, attached in process_session
+
         # Initialize dictionary to store channel selection metadata
         self.channel_selection_metadata_dict = {
             'probe_id': str(session_id), # Store probe ID here during setup/processing
@@ -1674,7 +1889,8 @@ def process_session(session_id, config):
     probe_events_dict = {}  # Initialize dictionary to store probe events
     all_probe_metadata = [] # Initialize list to store metadata from each processed probe
     loader = None  # Initialize loader to None
-    
+    tracker = None  # Initialize progress tracker to None
+
     try:
         # Check if we're in find_global mode and the session folder doesn't exist
         if config['flags'].get('find_global', False):
@@ -1685,11 +1901,33 @@ def process_session(session_id, config):
 
         # Create session subfolder paths
         session_subfolder = os.path.join(swr_output_dir_path, f"swrs_session_{str(session_id)}")
-        
+
+        # Progress tracking: skip sessions already completed in an earlier (interrupted) run.
+        # Done before the loader is set up, since that is the slow step.
+        tracker = ProgressTracker(
+            swr_output_dir_path, dataset_to_process, run_name, session_id,
+            read_only=config['flags'].get('find_global', False)
+        )
+        if not tracker.read_only and not overwrite_existing and requested_probe_ids is None:
+            previous_run = tracker.session_entry()
+            previous_status = previous_run.get("status")
+            if previous_status == "no_ca1" or (previous_status == "done" and os.path.isdir(session_subfolder)):
+                if previous_run.get("run_name") != run_name:
+                    logger.warning(f"Session {session_id}: Completed under run_name '{previous_run.get('run_name')}', current run_name is '{run_name}'. Use -o to rerun with current settings.")
+                logger.info(f"Session {session_id}: Marked '{previous_status}' in {tracker.path}, skipping.")
+                return
+
         # Create LFP subfolder path
         if save_lfp:
             session_lfp_subfolder = os.path.join(lfp_output_dir_path, f"lfp_session_{str(session_id)}")
-        
+
+        # Clear files left by probes that never finished in an earlier run, before resuming
+        session_folders = [session_subfolder] + ([session_lfp_subfolder] if save_lfp else [])
+        cleared_files = tracker.clear_incomplete_outputs(session_folders)
+        if cleared_files:
+            logger.warning(f"Session {session_id}: Removed {len(cleared_files)} file(s) from unfinished work in an earlier run.")
+        tracker.start_session(reset=overwrite_existing)
+
         # Create directories
         os.makedirs(session_subfolder, exist_ok=True)
         if save_lfp:
@@ -1704,6 +1942,7 @@ def process_session(session_id, config):
         process_stage = "Setting up loader"
         _trace("loader.create.start", session_id=session_id, dataset=dataset_to_process)
         loader = BaseLoader.create(dataset_to_process, session_id)
+        loader.progress = tracker
         _trace("loader.create.done", session_id=session_id, loader=loader)
         _trace("loader.set_config.start", session_id=session_id, config=config)
         loader.set_config(config)  # Pass the config to the loader
@@ -1738,8 +1977,11 @@ def process_session(session_id, config):
         # If no probes with CA1, log and return
         if not probelist:
             logger.warning(f"Session {session_id}: No probes with CA1 found or no requested probes matched, skipping.")
+            if requested_probe_ids is None:
+                tracker.set_session("no_ca1")
             return
-            
+        tracker.register_probes(probelist)
+
         # Process probes
         process_stage = "Running through the probes in the session"
         
@@ -1753,7 +1995,16 @@ def process_session(session_id, config):
                 probe_id_log = str(probe_id)
                 logger.info(f"Session {session_id}: Processing probe {probe_id_log}")
                 _trace("probe.start", session_id=session_id, probe_id=probe_id_log)
-                
+
+                # Resume: skip probes finished in an earlier run, reloading their saved events
+                if not overwrite_existing and tracker.probe_done(probe_id_log):
+                    saved_events = glob.glob(os.path.join(session_subfolder, f"probe_{probe_id_log}_channel_*_putative_swr_events.csv.gz"))
+                    if saved_events:
+                        probe_events_dict[probe_id_log] = pd.read_csv(saved_events[0], compression='gzip', index_col=0)
+                        logger.info(f"Session {session_id}: Probe {probe_id_log} already done, loaded saved events and skipping.")
+                        continue
+                tracker.set_probe(probe_id_log, "running")
+
                 # Process the probe and get results
                 process_stage = f"Processing probe with id {probe_id_log}"
                 _trace("loader.process_probe.start", session_id=session_id, probe_id=probe_id_log)
@@ -1993,7 +2244,8 @@ def process_session(session_id, config):
                 probe_events_dict[probe_id_log] = Karlsson_ripple_times
                 logger.info(f"Session {session_id}: Saved {len(Karlsson_ripple_times)} filtered events for probe {probe_id_log}")
                 _trace("probe.done", session_id=session_id, probe_id=probe_id_log, n_events=len(Karlsson_ripple_times))
-                
+                tracker.set_probe(probe_id_log, "done")
+
         else:
             logger.info(f"\n{'='*80}\nSkipping probe processing (find_global=True)\n{'='*80}")
 
@@ -2094,15 +2346,28 @@ def process_session(session_id, config):
                 except Exception as e_cache:
                     logger.error(f"Session {session_id}: Error during cache cleanup - {e_cache}")
         
+        # A run restricted to selected probes is not a complete session, so it is not skipped later
+        tracker.set_session("done" if requested_probe_ids is None else "partial")
         logger.info(f"Session {session_id}: Processing completed successfully")
-        
+
     except Exception as e_main:
         # Log the error
         tb_str = traceback.format_exc()
         logger.error(f"Session {session_id}: Error during processing at stage '{process_stage}' for probe '{probe_id_log}': {e_main}")
         logger.error(f"Traceback:\n{tb_str}")
         _trace("process_session.exception", session_id=session_id, probe_id=probe_id_log, error=str(e_main), process_stage=process_stage)
-        
+
+        # Record the failure so the session is retried on the next run
+        if tracker is not None:
+            try:
+                tracker.fail_session(process_stage, e_main)
+                # Remove the failed probe's files now, so nothing half-written is left on disk
+                if 'session_folders' in locals():
+                    cleared_files = tracker.clear_incomplete_outputs(session_folders)
+                    logger.warning(f"Session {session_id}: Removed {len(cleared_files)} file(s) from unfinished work after error.")
+            except Exception as e_tracker:
+                logger.error(f"Session {session_id}: Could not record failure or clear unfinished files: {e_tracker}")
+
         # Attempt loader cleanup if it exists
         if loader is not None:
             try:
