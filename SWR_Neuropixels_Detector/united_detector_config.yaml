@@ -22,6 +22,21 @@ channel_selection:
   sharpwave_channel_metric: 'modulation_index'  # Options: 'modulation_index', 'circular_linear_corr', 'net_sw_power'
   max_distance_microns: 500  # Maximum distance from ripple channel for sharp wave channel candidates
 
+# Previous Version Settings
+# Reuse channel choices made by an earlier run so results are comparable across versions.
+# Control channels are picked at random, so this is the only way to get the same ones again.
+# Command line flags (--newver, --keep, --strict-previous) override these values.
+previous_version:
+  # Output directory of the earlier run (its OUTPUT_DIR, or its dataset folder holding
+  # swrs_session_* folders). Leave empty to choose every channel fresh.
+  output_dir: ''
+  # Channel choices to keep: any of 'control', 'ripple', 'sw'. Anything not listed is
+  # chosen fresh. Channel stats are recomputed and saved for all CA1 channels either way.
+  keep_channels: ['control', 'ripple']
+  # false: a kept choice missing from the earlier run is chosen fresh, with a warning.
+  # true: the probe fails instead.
+  strict: false
+
 # Paths to Filters
 filters:
   gamma_filter: 'Filters/frank2008_gamma_1500hz_bandpass_filter.npz'

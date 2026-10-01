@@ -29,6 +29,7 @@ import logging
 import logging.handlers
 import shutil
 import importlib
+from previous_version_channels import PreviousVersionChannels
 
 # ===================================
 # Helper functions
@@ -309,6 +310,7 @@ class BaseLoader:
         self.session_id = session_id
         self.config = None  # Will be set later
         self.progress = None  # ProgressTracker, attached in process_session
+        self.previous_channels = None  # PreviousVersionChannels, attached in process_session
 
         # Initialize dictionary to store channel selection metadata
         self.channel_selection_metadata_dict = {
@@ -328,6 +330,10 @@ class BaseLoader:
                 'modulation_index': [],
                 'circular_linear_corrs': [],
                 'selected_channel_id': None,
+                'selection_method': None
+            },
+            'control_channels': { # Channels outside hippocampus used for movement artifacts
+                'selected_channel_ids': [],
                 'selection_method': None
             }
             # Note: We might rename 'channel idx' and 'depths' from instructions
@@ -391,6 +397,71 @@ class BaseLoader:
             Configuration dictionary containing all processing settings
         """
         self.config = config
+
+    # ---------- reuse of channel choices from a previous version ----------
+    def kept_channel(self, probe_id, kind, valid_ids):
+        """
+        Channel choice to reuse from the previous version, or None if this kind of
+        channel should be chosen fresh in this run.
+
+        Returns None when no previous version is in use, when `kind` is not in the
+        keep list, or when the previous choice cannot be reused (not recorded, or
+        not among this run's candidate channels). In that last case a warning is
+        logged and the channel is chosen fresh, unless strict mode is on, in which
+        case an error is raised so the probe fails visibly.
+
+        Parameters
+        ----------
+        probe_id : str or int
+        kind : {'control', 'ripple', 'sw'}
+        valid_ids : iterable of int
+            Channels this run could legitimately pick from for this kind.
+
+        Returns
+        -------
+        int, list of int, or None
+            int for 'ripple' and 'sw', list of two ints for 'control'.
+        """
+        previous = self.previous_channels
+        if previous is None or probe_id is None or kind not in previous.keep:
+            return None
+
+        kept = previous.get(probe_id, kind)
+        problem = None
+        if kept is None:
+            problem = f"no {kind} channel recorded in {previous.session_folder}"
+        else:
+            valid = {int(chan) for chan in valid_ids}
+            invalid = [chan for chan in (kept if isinstance(kept, list) else [kept]) if chan not in valid]
+            if invalid:
+                problem = f"previous {kind} channel(s) {invalid} are not among this run's candidate channels"
+        if problem is None:
+            return kept
+
+        message = f"Session {self.session_id} Probe {probe_id}: cannot keep {kind} channel from previous version, {problem}."
+        if previous.strict:
+            raise ValueError(message)
+        logging.warning(message + " Choosing it fresh.")
+        return None
+
+    def choose_control_channels(self, probe_id, candidate_ids):
+        """
+        Pick the two control channels outside hippocampus used for movement artifact
+        detection: the previous version's pair if they are being kept, otherwise two
+        at random from candidate_ids. The choice is recorded in the channel selection
+        metadata so later versions can read it back.
+        """
+        kept = self.kept_channel(probe_id, 'control', candidate_ids)
+        if kept is not None:
+            control_channels = np.array(kept)
+            selection_method = 'previous_version'
+        else:
+            control_channels = np.random.choice(candidate_ids, 2, replace=False)
+            selection_method = 'random'
+
+        self.channel_selection_metadata_dict['control_channels']['selected_channel_ids'] = [int(chan) for chan in control_channels]
+        self.channel_selection_metadata_dict['control_channels']['selection_method'] = selection_method
+        return control_channels
 
     def resample_signal(self, signal_data, time_values, target_fs=1500.0):
         """
@@ -526,7 +597,7 @@ class BaseLoader:
 
         return np.sqrt(r_cl)
 
-    def select_ripple_channel(self, ca1_lfp, ca1_chan_ids, channel_positions, ripple_filter_func, config=None):
+    def select_ripple_channel(self, ca1_lfp, ca1_chan_ids, channel_positions, ripple_filter_func, config=None, probe_id=None):
         """Select the putative pyramidal layer (ripple band) channel for a given probe.
         
         Parameters
@@ -544,7 +615,11 @@ class BaseLoader:
             Function to filter the LFP data into the ripple band.
         config : dict, optional
             Configuration dictionary containing channel selection settings.
-        
+        probe_id : str or int, optional
+            Probe being processed. Needed to keep the ripple channel chosen by a
+            previous version; the metrics for every CA1 channel are still computed
+            and recorded either way.
+
         Returns
         -------
         tuple
@@ -559,7 +634,14 @@ class BaseLoader:
         
         # Initialize lists to store metrics for each channel
         channel_metrics = []
-        
+
+        # Reset the metadata lists so they hold this probe's channels only
+        # (the loader, and so this dict, is shared by every probe in the session)
+        if probe_id is not None:
+            self.channel_selection_metadata_dict['probe_id'] = str(probe_id)
+        for metric_name in ('channel_ids', 'depths', 'skewness', 'net_power'):
+            self.channel_selection_metadata_dict['ripple_band'][metric_name] = []
+
         # Process each CA1 channel
         for chan_idx, chan_id in enumerate(ca1_chan_ids):
             # Get raw LFP for this channel
@@ -593,8 +675,13 @@ class BaseLoader:
         # Convert to DataFrame for easier selection
         metrics_df = pd.DataFrame(channel_metrics)
         
-        # Select channel based on configured metric
-        if selection_metric == 'skewness':
+        # Select channel: the previous version's choice if it is being kept,
+        # otherwise based on configured metric
+        kept_chan_id = self.kept_channel(probe_id, 'ripple', ca1_chan_ids)
+        if kept_chan_id is not None:
+            best_channel = metrics_df[metrics_df['channel_id'] == kept_chan_id].iloc[0]
+            selection_metric = 'previous_version'
+        elif selection_metric == 'skewness':
             best_channel = metrics_df.loc[metrics_df['skewness'].idxmax()]
         else:  # default to 'net_power'
             best_channel = metrics_df.loc[metrics_df['net_power'].idxmax()]
@@ -620,7 +707,8 @@ class BaseLoader:
             config=None,
             filter_path=None,
             running_exclusion_periods=None,
-            selection_metric='modulation_index'):
+            selection_metric='modulation_index',
+            probe_id=None):
         """
         Selects the optimal sharp wave channel below the ripple channel based on 
         phase-amplitude coupling and return metadata for all evaluated channels.
@@ -770,6 +858,15 @@ class BaseLoader:
             self.channel_selection_metadata_dict['sharp_wave_band']['net_sw_power'].append(float(net_sw_power_val))
             self.channel_selection_metadata_dict['sharp_wave_band']['modulation_index'].append(float(modulation_index) if not np.isnan(modulation_index) else None)
             self.channel_selection_metadata_dict['sharp_wave_band']['circular_linear_corrs'].append(float(circular_linear_corr) if not np.isnan(circular_linear_corr) else None)
+
+        # Keep the previous version's sharp wave channel if asked to. The metrics above
+        # are still recorded for every channel below the ripple channel.
+        kept_chan_id = self.kept_channel(probe_id, 'sw', ca1_chan_ids)
+        if kept_chan_id is not None:
+            best_lfp = ca1_lfp[:, id_to_idx[kept_chan_id]]
+            self.channel_selection_metadata_dict['sharp_wave_band']['selected_channel_id'] = int(kept_chan_id)
+            self.channel_selection_metadata_dict['sharp_wave_band']['selection_method'] = 'previous_version'
+            return kept_chan_id, best_lfp
 
         # Now apply distance constraint for channel selection (but keep all metadata).
         # Use the signed distance in the actual depth direction: lower depth = further below.
@@ -1131,7 +1228,9 @@ class BaseLoader:
                 "channel_selection": config["channel_selection"],
                 "global_swr_detection": config["global_swr"],
                 "dataset": config["run_details"]["dataset_to_process"],
-                "sampling_rates": config["sampling_rates"]
+                "sampling_rates": config["sampling_rates"],
+                # Which previous version (if any) channel choices were kept from
+                "previous_version": config.get("previous_version")
             }
             
             # Ensure directory exists
@@ -1946,6 +2045,8 @@ def process_session(session_id, config):
         _trace("loader.create.done", session_id=session_id, loader=loader)
         _trace("loader.set_config.start", session_id=session_id, config=config)
         loader.set_config(config)  # Pass the config to the loader
+        # Channel choices to keep from a previous version (None if not in use)
+        loader.previous_channels = PreviousVersionChannels.from_config(config, session_id)
         _trace("loader.set_up.start", session_id=session_id)
         loader.set_up()
         _trace("loader.set_up.done", session_id=session_id)

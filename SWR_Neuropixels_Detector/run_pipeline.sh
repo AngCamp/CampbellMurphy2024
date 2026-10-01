@@ -27,6 +27,11 @@ export IBL_ONEAPI_CACHE=${IBL_ONEAPI_CACHE:-"your/path_to/IBL_data_cache"}
 # Detection thresholds from config file are stored with each session's output
 export RUN_NAME=${RUN_NAME:-"run_name_here_$(date +%Y%m%d_%H%M%S)"}
 
+# Output directory of a previous version of the pipeline to keep channel choices from
+# (the OUTPUT_DIR that run used). Leave empty to choose every channel fresh.
+# Can also be set with -nv/--newver. Which choices are kept is set with --keep or previous_version.keep_channels in the config file
+export PREVIOUS_VERSION_DIR=${PREVIOUS_VERSION_DIR:-""}
+
 # prevents pycache files from being created in working directory
 export PYTHONDONTWRITEBYTECODE=1 
 
@@ -57,6 +62,13 @@ show_help() {
   echo "  -o, --overwrite, --overwrite-existing   Overwrite existing session output folders"
   echo "  -X, --cleanup, --cleanup-after  Clean up cache after processing each session"
   echo "  -d, --debug                     Enable debug mode (debugpy listening on port 5678)"
+  echo "  -nv, --newver DIR               Make a new version: output directory of the previous version to keep channel choices from"
+  echo "                                  (overrides PREVIOUS_VERSION_DIR and the config file)"
+  echo "  -k, --keep LIST                 Comma-separated channel choices to keep from the previous version:"
+  echo "                                  control, ripple, sw, all or none. Anything not listed is chosen fresh."
+  echo "                                  (default: keep_channels in the config file)"
+  echo "  --strict-previous               Fail a probe if a kept choice is missing from the previous version"
+  echo "                                  (default: choose it fresh and log a warning)"
   echo ""
   echo "Examples:"
   echo "  ./run_pipeline.sh                          # Run all datasets with all stages"
@@ -66,10 +78,13 @@ show_help() {
   echo "  ./run_pipeline.sh subset ibl -s           # Run IBL and save LFP"
   echo "  ./run_pipeline.sh subset ibl --save-lfp   # Same as above with descriptive flags"
   echo "  ./run_pipeline.sh subset ibl -fg          # Run IBL with only global event detection using existing probe events"
+  echo "  ./run_pipeline.sh subset abi_visual_coding -nv /path/to/old_output -k control,ripple"
+  echo "                                            # Keep old control and ripple channels, rechoose the sharp wave channel"
   echo ""
   echo "Environment Variables:"
   echo "  DATASET_TO_PROCESS         Alternative way to specify dataset to process"
   echo "  OUTPUT_DIR                 Base output directory for results"
+  echo "  PREVIOUS_VERSION_DIR       Output directory of a previous version to keep channel choices from"
   echo "  CONFIG_PATH                Custom path to configuration YAML file"
   echo ""
 }
@@ -92,6 +107,8 @@ DEBUG_MODE=false
 FIND_GLOBAL=false
 SESSION_ID=""
 PROBE_ID=""
+KEEP_CHANNELS=""
+STRICT_PREVIOUS=false
 
 # Initialize defaults
 COMMAND="all"
@@ -151,6 +168,18 @@ while [[ $# -gt 0 ]]; do
       PROBE_ID="$2"
       shift 2
       ;;
+    -nv|--newver)
+      export PREVIOUS_VERSION_DIR="$2"
+      shift 2
+      ;;
+    -k|--keep)
+      KEEP_CHANNELS="$2"
+      shift 2
+      ;;
+    --strict-previous)
+      STRICT_PREVIOUS=true
+      shift
+      ;;
     -h|--help)
       show_help
       exit 0
@@ -205,6 +234,8 @@ if [[ "$SAVE_LFP" == "true" ]]; then echo "- Saving LFP data"; fi
 if [[ "$SAVE_CHANNEL_METADATA" == "true" ]]; then echo "- Saving channel selection metadata"; fi
 if [[ "$OVERWRITE_EXISTING" == "true" ]]; then echo "- Overwriting existing data"; fi
 if [[ "$CLEANUP_AFTER" == "true" ]]; then echo "- Cleaning up after processing"; fi
+if [[ -n "$PREVIOUS_VERSION_DIR" ]]; then echo "- Previous version: $PREVIOUS_VERSION_DIR (keeping: ${KEEP_CHANNELS:-keep_channels from config file})"; fi
+if [[ "$STRICT_PREVIOUS" == "true" ]]; then echo "- Failing probes whose kept channel choices are missing from the previous version"; fi
 echo "========================================================"
 
 # Create a timestamp for this run
@@ -227,6 +258,9 @@ if [[ "$CLEANUP_AFTER" == "true" ]]; then PYTHON_ARGS+=" --cleanup-after"; fi
 if [[ "$DEBUG_MODE" == "true" ]]; then PYTHON_ARGS+=" --debug"; fi
 if [[ -n "$SESSION_ID" ]]; then PYTHON_ARGS+=" --session-id $SESSION_ID"; fi
 if [[ -n "$PROBE_ID" ]]; then PYTHON_ARGS+=" --probe-id $PROBE_ID"; fi
+# The previous version directory itself is passed through the PREVIOUS_VERSION_DIR environment variable
+if [[ -n "$KEEP_CHANNELS" ]]; then PYTHON_ARGS+=" --keep $KEEP_CHANNELS"; fi
+if [[ "$STRICT_PREVIOUS" == "true" ]]; then PYTHON_ARGS+=" --strict-previous"; fi
 PYTHON_ARGS+=" --config $CONFIG_PATH"
 
 # Create output/log directories

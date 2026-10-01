@@ -34,6 +34,7 @@ SWR_Neuropixels_Detector/
 ├── README.md                       # This file
 ├── Setup/                            # Environment setup information
 │   └── README.md
+├── previous_version_channels.py    # Reads channel choices from a previous version's output
 ├── swr_neuropixels_collection_core.py # Core functions (BaseLoader, processing, detection algorithms)
 ├── swr_neuropixels_detector_main.py # Main script orchestrating the pipeline
 ├── run_pipeline.sh                 # Bash script to run the pipeline
@@ -74,6 +75,7 @@ Key sections in the YAML configuration file include:
 *   `sampling_rates`: Target sampling frequency (`target_fs`).
 *   `region_definitions`: Brain region acronyms for hippocampus and control areas.
 *   `channel_selection`: Parameters for ripple and sharp-wave channel selection.
+*   `previous_version`: Which channel choices to keep from an earlier run of the pipeline, and where that run's output is (see [Rerunning Against a Previous Version](#rerunning-against-a-previous-version)).
 *   `ripple_detection_params`: Parameters for the Karlsson ripple detector.
 *   `artifact_detection_params`: Parameters for gamma burst and movement artifact detection and filtering thresholds.
 *   `global_event_params`: Parameters for merging probe events into global events (merge window, minimum probe count, SW power threshold, minimum CA1 units).
@@ -154,6 +156,9 @@ The `run_pipeline.sh` script accepts the following command-line flags, which can
 | `-o` | `--overwrite-existing` | Overwrite existing session output folders |
 | `-X` | `--cleanup-after` | Clean up cache after processing each session |
 | `-d` | `--debug` | Enable debug mode (debugpy listening on port 5678) |
+| `-nv DIR` | `--newver DIR` | Make a new version: output directory of the previous version to keep channel choices from |
+| `-k LIST` | `--keep LIST` | Comma-separated channel choices to keep from the previous version: `control`, `ripple`, `sw`, `all` or `none` |
+| | `--strict-previous` | Fail a probe if a kept channel choice is missing from the previous version |
 
 **Notes:**
 - The `-fg` flag is useful when you want to rerun global event detection using existing probe events without reprocessing the probes. This is helpful when you want to try different global event parameters without redoing the computationally expensive probe processing.
@@ -168,6 +173,7 @@ You can also control other aspects of the pipeline behavior by setting environme
 |----------|-------------|---------|
 | `OUTPUT_DIR` | Base output directory for results | Specified in config file |
 | `CONFIG_PATH` | Custom path to configuration YAML file | ./united_detector_config.yaml |
+| `PREVIOUS_VERSION_DIR` | Output directory of a previous version to keep channel choices from | Empty (all channels chosen fresh) |
 
 ### Examples
 
@@ -199,6 +205,58 @@ You can also control other aspects of the pipeline behavior by setting environme
 Remember that you need to activate the correct conda environment for your dataset:
 - For IBL data: `conda activate ONE_ibl_env`
 - For Allen data (both visual behavior and coding): `conda activate allensdk_env`
+
+## Rerunning Against a Previous Version
+
+When the pipeline is updated and rerun, you can make the new run reuse channel choices from an earlier run, so the two versions are comparable. This matters most for the control channels: they are picked at random, so a fresh run will not pick the same ones.
+
+Three channel choices can be kept, in any combination:
+
+| Name | Channel | Read from the previous version's session folder |
+|------|---------|------------------------------------------------|
+| `control` | The two channels outside hippocampus used for movement artifact detection | The two `probe_<probe_id>_channel_<chan_id>_movement_artifacts.csv.gz` file names |
+| `ripple` | The CA1 channel ripples are detected on | The `probe_<probe_id>_channel_<chan_id>_putative_swr_events.csv.gz` file name |
+| `sw` | The CA1 channel used for the sharp-wave component | `probe_<probe_id>_channel_selection_metadata.json.gz` |
+
+Anything you do not keep is chosen fresh by the current code.
+
+### Steps
+
+1. **Leave the previous version's output where it is, and send the new run to a different output directory.** Set `OUTPUT_DIR` at the top of `run_pipeline.sh` (or as an environment variable) to a new location. The pipeline refuses to run if the previous and new directories are the same.
+
+2. **Point the pipeline at the previous version.** Give the `OUTPUT_DIR` that the previous run used. Any one of these works; the first one set wins:
+   *   `-nv /path/to/previous_output` (or `--newver`) on the command line
+   *   the `PREVIOUS_VERSION_DIR` variable at the top of `run_pipeline.sh` (or as an environment variable)
+   *   `previous_version.output_dir` in `united_detector_config.yaml`
+
+3. **Say what to keep.** Use `-k` on the command line, or `previous_version.keep_channels` in the config file:
+   ```yaml
+   previous_version:
+     output_dir: ''                          # or set with -nv / PREVIOUS_VERSION_DIR
+     keep_channels: ['control', 'ripple']    # any of 'control', 'ripple', 'sw'
+     strict: false
+   ```
+
+4. **Run the pipeline as usual.**
+   ```bash
+   # Keep the control and ripple channels, rechoose the sharp-wave channel
+   ./run_pipeline.sh subset abi_visual_coding -nv /path/to/previous_output -k control,ripple
+
+   # Keep only the control channels
+   ./run_pipeline.sh subset ibl -nv /path/to/previous_output -k control
+
+   # Keep everything
+   ./run_pipeline.sh subset ibl -nv /path/to/previous_output -k all
+   ```
+   The start-up messages confirm which choices are being kept and from where.
+
+### What to expect
+
+*   **Channel statistics are always recomputed.** Ripple power and skewness are computed for every CA1 channel, and the sharp-wave metrics for every CA1 channel below the ripple channel, whether or not the choice is kept. They are saved in the channel selection metadata file.
+*   **The metadata records where each choice came from.** In `probe_<probe_id>_channel_selection_metadata.json.gz`, the `selection_method` of each choice is `previous_version` if it was kept, otherwise the metric used (or `random` for control channels). The control channels chosen are now recorded there too. The session's `run_settings.json.gz` records the previous version's path and the keep list.
+*   **Missing choices are chosen fresh by default.** If a probe was not in the previous version, or its kept channel is no longer a valid candidate, a warning is logged and that channel is chosen fresh. Add `--strict-previous` (or `strict: true`) to make the probe fail so these cases are not missed.
+*   **Keeping `sw` needs the previous version's channel selection metadata**, which is saved by default (`-m`). The `control` and `ripple` choices are read from file names, so they do not need it.
+*   **Leaving the previous version unset turns all of this off**, and every channel is chosen fresh.
 
 ## Output Files
 
@@ -332,6 +390,7 @@ This section provides a brief overview of the code structure and logic for those
     *   Sets up multiprocessing pool based on `max_workers` and `multiprocessing_start_method` from config.
     *   If cleanup is requested, calls `cleanup_session_cache` for each session (potentially in parallel).
     *   If processing stages are requested, calls `process_session` for each session (potentially in parallel).
+*   **`previous_version_channels.py`**: Reads the channel choices made by a previous version of the pipeline from its output folder (`PreviousVersionChannels`). The loader's `kept_channel` and `choose_control_channels` methods use it to decide whether to reuse a choice or make a fresh one.
 *   **`swr_neuropixels_collection_core.py`**: Contains the core logic and shared functions.
     *   `BaseLoader`: Abstract base class defining the interface for dataset-specific loaders. Includes common methods like `resample_signal` and `select_sharpwave_channel`.
     *   `process_session`: The main function executed for each session. It orchestrates:

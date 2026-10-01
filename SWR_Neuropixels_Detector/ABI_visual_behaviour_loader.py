@@ -120,9 +120,9 @@ class abi_visual_behaviour_loader(BaseLoader):
             )
         )
         
-        # Choose two random channels
-        take_two = np.random.choice(
-            organisedprobechans.index[not_a_ca1_chan], 2, replace=False
+        # Choose two random channels, or keep the previous version's pair
+        take_two = self.choose_control_channels(
+            probe_id, organisedprobechans.index[not_a_ca1_chan]
         )
         control_channels = []
         
@@ -171,7 +171,8 @@ class abi_visual_behaviour_loader(BaseLoader):
             ca1_chan_ids=lfp_ca1_chans,
             channel_positions=all_channel_positions, # Pass the extracted positions
             ripple_filter_func=filter_ripple_band_func,
-            config=self.config # Pass config from the loader
+            config=self.config, # Pass config from the loader
+            probe_id=probe_id
         )
 
 
@@ -184,7 +185,8 @@ class abi_visual_behaviour_loader(BaseLoader):
             channel_positions=all_channel_positions,
             ripple_filtered=peakrippleband,
             config=self.config, # Pass config from the loader
-            filter_path=getattr(self, 'sw_component_filter_path', None) # Use attribute if exists
+            filter_path=getattr(self, 'sw_component_filter_path', None), # Use attribute if exists
+            probe_id=probe_id
         )
 
         # Extract sharpwave channel information 
