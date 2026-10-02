@@ -13,8 +13,8 @@ PROJECT_DIR=${PROJECT_DIR:-"/home/caoyut/AngusC/SWR_project_folders"}
 # Datasets processed when no command is given (./run_pipeline.sh all still runs all three)
 DEFAULT_DATASETS=${DEFAULT_DATASETS:-"abi_visual_coding,abi_visual_behaviour"}
 
-# Save LFP traces by default (true/false). -s on the command line also turns it on
-SAVE_LFP=${SAVE_LFP:-true}
+# LFP traces are only saved when -s is given on the command line
+SAVE_LFP=false
 
 # Output directory for all SWR detection results
 # This is where all processed data, events, and metadata will be saved
@@ -70,7 +70,7 @@ show_help() {
   echo "  -c, --config FILE               Specify a custom configuration YAML file"
   echo "                                  (default: united_detector_config.yaml)"
   echo "  -fg, --find-global             Run global event detection using existing probe events (skip probe processing)"
-  echo "  -s, --save-lfp, --save-lfp-data Enable saving of LFP data (default: $SAVE_LFP, set SAVE_LFP=false to turn off)"
+  echo "  -s, --save-lfp, --save-lfp-data Enable saving of LFP data (off unless this flag is given)"
   echo "  -m, --save-metadata             Enable saving of channel selection metadata"
   echo "  -o, --overwrite, --overwrite-existing   Overwrite existing session output folders"
   echo "  -X, --cleanup, --cleanup-after  Clean up cache after processing each session"
