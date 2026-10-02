@@ -221,6 +221,12 @@ class abi_visual_behaviour_loader(BaseLoader):
         """Cleans up resources to free memory."""
         self.session = None
 
+    def cleanup_cache(self, config=None):
+        """Deletes this session's downloaded NWB files (behavior_ecephys_sessions/<id>/ in the SDK cache)."""
+        return self.remove_session_cache_folders(
+            config['paths']['abi_vb_cache_dir'], [str(self.session_id)], config=config
+        )
+
     def get_metadata_for_probe(self, probe_id, config=None):
         """
         Generates metadata for a single specified probe (ABI Visual Behaviour).

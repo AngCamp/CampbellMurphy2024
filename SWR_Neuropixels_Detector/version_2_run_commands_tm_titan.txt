@@ -1,1 +1,1 @@
-./run_pipeline.sh subset abi_visual_coding,abi_visual_behaviour -nv /home/caoyut/AngusC/SWR_project_folders/version_1_OSF_data/CampbellMurphy2025_SWRs_data -k control,ripple -m -s
+./run_pipeline.sh subset abi_visual_coding,abi_visual_behaviour -nv /home/caoyut/AngusC/SWR_project_folders/version_1_OSF_data/CampbellMurphy2025_SWRs_data -k control,ripple -m -s -X

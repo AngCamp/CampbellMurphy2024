@@ -1253,6 +1253,41 @@ class BaseLoader:
     def cleanup(self):
         """Clean up resources."""
         raise NotImplementedError("Subclasses must implement cleanup method")
+
+    def cleanup_cache(self, config=None):
+        """Delete this session's downloaded raw data from the dataset cache. Returns the folders removed."""
+        raise NotImplementedError("Cache cleanup is not implemented for this dataset")
+
+    def remove_session_cache_folders(self, cache_dir, folder_names, config=None, max_depth=4):
+        """
+        Delete the folders holding this session's raw data from a dataset cache.
+
+        Searches cache_dir, up to max_depth levels down, for folders whose name is
+        exactly one of folder_names and removes them. Sessions listed in
+        run_details.dont_wipe_these_sessions are left alone.
+
+        Returns
+        -------
+        list of str
+            Paths of the folders removed.
+        """
+        keep_sessions = ((config or {}).get('run_details') or {}).get('dont_wipe_these_sessions') or []
+        if str(self.session_id) in {str(session) for session in keep_sessions}:
+            return []
+        if not cache_dir or not os.path.isdir(cache_dir):
+            raise FileNotFoundError(f"Cache directory does not exist: {cache_dir}")
+
+        cache_dir = os.path.abspath(cache_dir)
+        removed = []
+        for root, dirs, _ in os.walk(cache_dir):
+            for name in [name for name in dirs if name in folder_names]:
+                path = os.path.join(root, name)
+                shutil.rmtree(path)
+                removed.append(path)
+                dirs.remove(name)
+            if root[len(cache_dir):].count(os.sep) >= max_depth - 1:
+                dirs[:] = []
+        return removed
     
     def set_up(self):
         """Setup the loader and initialize connections."""
@@ -2443,7 +2478,11 @@ def process_session(session_id, config):
             if cleanup_after:
                 logger.info(f"Session {session_id}: Running cache cleanup")
                 try:
-                    loader.cleanup_cache(config=config)
+                    removed_cache = loader.cleanup_cache(config=config)
+                    if removed_cache:
+                        logger.info(f"Session {session_id}: Removed cached raw data: {removed_cache}")
+                    else:
+                        logger.warning(f"Session {session_id}: No cached raw data was removed (not found, or session is in dont_wipe_these_sessions)")
                 except Exception as e_cache:
                     logger.error(f"Session {session_id}: Error during cache cleanup - {e_cache}")
         

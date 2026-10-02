@@ -241,6 +241,12 @@ class abi_visual_coding_loader(BaseLoader):
         """Cleans up resources to free memory."""
         self.session = None
 
+    def cleanup_cache(self, config=None):
+        """Deletes this session's downloaded NWB files (session_<id>/ in the SDK cache)."""
+        return self.remove_session_cache_folders(
+            config['paths']['abi_vc_cache_dir'], [f"session_{self.session_id}"], config=config
+        )
+
     def get_metadata_for_probe(self, probe_id, config=None):
         """
         Generates metadata for a single specified probe (ABI Visual Coding).
