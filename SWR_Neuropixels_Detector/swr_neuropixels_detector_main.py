@@ -422,7 +422,7 @@ def main():
                     session_lfp_subfolder = os.path.join(lfp_output_dir_path, f"lfp_session_{str(session_id)}")
                 
                 # Add overwrite handling for LFP directory
-                if os.path.exists(session_lfp_subfolder) and os.listdir(session_lfp_subfolder):
+                if save_lfp and os.path.exists(session_lfp_subfolder) and os.listdir(session_lfp_subfolder):
                     if not args.overwrite_existing:
                         logger.info(f"Session {session_id}: LFP output directory already exists and contains files.")
                         # Continue processing, but don't save LFP data
