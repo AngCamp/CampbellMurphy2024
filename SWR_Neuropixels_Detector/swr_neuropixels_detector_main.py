@@ -71,6 +71,7 @@ from swr_neuropixels_collection_core import (
     read_json_file,
     get_filter
 )
+from previous_version_channels import parse_keep_list, resolve_previous_dataset_dir
 from functools import partial
 import argparse
 
@@ -131,9 +132,28 @@ def main():
     parser.add_argument("-m", "--save-channel-metadata", action="store_true", default=True, help="Enable saving of channel selection metadata.")
     parser.add_argument("-o", "--overwrite-existing", action="store_true", help="Overwrite existing session output.")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable debug mode (for internal script use).")
+    parser.add_argument("--session-id", type=str, default=os.environ.get('SESSION_ID', os.environ.get('SESSION_IDS', '')), help="Optional comma-separated session IDs to process.")
+    parser.add_argument("--probe-id", type=str, default=os.environ.get('PROBE_ID', os.environ.get('PROBE_IDS', '')), help="Optional comma-separated probe IDs to process within each selected session.")
+    # Reuse channel choices from a previous version of the pipeline (override the config file)
+    parser.add_argument("--previous-version", type=str, default=os.environ.get('PREVIOUS_VERSION_DIR', ''), help="Output directory of a previous version to keep channel choices from.")
+    parser.add_argument("--keep", type=str, default=None, help="Comma-separated channel choices to keep from the previous version: control, ripple, sw, all or none. Anything not listed is chosen fresh.")
+    parser.add_argument("--strict-previous", action="store_true", help="Fail a probe if a kept channel choice cannot be found in the previous version, instead of choosing it fresh.")
     # Add argument for config path if needed, overriding env var
     parser.add_argument("--config", type=str, default=os.environ.get('CONFIG_PATH', 'united_detector_config.yaml'), help="Path to configuration YAML file.")
     args = parser.parse_args()
+
+    def parse_optional_csv_ids(value):
+        if value is None or str(value).strip() == "":
+            return None
+        ids = []
+        for entry in str(value).split(','):
+            cleaned = entry.strip()
+            if cleaned:
+                ids.append(cleaned)
+        return ids if ids else None
+
+    target_session_ids = parse_optional_csv_ids(args.session_id)
+    target_probe_ids = parse_optional_csv_ids(args.probe_id)
 
     # Assign flags from args to variables used later
     save_lfp = args.save_lfp
@@ -206,6 +226,23 @@ def main():
     print(f"Output directory: {output_dir}")
     print(f"SWR output directory: {swr_output_dir}")
 
+    # Previous version settings: command line (or PREVIOUS_VERSION_DIR) overrides the config file
+    previous_config = full_config.get("previous_version") or {}
+    previous_version_dir = args.previous_version or previous_config.get("output_dir") or ""
+    keep_channels = parse_keep_list(args.keep if args.keep is not None else previous_config.get("keep_channels"))
+    strict_previous = args.strict_previous or bool(previous_config.get("strict", False))
+    if previous_version_dir and keep_channels:
+        previous_dataset_dir = resolve_previous_dataset_dir(previous_version_dir, swr_output_dir)
+        if os.path.realpath(previous_dataset_dir) == os.path.realpath(os.path.join(output_dir, swr_output_dir)):
+            raise ValueError(f"Previous version directory is the same as this run's output directory: {previous_dataset_dir}")
+        previous_version = {"dir": previous_dataset_dir, "keep": keep_channels, "strict": strict_previous}
+        print(f"Keeping {keep_channels} channel choices from previous version: {previous_dataset_dir}")
+    else:
+        if args.keep is not None and keep_channels:
+            raise ValueError("--keep was given but no previous version directory is set (--previous-version).")
+        previous_version = None
+        print("No previous version in use: all channels will be chosen fresh.")
+
     # Setup logging
     queue = Queue()
     # Ensure log directory exists (must be done before listener starts)
@@ -251,6 +288,13 @@ def main():
         del data
         print(f"Loaded {len(all_sesh_with_ca1_eid)} sessions from {session_file_path}")
 
+    if target_session_ids is not None:
+        target_session_id_set = {str(sid) for sid in target_session_ids}
+        all_sesh_with_ca1_eid = np.array([
+            sid for sid in np.asarray(all_sesh_with_ca1_eid).tolist() if str(sid) in target_session_id_set
+        ], dtype=int)
+        print(f"Filtered to {len(all_sesh_with_ca1_eid)} sessions by explicit session IDs: {target_session_ids}")
+
     # --- Consolidate Config Dictionary --- 
     config = {
         "paths": {
@@ -265,6 +309,8 @@ def main():
         "run_details": {
             "dataset_to_process": DATASET_TO_PROCESS,
             "run_name": run_name,
+            "session_ids": target_session_ids,
+            "probe_ids": target_probe_ids,
             # Add other relevant details from dataset_config?
             "dont_wipe_these_sessions": dont_wipe_these_sessions,
             "only_brain_observatory_sessions": only_brain_observatory_sessions if DATASET_TO_PROCESS != 'ibl' else None,
@@ -296,6 +342,7 @@ def main():
             "sharpwave_channel_metric": sharpwave_channel_metric, 
             "max_distance_microns": max_distance_microns
         },
+        "previous_version": previous_version, # None, or dir/keep/strict for reusing channel choices
         "global_swr": full_config.get("global_swr_detection", {}), # Pass the whole sub-dict
         # Add other top-level or dataset-specific configs from full_config if needed by process_session
         # e.g., sampling rates:
@@ -375,7 +422,7 @@ def main():
                     session_lfp_subfolder = os.path.join(lfp_output_dir_path, f"lfp_session_{str(session_id)}")
                 
                 # Add overwrite handling for LFP directory
-                if os.path.exists(session_lfp_subfolder) and os.listdir(session_lfp_subfolder):
+                if save_lfp and os.path.exists(session_lfp_subfolder) and os.listdir(session_lfp_subfolder):
                     if not args.overwrite_existing:
                         logger.info(f"Session {session_id}: LFP output directory already exists and contains files.")
                         # Continue processing, but don't save LFP data

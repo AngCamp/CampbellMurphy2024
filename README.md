@@ -1,8 +1,23 @@
 # Mouse Hippocampal Sharp Wave Ripple Dataset Curated From Public Neuropixels Datasets
 
-## NOTE: Monday, Aug, 24th
+## NOTE: We have been made aware of two potential issues with the analysis code.
 
-After review by a commentor we have found the direction on the probe searching for a sharp-wave component channel was reversed, and was selecting channels dorsal to the ripple channel rather than ventral.  The bug has been corrected with this update and the data is being reprocessed for those lacking sufficient compute.  A correction will also be issued to the publicaiton.  The following fields have been affected:
+The first issue is a lack of a filter for channel quality in the IBL data, the other being a flipped sign on Sharp-Wave Channel (the putative stratum radiatum channel) selection.
+
+## NOTE 1: Faulty channels in the IBL data. Nov 19th 2026
+
+After correspondence with a user we were made aware that faulty
+channels with high noise can be selected as ripples in the IBL data, since channel selection is based on z-scoring. In this case ripple times are correct but
+the high-noise channel gets selected. Visual inspection has revealed that, though events were present in the recording and correctly identified, the channel itself may have been faulty.  We are currently testing a filtering step to remove
+bad channels.  We are piloting a solution requiring a putative ripple channel to have '>0.3' Pearson's correlation with neighbouring channels; a channel below this would be seen as a faulty channel, since we would expect redundancy with high-density neuropixels recording.
+
+The ABI LFP has been prefiltered by Allen Institute Staff and should be free of this issue.
+
+## NOTE 2: Monday, Aug 24th 2026
+
+After review by a commentator we have found the direction on the probe searching for a sharp-wave component channel was reversed, and was selecting channels dorsal to the ripple channel rather than ventral.  The bug has been corrected in the current version of
+the code with this update and the data is being reprocessed for those lacking sufficient compute.  A correction will also be issued to the publication once the data
+has been re-processed.  The following fields have been affected:
 
         out_df['sw_exceeds_threshold'] = exceeds
         out_df['sw_peak_power']        = peak_pwr
@@ -10,6 +25,21 @@ After review by a commentor we have found the direction on the probe searching f
         out_df['sw_ripple_plv']        = plv
         out_df['sw_ripple_mi']         = mi
         out_df['sw_ripple_clcorr']     = clcorr
+
+Two corrections were made to the `BaseLoader` class's `select_sharpwave_channel` method, in `SWR_Neuropixels_Detector/swr_neuropixels_collection_core.py`.
+
+- "Below" test:
+```
+channel_positions.loc[cid] < ref_depth
+```
+Previously was '>'.
+
+- Distance:
+```
+ref_depth - channel_positions.loc[cid]
+```
+Previously was the reverse.
+
 
 ![](RepoImages/figure_one_revised.png)
 *Overview figure showing the dataset structure and probe placements across the three datasets (ABI Visual Behavior, ABI Visual Coding, and IBL), with a pictoral explanation of the detector pipeline showing how the values in the Events CSV relates to source data of the anatomy and electrophysiology.*

@@ -153,7 +153,7 @@ class ibl_loader(BaseLoader):
         
         # Get non-hippocampal control channels for artifact detection
         print(f"Getting control channels for artifact detection probe {probe_id}...")
-        control_data, control_channels = self.get_non_hippocampal_channels(channels, destriped)
+        control_data, control_channels = self.get_non_hippocampal_channels(channels, destriped, probe_id=probe_id)
         
         return {
             'probe_id': probe_id,
@@ -215,7 +215,8 @@ class ibl_loader(BaseLoader):
             ca1_chan_ids=data['ca1_chans'],
             channel_positions=all_channel_positions, # Pass the extracted positions
             ripple_filter_func=filter_ripple_band_func,
-            config=self.config # Pass config from the loader
+            config=self.config, # Pass config from the loader
+            probe_id=data['probe_id']
         )
         
         # Create a channel ID string for naming files
@@ -231,7 +232,8 @@ class ibl_loader(BaseLoader):
             channel_positions=all_channel_positions,
             ripple_filtered=peakrippleband, # Pass ripple LFP from selected chan
             config=self.config, # Pass config from the loader
-            filter_path=getattr(self, 'sw_component_filter_path', None) # Use attribute if exists
+            filter_path=getattr(self, 'sw_component_filter_path', None), # Use attribute if exists
+            probe_id=data['probe_id']
         )
 
         # Extract sharpwave channel information - Remove None check
@@ -321,7 +323,7 @@ class ibl_loader(BaseLoader):
         
         return lfp_ca1, ca1_chans
     
-    def get_non_hippocampal_channels(self, channels, destriped):
+    def get_non_hippocampal_channels(self, channels, destriped, probe_id=None):
         """Gets two non-hippocampal channels for artifact detection."""
         # Find channels outside the hippocampal formation
         not_a_hp_chan = np.logical_not(
@@ -331,9 +333,9 @@ class ibl_loader(BaseLoader):
             )
         )
         
-        # Select two random non-hippocampal channels
-        control_channels = np.random.choice(
-            channels.rawInd[not_a_hp_chan], 2, replace=False
+        # Select two random non-hippocampal channels, or keep the previous version's pair
+        control_channels = self.choose_control_channels(
+            probe_id, channels.rawInd[not_a_hp_chan]
         )
         
         # Extract data for these channels

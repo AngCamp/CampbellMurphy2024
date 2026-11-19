@@ -1,5 +1,3 @@
-# Standard library imports
-# swr_neuropixels_collection_core
 import os
 import time
 import sys
@@ -10,69 +8,28 @@ import gzip
 import string
 import glob
 import re
-
-# Third-party data processing libraries
 import numpy as np
 import pandas as pd
 import yaml
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-
-# SciPy imports
 from scipy import io, signal, stats, interpolate
 from scipy.signal import lfilter, hilbert, fftconvolve
 import scipy.ndimage
 from scipy.ndimage import gaussian_filter, gaussian_filter1d
 from scipy.stats import pearsonr, skew
-
-
-# Multiprocessing
 from multiprocessing import Pool, Process, Queue, Manager, set_start_method
-
-# AWS
 import boto3
 from botocore.config import Config
-
-# Ripple detection
 import ripple_detection
 from ripple_detection import filter_ripple_band
 import ripple_detection.simulate as ripsim
 from ripple_detection.core import gaussian_smooth
-
-# Logging
 import logging
 import logging.handlers
-
-# United SWR detector
-import os
-import subprocess
-import numpy as np
-import pandas as pd
-from scipy import io, signal, stats
-from scipy.signal import lfilter
-import scipy.ndimage
-from scipy.ndimage import gaussian_filter
-from scipy.ndimage import gaussian_filter1d
-from scipy import interpolate
-import matplotlib.pyplot as plt
-import ripple_detection
-from ripple_detection import filter_ripple_band
-import ripple_detection.simulate as ripsim  # for making our time vectors
-from tqdm import tqdm
-import time
-import traceback
-import logging
-import logging.handlers
-import sys
-from multiprocessing import Pool, Process, Queue, Manager, set_start_method
-import yaml
-import json
-import gzip
-import string
-from botocore.config import Config
-import boto3
 import shutil
-
+import importlib
+from previous_version_channels import PreviousVersionChannels
 
 # ===================================
 # Helper functions
@@ -88,22 +45,263 @@ def get_filter(filter_path):
     filter_data = np.load(filter_path)
     return filter_data["arr_0"]
 
+
+def _trace_enabled():
+    """Enable verbose runtime prints by setting SWR_TRACE_PRINTS=1."""
+    return str(os.environ.get("SWR_TRACE_PRINTS", "0")).lower() in {"1", "true", "yes", "on"}
+
+
+def _shape_or_len(obj):
+    """Best-effort shape/length summary for debug tracing."""
+    if obj is None:
+        return "None"
+    if hasattr(obj, "shape"):
+        try:
+            return f"shape={tuple(obj.shape)}"
+        except Exception:
+            pass
+    if isinstance(obj, (list, tuple, set, dict)):
+        try:
+            return f"len={len(obj)}"
+        except Exception:
+            pass
+    return type(obj).__name__
+
+
+def _trace(stage, session_id=None, probe_id=None, **objects):
+    """Print compact trace lines for notebook/server debugging."""
+    if not _trace_enabled():
+        return
+    prefix = f"[TRACE] stage={stage}"
+    if session_id is not None:
+        prefix += f" session={session_id}"
+    if probe_id is not None:
+        prefix += f" probe={probe_id}"
+    print(prefix, flush=True)
+    if objects:
+        obj_parts = [f"{key}:{_shape_or_len(value)}" for key, value in objects.items()]
+        print(f"[TRACE]   objects -> {' | '.join(obj_parts)}", flush=True)
+
+# ===================================
+# PROGRESS TRACKER
+# ===================================
+
+class ProgressTracker:
+    """
+    Records which sessions and probes have been run in a JSON file at the top of
+    the SWR output folder, so an interrupted pipeline can pick up where it left off.
+
+    Worker processes do not share memory, so the JSON file on disk is the single
+    shared record. Every update takes the lock, re-reads the file, changes only
+    this session's entry, writes it back and releases the lock. self.state is
+    only this process's latest snapshot of the file.
+
+    Session statuses: pending, running, done, partial (only a requested subset of
+    probes was run), failed, no_ca1. Probe statuses: pending, running, done, failed.
+
+    Known failure modes and how they are handled:
+    - Kill while holding the lock: the lock file is left behind and every worker
+      would wait forever. A lock older than STALE_LOCK_SECONDS is treated as stale
+      and removed.
+    - Hard kill mid-session: the status stays running. On restart, running is
+      treated as not done and is rerun, which is safe because no workers survive
+      a restart.
+    - Two pipeline runs on the same output folder at once: both would process the
+      same running session. The tracker records progress; it does not claim work.
+    - JSON says done but the files were deleted: covered by checking the events
+      file exists before skipping a probe.
+    - Half-written files from a probe that never finished: removed by
+      clear_incomplete_outputs before the session is resumed and after an error.
+      If no probe is done the whole session is cleared.
+    - Changed thresholds between runs: old results would be skipped as done. Use
+      -o to force a rerun; run_name is stored per session so a mismatch can be
+      warned about.
+    - ID types: JSON keys are strings, so all session and probe IDs are cast
+      with str().
+    - find_global mode: the session-level skip is disabled there, since that mode
+      exists to rerun the global step on finished sessions. The tracker is
+      read_only in that mode so the probe-stage record is left untouched.
+    - Network drives: the lock-file approach works on NFS, which is why it is
+      used over fcntl locks.
+    """
+    FILENAME = "pipeline_progress.json"
+    LOCK_WAIT_SECONDS = 3
+    STALE_LOCK_SECONDS = 60
+
+    def __init__(self, output_dir, dataset, run_name, session_id, read_only=False):
+        self.path = os.path.join(output_dir, self.FILENAME)
+        self.lock_path = self.path + ".lock"
+        self.dataset = dataset
+        self.run_name = run_name
+        self.session_id = str(session_id)
+        self.read_only = read_only
+        # Written into the lock file so this process can tell the lock is still its own
+        self._lock_token = f"{os.getpid()}_{time.time()}"
+        os.makedirs(output_dir, exist_ok=True)
+        self.state = self._read()
+
+    # ---------- file and lock handling ----------
+    def _read(self):
+        """Read the progress file. Safe without the lock because writes are atomic renames."""
+        if not os.path.exists(self.path):
+            return {"dataset": self.dataset, "sessions": {}}
+        with open(self.path, 'r') as f:
+            return json.load(f)
+
+    def _acquire_lock(self):
+        """Create the lock file, waiting LOCK_WAIT_SECONDS between attempts if another worker holds it."""
+        while True:
+            try:
+                # O_CREAT | O_EXCL is atomic: exactly one process can create the file
+                fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                with os.fdopen(fd, 'w') as f:
+                    f.write(self._lock_token)
+                return
+            except FileExistsError:
+                try:
+                    lock_age = time.time() - os.path.getmtime(self.lock_path)
+                except OSError:
+                    continue  # lock was released between the two calls, retry now
+                if lock_age > self.STALE_LOCK_SECONDS:
+                    try:
+                        os.remove(self.lock_path)
+                    except OSError:
+                        pass
+                    continue
+                time.sleep(self.LOCK_WAIT_SECONDS)
+
+    def _holds_lock(self):
+        """True if the lock file on disk is still the one this process created."""
+        try:
+            with open(self.lock_path, 'r') as f:
+                return f.read() == self._lock_token
+        except OSError:
+            return False
+
+    def _update(self, change):
+        """Apply change(entry) to this session's entry in the shared file, under the lock."""
+        if self.read_only:
+            return
+        while True:
+            self._acquire_lock()
+            try:
+                state = self._read()
+                state["dataset"] = self.dataset
+                entry = state.setdefault("sessions", {}).setdefault(
+                    self.session_id, {"status": "pending", "probes": {}}
+                )
+                change(entry)
+                entry["updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                if not self._holds_lock():
+                    continue  # our lock was removed as stale by another worker, redo the update
+                # Write to a temp file then rename, so a kill mid-write cannot corrupt the JSON
+                tmp_path = f"{self.path}.{os.getpid()}.tmp"
+                with open(tmp_path, 'w') as f:
+                    json.dump(state, f, indent=2)
+                os.replace(tmp_path, self.path)
+                self.state = state
+                return
+            finally:
+                if self._holds_lock():
+                    os.remove(self.lock_path)
+
+    # ---------- reading progress ----------
+    def session_entry(self):
+        """Re-read the file and return this session's entry (empty dict if never run)."""
+        self.state = self._read()
+        return self.state.get("sessions", {}).get(self.session_id, {})
+
+    def probe_done(self, probe_id):
+        return self.session_entry().get("probes", {}).get(str(probe_id)) == "done"
+
+    # ---------- clearing unfinished work ----------
+    def clear_incomplete_outputs(self, session_folders):
+        """
+        Delete output files left behind by work that never finished, so a
+        half-written file cannot interrupt a resumed run. Returns the paths removed.
+
+        - Session never recorded by the tracker: nothing is touched.
+        - No probe is done: the session is cleared (every file in session_folders).
+        - Otherwise: the files of each probe not marked done are removed, plus the
+          session-level files (rewritten at the end of every session) unless the
+          session itself is done.
+        """
+        if self.read_only:
+            return []
+        entry = self.session_entry()
+        if not entry:
+            return []
+        probes = entry.get("probes", {})
+        done_probes = [probe_id for probe_id, status in probes.items() if status == "done"]
+        unfinished_prefixes = tuple(f"probe_{probe_id}_" for probe_id, status in probes.items() if status != "done")
+        session_prefix = f"session_{self.session_id}_"
+
+        removed = []
+        for folder in session_folders:
+            if not os.path.isdir(folder):
+                continue
+            for name in os.listdir(folder):
+                path = os.path.join(folder, name)
+                if not os.path.isfile(path):
+                    continue
+                if not done_probes:
+                    unfinished = True
+                elif name.startswith(session_prefix):
+                    unfinished = entry.get("status") != "done"
+                else:
+                    unfinished = name.startswith(unfinished_prefixes)
+                if unfinished:
+                    os.remove(path)
+                    removed.append(path)
+        return removed
+
+    # ---------- recording progress ----------
+    def start_session(self, reset=False):
+        """Mark the session running. reset=True forgets earlier probe results (overwrite runs)."""
+        def change(entry):
+            if reset:
+                entry["probes"] = {}
+            entry["status"] = "running"
+            entry["run_name"] = self.run_name
+            entry.pop("failed_stage", None)
+            entry.pop("error", None)
+        self._update(change)
+
+    def register_probes(self, probe_ids):
+        """Add probes as pending, leaving the status of any already recorded untouched."""
+        def change(entry):
+            for probe_id in probe_ids:
+                entry.setdefault("probes", {}).setdefault(str(probe_id), "pending")
+        self._update(change)
+
+    def set_probe(self, probe_id, status):
+        def change(entry):
+            entry.setdefault("probes", {})[str(probe_id)] = status
+        self._update(change)
+
+    def set_session(self, status):
+        def change(entry):
+            entry["status"] = status
+        self._update(change)
+
+    def fail_session(self, stage, error):
+        """Mark the session failed, along with whichever probe was mid-processing."""
+        def change(entry):
+            entry["status"] = "failed"
+            entry["failed_stage"] = str(stage)
+            entry["error"] = str(error)
+            for probe_id, status in entry.get("probes", {}).items():
+                if status == "running":
+                    entry["probes"][probe_id] = "failed"
+        self._update(change)
+
+
 # ===================================
 # BASE LOADER CLASS
 # ===================================
 # swr_neuropixels_collection_core.py
 
 # Standard library imports
-import os
-import time
-import sys
-import importlib
-
-# Common numerical/scientific imports
-import numpy as np
-from scipy import signal, interpolate, stats
-from scipy.signal import hilbert, fftconvolve
-
 class BaseLoader:
     """
     Base class for all dataset loaders with common functionality.
@@ -111,7 +309,9 @@ class BaseLoader:
     def __init__(self, session_id):
         self.session_id = session_id
         self.config = None  # Will be set later
-        
+        self.progress = None  # ProgressTracker, attached in process_session
+        self.previous_channels = None  # PreviousVersionChannels, attached in process_session
+
         # Initialize dictionary to store channel selection metadata
         self.channel_selection_metadata_dict = {
             'probe_id': str(session_id), # Store probe ID here during setup/processing
@@ -130,6 +330,10 @@ class BaseLoader:
                 'modulation_index': [],
                 'circular_linear_corrs': [],
                 'selected_channel_id': None,
+                'selection_method': None
+            },
+            'control_channels': { # Channels outside hippocampus used for movement artifacts
+                'selected_channel_ids': [],
                 'selection_method': None
             }
             # Note: We might rename 'channel idx' and 'depths' from instructions
@@ -193,6 +397,71 @@ class BaseLoader:
             Configuration dictionary containing all processing settings
         """
         self.config = config
+
+    # ---------- reuse of channel choices from a previous version ----------
+    def kept_channel(self, probe_id, kind, valid_ids):
+        """
+        Channel choice to reuse from the previous version, or None if this kind of
+        channel should be chosen fresh in this run.
+
+        Returns None when no previous version is in use, when `kind` is not in the
+        keep list, or when the previous choice cannot be reused (not recorded, or
+        not among this run's candidate channels). In that last case a warning is
+        logged and the channel is chosen fresh, unless strict mode is on, in which
+        case an error is raised so the probe fails visibly.
+
+        Parameters
+        ----------
+        probe_id : str or int
+        kind : {'control', 'ripple', 'sw'}
+        valid_ids : iterable of int
+            Channels this run could legitimately pick from for this kind.
+
+        Returns
+        -------
+        int, list of int, or None
+            int for 'ripple' and 'sw', list of two ints for 'control'.
+        """
+        previous = self.previous_channels
+        if previous is None or probe_id is None or kind not in previous.keep:
+            return None
+
+        kept = previous.get(probe_id, kind)
+        problem = None
+        if kept is None:
+            problem = f"no {kind} channel recorded in {previous.session_folder}"
+        else:
+            valid = {int(chan) for chan in valid_ids}
+            invalid = [chan for chan in (kept if isinstance(kept, list) else [kept]) if chan not in valid]
+            if invalid:
+                problem = f"previous {kind} channel(s) {invalid} are not among this run's candidate channels"
+        if problem is None:
+            return kept
+
+        message = f"Session {self.session_id} Probe {probe_id}: cannot keep {kind} channel from previous version, {problem}."
+        if previous.strict:
+            raise ValueError(message)
+        logging.warning(message + " Choosing it fresh.")
+        return None
+
+    def choose_control_channels(self, probe_id, candidate_ids):
+        """
+        Pick the two control channels outside hippocampus used for movement artifact
+        detection: the previous version's pair if they are being kept, otherwise two
+        at random from candidate_ids. The choice is recorded in the channel selection
+        metadata so later versions can read it back.
+        """
+        kept = self.kept_channel(probe_id, 'control', candidate_ids)
+        if kept is not None:
+            control_channels = np.array(kept)
+            selection_method = 'previous_version'
+        else:
+            control_channels = np.random.choice(candidate_ids, 2, replace=False)
+            selection_method = 'random'
+
+        self.channel_selection_metadata_dict['control_channels']['selected_channel_ids'] = [int(chan) for chan in control_channels]
+        self.channel_selection_metadata_dict['control_channels']['selection_method'] = selection_method
+        return control_channels
 
     def resample_signal(self, signal_data, time_values, target_fs=1500.0):
         """
@@ -328,7 +597,7 @@ class BaseLoader:
 
         return np.sqrt(r_cl)
 
-    def select_ripple_channel(self, ca1_lfp, ca1_chan_ids, channel_positions, ripple_filter_func, config=None):
+    def select_ripple_channel(self, ca1_lfp, ca1_chan_ids, channel_positions, ripple_filter_func, config=None, probe_id=None):
         """Select the putative pyramidal layer (ripple band) channel for a given probe.
         
         Parameters
@@ -346,7 +615,11 @@ class BaseLoader:
             Function to filter the LFP data into the ripple band.
         config : dict, optional
             Configuration dictionary containing channel selection settings.
-        
+        probe_id : str or int, optional
+            Probe being processed. Needed to keep the ripple channel chosen by a
+            previous version; the metrics for every CA1 channel are still computed
+            and recorded either way.
+
         Returns
         -------
         tuple
@@ -361,7 +634,14 @@ class BaseLoader:
         
         # Initialize lists to store metrics for each channel
         channel_metrics = []
-        
+
+        # Reset the metadata lists so they hold this probe's channels only
+        # (the loader, and so this dict, is shared by every probe in the session)
+        if probe_id is not None:
+            self.channel_selection_metadata_dict['probe_id'] = str(probe_id)
+        for metric_name in ('channel_ids', 'depths', 'skewness', 'net_power'):
+            self.channel_selection_metadata_dict['ripple_band'][metric_name] = []
+
         # Process each CA1 channel
         for chan_idx, chan_id in enumerate(ca1_chan_ids):
             # Get raw LFP for this channel
@@ -395,8 +675,13 @@ class BaseLoader:
         # Convert to DataFrame for easier selection
         metrics_df = pd.DataFrame(channel_metrics)
         
-        # Select channel based on configured metric
-        if selection_metric == 'skewness':
+        # Select channel: the previous version's choice if it is being kept,
+        # otherwise based on configured metric
+        kept_chan_id = self.kept_channel(probe_id, 'ripple', ca1_chan_ids)
+        if kept_chan_id is not None:
+            best_channel = metrics_df[metrics_df['channel_id'] == kept_chan_id].iloc[0]
+            selection_metric = 'previous_version'
+        elif selection_metric == 'skewness':
             best_channel = metrics_df.loc[metrics_df['skewness'].idxmax()]
         else:  # default to 'net_power'
             best_channel = metrics_df.loc[metrics_df['net_power'].idxmax()]
@@ -422,7 +707,8 @@ class BaseLoader:
             config=None,
             filter_path=None,
             running_exclusion_periods=None,
-            selection_metric='modulation_index'):
+            selection_metric='modulation_index',
+            probe_id=None):
         """
         Selects the optimal sharp wave channel below the ripple channel based on 
         phase-amplitude coupling and return metadata for all evaluated channels.
@@ -517,10 +803,12 @@ class BaseLoader:
         ref_depth = channel_positions.loc[peak_ripple_chan_id]
         print(f"Reference channel {peak_ripple_chan_id} depth: {ref_depth}")
         
-        # Get CA1 channels that are below the reference
+        # Get CA1 channels that are below the reference in the actual probe depth axis.
+        # In this dataset, smaller probe_vertical_position values are deeper toward CA1/DG,
+        # while larger values are more superficial / toward visual cortex.
         below_ids = []
         for cid in ca1_chan_ids:  # Only consider CA1 channels
-            if channel_positions.loc[cid] > ref_depth:  # Check if below reference
+            if channel_positions.loc[cid] < ref_depth:
                 below_ids.append(cid)
         
         print(f"Found {len(below_ids)} CA1 channels below reference channel")
@@ -571,10 +859,20 @@ class BaseLoader:
             self.channel_selection_metadata_dict['sharp_wave_band']['modulation_index'].append(float(modulation_index) if not np.isnan(modulation_index) else None)
             self.channel_selection_metadata_dict['sharp_wave_band']['circular_linear_corrs'].append(float(circular_linear_corr) if not np.isnan(circular_linear_corr) else None)
 
-        # Now apply distance constraint for channel selection (but keep all metadata)
+        # Keep the previous version's sharp wave channel if asked to. The metrics above
+        # are still recorded for every channel below the ripple channel.
+        kept_chan_id = self.kept_channel(probe_id, 'sw', ca1_chan_ids)
+        if kept_chan_id is not None:
+            best_lfp = ca1_lfp[:, id_to_idx[kept_chan_id]]
+            self.channel_selection_metadata_dict['sharp_wave_band']['selected_channel_id'] = int(kept_chan_id)
+            self.channel_selection_metadata_dict['sharp_wave_band']['selection_method'] = 'previous_version'
+            return kept_chan_id, best_lfp
+
+        # Now apply distance constraint for channel selection (but keep all metadata).
+        # Use the signed distance in the actual depth direction: lower depth = further below.
         distance_filtered_candidates = []
         for cid in below_ids:  # Use the original list of channels below reference
-            distance_from_ref = channel_positions.loc[cid] - ref_depth
+            distance_from_ref = ref_depth - channel_positions.loc[cid]
             if 0 < distance_from_ref <= max_distance_microns:
                 distance_filtered_candidates.append(cid)
 
@@ -930,7 +1228,9 @@ class BaseLoader:
                 "channel_selection": config["channel_selection"],
                 "global_swr_detection": config["global_swr"],
                 "dataset": config["run_details"]["dataset_to_process"],
-                "sampling_rates": config["sampling_rates"]
+                "sampling_rates": config["sampling_rates"],
+                # Which previous version (if any) channel choices were kept from
+                "previous_version": config.get("previous_version")
             }
             
             # Ensure directory exists
@@ -953,6 +1253,41 @@ class BaseLoader:
     def cleanup(self):
         """Clean up resources."""
         raise NotImplementedError("Subclasses must implement cleanup method")
+
+    def cleanup_cache(self, config=None):
+        """Delete this session's downloaded raw data from the dataset cache. Returns the folders removed."""
+        raise NotImplementedError("Cache cleanup is not implemented for this dataset")
+
+    def remove_session_cache_folders(self, cache_dir, folder_names, config=None, max_depth=4):
+        """
+        Delete the folders holding this session's raw data from a dataset cache.
+
+        Searches cache_dir, up to max_depth levels down, for folders whose name is
+        exactly one of folder_names and removes them. Sessions listed in
+        run_details.dont_wipe_these_sessions are left alone.
+
+        Returns
+        -------
+        list of str
+            Paths of the folders removed.
+        """
+        keep_sessions = ((config or {}).get('run_details') or {}).get('dont_wipe_these_sessions') or []
+        if str(self.session_id) in {str(session) for session in keep_sessions}:
+            return []
+        if not cache_dir or not os.path.isdir(cache_dir):
+            raise FileNotFoundError(f"Cache directory does not exist: {cache_dir}")
+
+        cache_dir = os.path.abspath(cache_dir)
+        removed = []
+        for root, dirs, _ in os.walk(cache_dir):
+            for name in [name for name in dirs if name in folder_names]:
+                path = os.path.join(root, name)
+                shutil.rmtree(path)
+                removed.append(path)
+                dirs.remove(name)
+            if root[len(cache_dir):].count(os.sep) >= max_depth - 1:
+                dirs[:] = []
+        return removed
     
     def set_up(self):
         """Setup the loader and initialize connections."""
@@ -1640,12 +1975,19 @@ def process_session(session_id, config):
     
     # Log the session ID and dataset being processed
     logger.info(f"Processing session {session_id} for dataset {config['run_details']['dataset_to_process']}")
+    _trace(
+        "process_session.start",
+        session_id=session_id,
+        dataset=config['run_details'].get('dataset_to_process'),
+        requested_probe_ids=config['run_details'].get('probe_ids')
+    )
     
     # Extract necessary paths and settings from config
     swr_output_dir_path = config['paths']['swr_output_dir']
     lfp_output_dir_path = config['paths']['lfp_output_dir']
     dataset_to_process = config['run_details']['dataset_to_process']
     run_name = config['run_details']['run_name']
+    requested_probe_ids = config['run_details'].get('probe_ids')
     
     # Extract processing flags
     save_lfp = config['flags']['save_lfp']
@@ -1681,7 +2023,8 @@ def process_session(session_id, config):
     probe_events_dict = {}  # Initialize dictionary to store probe events
     all_probe_metadata = [] # Initialize list to store metadata from each processed probe
     loader = None  # Initialize loader to None
-    
+    tracker = None  # Initialize progress tracker to None
+
     try:
         # Check if we're in find_global mode and the session folder doesn't exist
         if config['flags'].get('find_global', False):
@@ -1692,11 +2035,33 @@ def process_session(session_id, config):
 
         # Create session subfolder paths
         session_subfolder = os.path.join(swr_output_dir_path, f"swrs_session_{str(session_id)}")
-        
+
+        # Progress tracking: skip sessions already completed in an earlier (interrupted) run.
+        # Done before the loader is set up, since that is the slow step.
+        tracker = ProgressTracker(
+            swr_output_dir_path, dataset_to_process, run_name, session_id,
+            read_only=config['flags'].get('find_global', False)
+        )
+        if not tracker.read_only and not overwrite_existing and requested_probe_ids is None:
+            previous_run = tracker.session_entry()
+            previous_status = previous_run.get("status")
+            if previous_status == "no_ca1" or (previous_status == "done" and os.path.isdir(session_subfolder)):
+                if previous_run.get("run_name") != run_name:
+                    logger.warning(f"Session {session_id}: Completed under run_name '{previous_run.get('run_name')}', current run_name is '{run_name}'. Use -o to rerun with current settings.")
+                logger.info(f"Session {session_id}: Marked '{previous_status}' in {tracker.path}, skipping.")
+                return
+
         # Create LFP subfolder path
         if save_lfp:
             session_lfp_subfolder = os.path.join(lfp_output_dir_path, f"lfp_session_{str(session_id)}")
-        
+
+        # Clear files left by probes that never finished in an earlier run, before resuming
+        session_folders = [session_subfolder] + ([session_lfp_subfolder] if save_lfp else [])
+        cleared_files = tracker.clear_incomplete_outputs(session_folders)
+        if cleared_files:
+            logger.warning(f"Session {session_id}: Removed {len(cleared_files)} file(s) from unfinished work in an earlier run.")
+        tracker.start_session(reset=overwrite_existing)
+
         # Create directories
         os.makedirs(session_subfolder, exist_ok=True)
         if save_lfp:
@@ -1705,27 +2070,54 @@ def process_session(session_id, config):
         # Set up logging
         process_stage = "Setting up"
         logger.info(f"Session {session_id}: Beginning processing, dataset {dataset_to_process}")
+        _trace("setup.paths", session_id=session_id, session_subfolder=session_subfolder, lfp_output_dir_path=lfp_output_dir_path)
         
         # Initialize and set up the loader using the BaseLoader factory
         process_stage = "Setting up loader"
+        _trace("loader.create.start", session_id=session_id, dataset=dataset_to_process)
         loader = BaseLoader.create(dataset_to_process, session_id)
+        loader.progress = tracker
+        _trace("loader.create.done", session_id=session_id, loader=loader)
+        _trace("loader.set_config.start", session_id=session_id, config=config)
         loader.set_config(config)  # Pass the config to the loader
+        # Channel choices to keep from a previous version (None if not in use)
+        loader.previous_channels = PreviousVersionChannels.from_config(config, session_id)
+        _trace("loader.set_up.start", session_id=session_id)
         loader.set_up()
+        _trace("loader.set_up.done", session_id=session_id)
         
         # Get probe IDs and names
         process_stage = "Getting probe IDs and names"
         if dataset_to_process == 'abi_visual_coding' or dataset_to_process == 'abi_visual_behaviour':
             probenames = None
+            _trace("loader.get_probes_with_ca1.start", session_id=session_id)
             probelist = loader.get_probes_with_ca1()
+            _trace("loader.get_probes_with_ca1.done", session_id=session_id, probelist=probelist)
         elif dataset_to_process == 'ibl':
             # Get probes with CA1 directly - this will handle both getting all probes and filtering
+            _trace("loader.get_probes_with_ca1.start", session_id=session_id)
             probelist, probenames = loader.get_probes_with_ca1()
+            _trace("loader.get_probes_with_ca1.done", session_id=session_id, probelist=probelist, probenames=probenames)
+
+        if requested_probe_ids is not None:
+            requested_probe_id_set = {str(pid) for pid in requested_probe_ids}
+            if dataset_to_process == 'ibl':
+                filtered_probe_pairs = [(pid, name) for pid, name in zip(probelist, probenames) if str(pid) in requested_probe_id_set]
+                probelist = [pid for pid, _ in filtered_probe_pairs]
+                probenames = [name for _, name in filtered_probe_pairs]
+            else:
+                probelist = [pid for pid in probelist if str(pid) in requested_probe_id_set]
+            logger.info(f"Session {session_id}: Filtered probes to {len(probelist)} selected IDs: {requested_probe_ids}")
+            _trace("probes.filtered", session_id=session_id, requested_probe_ids=requested_probe_ids, probelist=probelist)
         
         # If no probes with CA1, log and return
         if not probelist:
-            logger.warning(f"Session {session_id}: No probes with CA1 found, skipping.")
+            logger.warning(f"Session {session_id}: No probes with CA1 found or no requested probes matched, skipping.")
+            if requested_probe_ids is None:
+                tracker.set_session("no_ca1")
             return
-            
+        tracker.register_probes(probelist)
+
         # Process probes
         process_stage = "Running through the probes in the session"
         
@@ -1738,13 +2130,25 @@ def process_session(session_id, config):
                 probe_id = probelist[this_probe]
                 probe_id_log = str(probe_id)
                 logger.info(f"Session {session_id}: Processing probe {probe_id_log}")
-                
+                _trace("probe.start", session_id=session_id, probe_id=probe_id_log)
+
+                # Resume: skip probes finished in an earlier run, reloading their saved events
+                if not overwrite_existing and tracker.probe_done(probe_id_log):
+                    saved_events = glob.glob(os.path.join(session_subfolder, f"probe_{probe_id_log}_channel_*_putative_swr_events.csv.gz"))
+                    if saved_events:
+                        probe_events_dict[probe_id_log] = pd.read_csv(saved_events[0], compression='gzip', index_col=0)
+                        logger.info(f"Session {session_id}: Probe {probe_id_log} already done, loaded saved events and skipping.")
+                        continue
+                tracker.set_probe(probe_id_log, "running")
+
                 # Process the probe and get results
                 process_stage = f"Processing probe with id {probe_id_log}"
+                _trace("loader.process_probe.start", session_id=session_id, probe_id=probe_id_log)
                 if dataset_to_process == 'abi_visual_coding' or dataset_to_process == 'abi_visual_behaviour':
                     results = loader.process_probe(probe_id, filter_ripple_band)
                 elif dataset_to_process == 'ibl':
                     results = loader.process_probe(this_probe, filter_ripple_band)
+                _trace("loader.process_probe.done", session_id=session_id, probe_id=probe_id_log, results=results)
                
                 # Extract results using the standardized key names
                 peakripple_chan_raw_lfp = results['peak_ripple_raw_lfp']
@@ -1754,6 +2158,18 @@ def process_session(session_id, config):
                 take_two = results['control_channel_ids'] # Use standardized key
                 peakrippleband = results['ripple_band_filtered'] # Use standardized key
                 peak_ripple_chan_id = results['peak_ripple_chan_id']
+                _trace(
+                    "probe.results.extracted",
+                    session_id=session_id,
+                    probe_id=probe_id_log,
+                    peakripple_chan_raw_lfp=peakripple_chan_raw_lfp,
+                    lfp_time_index=lfp_time_index,
+                    ca1_chans=ca1_chans,
+                    outof_hp_chans_lfp=outof_hp_chans_lfp,
+                    take_two=take_two,
+                    peakrippleband=peakrippleband,
+                    peak_ripple_chan_id=peak_ripple_chan_id
+                )
                 
                 # Save channel selection metadata only if the flag is enabled
                 if save_channel_metadata:
@@ -1807,11 +2223,13 @@ def process_session(session_id, config):
                     speed=dummy_speed,
                     sampling_frequency=1500.0,
                 )
+                _trace("events.karlsson_raw", session_id=session_id, probe_id=probe_id_log, Karlsson_ripple_times=Karlsson_ripple_times)
                 
                 # Filter by duration
                 Karlsson_ripple_times = Karlsson_ripple_times[
                     Karlsson_ripple_times.duration < 0.25
                 ]
+                _trace("events.karlsson_duration_filtered", session_id=session_id, probe_id=probe_id_log, Karlsson_ripple_times=Karlsson_ripple_times)
                 
                 # Remove speed columns
                 speed_cols = [
@@ -1872,6 +2290,7 @@ def process_session(session_id, config):
                     maximum_duration=float("inf"),
                     five_to_fourty_band_power_df=gamma_power,
                 )
+                _trace("events.gamma", session_id=session_id, probe_id=probe_id_log, gamma_times=gamma_times, gamma_power=gamma_power)
                 
                 # Save gamma events
                 csv_filename = f"probe_{probe_id_log}_channel_{peak_ripple_chan_id}_gamma_band_events.csv.gz"
@@ -1909,6 +2328,14 @@ def process_session(session_id, config):
                         zscore_threshold=movement_artifact_ripple_band_threshold,
                         sampling_frequency=1500.0,
                     )
+                    _trace(
+                        "events.movement_control",
+                        session_id=session_id,
+                        probe_id=probe_id_log,
+                        control_channel=channel_outside_hp,
+                        movement_controls=movement_controls,
+                        rip_power_controlchan=rip_power_controlchan
+                    )
                     
                     # Remove speed columns
                     speed_cols = [
@@ -1927,6 +2354,7 @@ def process_session(session_id, config):
                 logger.info(f"Session {session_id}: Filtering events for probe {probe_id_log}")
                 Karlsson_ripple_times = check_gamma_overlap(Karlsson_ripple_times, gamma_times)
                 Karlsson_ripple_times = check_movement_overlap(Karlsson_ripple_times, movement_control_list[0], movement_control_list[1])
+                _trace("events.filtered_overlap", session_id=session_id, probe_id=probe_id_log, Karlsson_ripple_times=Karlsson_ripple_times)
                 
                 # Define the desired column order
                 column_order = [
@@ -1951,7 +2379,9 @@ def process_session(session_id, config):
                 Karlsson_ripple_times.to_csv(csv_path, index=True, compression="gzip")
                 probe_events_dict[probe_id_log] = Karlsson_ripple_times
                 logger.info(f"Session {session_id}: Saved {len(Karlsson_ripple_times)} filtered events for probe {probe_id_log}")
-                
+                _trace("probe.done", session_id=session_id, probe_id=probe_id_log, n_events=len(Karlsson_ripple_times))
+                tracker.set_probe(probe_id_log, "done")
+
         else:
             logger.info(f"\n{'='*80}\nSkipping probe processing (find_global=True)\n{'='*80}")
 
@@ -1966,11 +2396,14 @@ def process_session(session_id, config):
         logger.info(f"Session {session_id}: Generating metadata for all probes")
         all_probe_metadata = []
         for probe_id in probelist:
+            _trace("metadata.get_probe.start", session_id=session_id, probe_id=probe_id)
             probe_metadata = loader.get_metadata_for_probe(probe_id, config=config)
             all_probe_metadata.append(probe_metadata)
+            _trace("metadata.get_probe.done", session_id=session_id, probe_id=probe_id, probe_metadata=probe_metadata)
         
         # Create metadata DataFrame
         probe_metadata_df = pd.DataFrame(all_probe_metadata)
+        _trace("metadata.dataframe", session_id=session_id, probe_metadata_df=probe_metadata_df)
         if probe_metadata_df.empty:
             logger.error(f"Session {session_id}: No valid probe metadata generated")
             return
@@ -2006,6 +2439,7 @@ def process_session(session_id, config):
                 session_id,
                 logger
             )
+            _trace("global_events.created", session_id=session_id, global_events=global_events)
             
             # Save global events if created successfully
             if global_events is not None and not global_events.empty:
@@ -2035,25 +2469,45 @@ def process_session(session_id, config):
         
         # Cleanup resources
         if loader is not None:
+            _trace("loader.cleanup.start", session_id=session_id)
             loader.cleanup()
             logger.info(f"Session {session_id}: Loader cleanup finished")
+            _trace("loader.cleanup.done", session_id=session_id)
             
             # Optional cache cleanup based on flag
             if cleanup_after:
                 logger.info(f"Session {session_id}: Running cache cleanup")
                 try:
-                    loader.cleanup_cache(config=config)
+                    removed_cache = loader.cleanup_cache(config=config)
+                    if removed_cache:
+                        logger.info(f"Session {session_id}: Removed cached raw data: {removed_cache}")
+                    else:
+                        logger.warning(f"Session {session_id}: No cached raw data was removed (not found, or session is in dont_wipe_these_sessions)")
                 except Exception as e_cache:
                     logger.error(f"Session {session_id}: Error during cache cleanup - {e_cache}")
         
+        # A run restricted to selected probes is not a complete session, so it is not skipped later
+        tracker.set_session("done" if requested_probe_ids is None else "partial")
         logger.info(f"Session {session_id}: Processing completed successfully")
-        
+
     except Exception as e_main:
         # Log the error
         tb_str = traceback.format_exc()
         logger.error(f"Session {session_id}: Error during processing at stage '{process_stage}' for probe '{probe_id_log}': {e_main}")
         logger.error(f"Traceback:\n{tb_str}")
-        
+        _trace("process_session.exception", session_id=session_id, probe_id=probe_id_log, error=str(e_main), process_stage=process_stage)
+
+        # Record the failure so the session is retried on the next run
+        if tracker is not None:
+            try:
+                tracker.fail_session(process_stage, e_main)
+                # Remove the failed probe's files now, so nothing half-written is left on disk
+                if 'session_folders' in locals():
+                    cleared_files = tracker.clear_incomplete_outputs(session_folders)
+                    logger.warning(f"Session {session_id}: Removed {len(cleared_files)} file(s) from unfinished work after error.")
+            except Exception as e_tracker:
+                logger.error(f"Session {session_id}: Could not record failure or clear unfinished files: {e_tracker}")
+
         # Attempt loader cleanup if it exists
         if loader is not None:
             try:
